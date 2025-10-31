@@ -4,6 +4,14 @@
 
 The Pattern Learning System is the intelligence core of Coinswarm. It observes all trades, market conditions, and outcomes to build a library of successful trading patterns. Over time, the system identifies what works, what doesn't, and continuously optimizes strategies through combination, augmentation, and evolutionary algorithms.
 
+**Integration with Memory System**: All patterns are stored as semantic memories in Redis vector database, enabling ultra-fast pattern matching during live trading. Agents use memory retrieval to find similar past situations and apply learned patterns.
+
+**Integration with MARL**: Pattern learning works alongside reinforcement learning - patterns represent explicit knowledge while RL policies capture implicit decision-making. Both are enhanced by the agent memory system.
+
+**See Also**:
+- **[Agent Memory System](../architecture/agent-memory-system.md)** - How patterns are stored and retrieved
+- **[Multi-Agent Architecture](../agents/multi-agent-architecture.md)** - How agents use patterns
+
 ---
 
 ## System Architecture

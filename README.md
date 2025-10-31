@@ -11,20 +11,28 @@ Coinswarm is an AI-powered trading system that uses specialized agents to gather
 ## Quick Links
 
 - **[Complete Documentation](docs/README.md)** - Architecture overview and system design
-- **[Broker Selection](docs/architecture/broker-exchange-selection.md)** - Why Alpaca + Coinbase for Phase 0
+
+**Core Systems**:
+- **[Agent Memory System](docs/architecture/agent-memory-system.md)** - ⭐ Memory-Augmented MARL framework
+- **[Redis Infrastructure](docs/architecture/redis-infrastructure.md)** - ⭐ Vector DB deployment & benchmarking
 - **[Multi-Agent Architecture](docs/agents/multi-agent-architecture.md)** - Agent roles and responsibilities
 - **[Pattern Learning System](docs/patterns/pattern-learning-system.md)** - How the system learns and evolves
+
+**Infrastructure**:
+- **[Broker Selection](docs/architecture/broker-exchange-selection.md)** - Why Alpaca + Coinbase for Phase 0
 - **[Coinbase API Integration](docs/api/coinbase-api-integration.md)** - Complete API documentation
 - **[MCP Server Design](docs/architecture/mcp-server-design.md)** - Claude agent integration
 - **[Information Sources](docs/architecture/information-sources.md)** - Data pipeline strategy
 
 ## Core Features
 
-- 🤖 **Multi-Agent System**: Specialized agents for gathering, analysis, learning, and execution
+- 🤖 **Memory-Augmented MARL**: Multi-agent reinforcement learning with explicit episodic/semantic memory
+- ⚡ **Ultra-Low Latency**: Redis vector DB for sub-millisecond memory retrieval (3.4× faster than alternatives)
 - 🧠 **Pattern Learning**: Automatically discovers and optimizes profitable trading patterns
+- 🎯 **Regime Adaptation**: Detects market regime changes and adapts strategies accordingly
 - 🛡️ **Risk Management**: Multiple layers of safety controls and circuit breakers
 - 📊 **Comprehensive Data**: Market data, sentiment, on-chain metrics, and fundamentals
-- 🔄 **Adaptive**: Continuously learns from outcomes and market conditions
+- 🔄 **Continuous Learning**: Agents learn from collective intelligence and past experiences
 - 🔌 **Broker Agnostic**: Unified interface across multiple exchanges and brokers
 
 ## System Architecture
@@ -44,10 +52,13 @@ Master Orchestrator
 ## Technology Stack
 
 - **Language**: Python 3.11+
+- **Framework**: Multi-Agent Reinforcement Learning (MARL)
+- **Memory Layer**: Redis (vector database, sub-ms latency)
 - **Brokers**: Alpaca (equities), Coinbase Advanced (crypto)
-- **Data**: InfluxDB, MongoDB, PostgreSQL
+- **Data Storage**: InfluxDB (time-series), MongoDB (documents), PostgreSQL (relational)
 - **MCP**: Model Context Protocol for Claude integration
 - **APIs**: CCXT, NewsAPI, Twitter, Reddit, Etherscan, FRED
+- **ML**: PyTorch (RL policies), scikit-learn (clustering, analysis)
 
 ## Phase 0 Goals
 

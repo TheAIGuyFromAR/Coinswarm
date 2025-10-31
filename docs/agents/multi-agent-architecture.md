@@ -2,7 +2,14 @@
 
 ## Overview
 
-Coinswarm employs a hierarchical multi-agent system where specialized agents collaborate to gather information, analyze markets, learn patterns, and execute trades. Each agent has a specific role and operates with defined responsibilities, boundaries, and communication protocols.
+Coinswarm employs a **Memory-Augmented Multi-Agent Reinforcement Learning (MARL)** system where specialized agents collaborate to gather information, analyze markets, learn patterns, and execute trades. Each agent has a specific role, maintains episodic and semantic memory, and learns through reinforcement learning while sharing knowledge with other agents.
+
+**Key Innovation**: Unlike traditional trading bots that rely solely on model weights, Coinswarm agents use explicit memory systems (stored in Redis vector database) to recall similar past experiences, adapt to regime changes, and learn from collective intelligence.
+
+**References**:
+- **[Agent Memory System](../architecture/agent-memory-system.md)** - Detailed memory architecture
+- Wei et al. (2024): "Multi-Agent RL for High-Frequency Trading" (Sharpe 2.87)
+- Zong et al. (2024): "MacroHFT: Memory Augmented Context-aware RL"
 
 ---
 

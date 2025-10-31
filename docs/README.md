@@ -82,6 +82,8 @@ Coinswarm is an intelligent, multi-agent cryptocurrency and equities trading sys
 - **[broker-exchange-selection.md](architecture/broker-exchange-selection.md)**: Broker/exchange selection strategy and migration path
 - **[mcp-server-design.md](architecture/mcp-server-design.md)**: Model Context Protocol server for Coinbase API integration
 - **[information-sources.md](architecture/information-sources.md)**: Comprehensive data sources strategy
+- **[agent-memory-system.md](architecture/agent-memory-system.md)**: ⭐ **NEW** - Memory-Augmented MARL with Redis vector database
+- **[redis-infrastructure.md](architecture/redis-infrastructure.md)**: ⭐ **NEW** - Redis deployment, optimization, and benchmarking
 
 ### API Integration
 - **[coinbase-api-integration.md](api/coinbase-api-integration.md)**: Complete Coinbase Advanced Trade API documentation with examples
@@ -108,10 +110,13 @@ Coinswarm is an intelligent, multi-agent cryptocurrency and equities trading sys
 - **MCP Server**: Model Context Protocol (Anthropic)
 
 ### Data Storage
-- **Time Series**: InfluxDB (market data)
-- **Documents**: MongoDB (news, social, patterns)
-- **Relational**: PostgreSQL (trades, patterns, metadata)
-- **Vectors**: Pinecone/Weaviate (embeddings, semantic search)
+- **Time Series**: InfluxDB (market data, OHLCV candles)
+- **Documents**: MongoDB (news, social media, external data)
+- **Relational**: PostgreSQL (trades, patterns, metadata, audit logs)
+- **Vector Database**: Redis (agent memory, episodic/semantic storage)
+  - **Why Redis**: 3.4× higher QPS than Qdrant, 4× lower latency than Milvus
+  - **Performance**: Sub-millisecond latency for memory retrieval
+  - **Critical for**: Memory-augmented MARL in HFT environment
 
 ### Data Sources
 - **Market Data**: Coinbase, Alpaca, CoinGecko, Yahoo Finance
@@ -349,6 +354,85 @@ For questions or feedback, please open an issue on GitHub.
 
 ### When working on pattern learning
 → See [pattern-learning-system.md](patterns/pattern-learning-system.md)
+
+### When implementing agent memory or vector database
+→ See [agent-memory-system.md](architecture/agent-memory-system.md)
+→ See [redis-infrastructure.md](architecture/redis-infrastructure.md)
+
+---
+
+## Research References
+
+The Coinswarm architecture integrates cutting-edge research in multi-agent reinforcement learning and vector databases:
+
+### Multi-Agent Reinforcement Learning (MARL)
+
+1. **Ning, Z. et al. (2024)**
+   - "A survey on multi-agent reinforcement learning and its applications"
+   - Comprehensive overview of MARL methods, challenges, and applications
+   - Key concepts: Centralized training/decentralized execution, credit assignment, non-stationarity
+
+2. **Wei, X. et al. (2024)**
+   - "Multi-Agent Reinforcement Learning for High-Frequency Trading Strategy Optimization"
+   - Applied MARL to HFT with strong results (Sharpe ratio 2.87)
+   - Demonstrates feasibility of multi-agent coordination in financial markets
+
+3. **Zong, J. et al. (2024)**
+   - "MacroHFT: Memory Augmented Context-aware Reinforcement Learning On High Frequency Trading"
+   - **Key innovation**: Memory mechanism for regime adaptation in HFT
+   - Architecture: Sub-agents per regime + hyper-agent with memory
+   - Validates using explicit memory (not just model weights) for agent adaptation
+
+4. **Shavandi, A. (2022)**
+   - "A multi-agent deep reinforcement learning framework for trade on the collective intelligence"
+   - Concrete RL system applying multi-agent deep RL in trading domain
+   - Supports using separate agents in swarm with shared information
+
+5. **Fang, J. et al. (2022)**
+   - "Imitate then Transcend: Multi-Agent Optimal Execution with Dual-Window Denoise PPO"
+   - MARL for optimal execution (key HFT sub-task)
+   - Combines imitation learning + multi-agent RL for noisy markets
+
+### Vector Database Performance
+
+6. **Redis (2024)**
+   - "Benchmarking results for vector databases"
+   - **Key finding**: Redis achieved 3.4× higher QPS than Qdrant, 4× lower latency than Milvus
+   - Recall ≥ 0.98 maintained across tests
+   - Justifies Redis as primary vector store for sub-millisecond memory retrieval
+
+7. **Redis (2024)**
+   - "Announcing faster Redis Query Engine and our vector database leads benchmarks"
+   - 16× throughput improvement in Redis Query Engine
+   - Outperforms top 7 vector DBs under identical hardware
+
+8. **Pixion (2025)**
+   - "Vector Database Benchmark – Overview"
+   - Comparative analysis: Redis, Milvus, Chroma, Qdrant
+   - Redis leads in latency/QPS for certain dimensions
+   - Trade-offs exist: Milvus better for indexing, but slower queries
+
+9. **Qdrant (2024)**
+   - "Vector Database Benchmarks"
+   - **Important caveat**: Redis latency increases with concurrency
+   - Single-thread: excellent; high concurrency: degradation
+   - Informs our query batching and replica strategy
+
+### Application to Coinswarm
+
+**Design Decisions Based on Research**:
+- ✅ Multi-agent architecture with memory (MacroHFT, Wei et al.)
+- ✅ Redis for ultra-low latency vector lookups (Redis benchmarks)
+- ✅ Episodic + semantic memory structure (Zong et al.)
+- ✅ Regime detection and adaptation (MacroHFT)
+- ✅ Shared memory pool for collective intelligence (Shavandi)
+- ✅ Concurrency mitigation: batching, pooling, replicas (Qdrant benchmarks)
+
+**Performance Targets** (informed by research):
+- Memory retrieval latency: < 1ms (P50), < 5ms (P99)
+- Sharpe ratio: > 2.0 (Wei et al. achieved 2.87)
+- Regime adaptation: < 10 seconds to detect shift
+- Pattern matching: 1000+ queries/second across 10+ agents
 
 ---
 
