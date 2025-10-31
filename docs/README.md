@@ -97,6 +97,9 @@ Coinswarm is an intelligent, multi-agent cryptocurrency and equities trading sys
 ### Pattern Learning
 - **[pattern-learning-system.md](patterns/pattern-learning-system.md)**: Pattern discovery, storage, optimization, and evolution system
 
+### Testing & Development
+- **[evidence-driven-development.md](testing/evidence-driven-development.md)**: ⭐⭐⭐ **CORE DISCIPLINE** - EDD testing strategy (TDD + economic soundness validation, 8k words)
+
 ---
 
 ## Technology Stack
