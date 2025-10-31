@@ -6,6 +6,15 @@ Coinswarm implements a **Memory-Augmented Multi-Agent Reinforcement Learning (MA
 
 **Inspired by**: MacroHFT (Zong et al., 2024) - Memory-augmented context-aware RL for high-frequency trading.
 
+**⭐ Production Implementation**: See **[Quorum-Governed Memory System](quorum-memory-system.md)** for the complete, production-ready specification with:
+- 3-vote consensus for all memory mutations
+- Deterministic manager evaluation
+- NATS message bus for proposals/votes/commits
+- Complete Redis schema and APIs
+- Deployment phases and CI gates
+
+**This document** provides the conceptual foundation; the quorum system is the implementation spec.
+
 ---
 
 ## Why Memory-Augmented RL?

@@ -21,22 +21,33 @@ Coinswarm employs a **Memory-Augmented Multi-Agent Reinforcement Learning (MARL)
                         │  (Strategic Coordinator)│
                         └───────────┬─────────────┘
                                     │
-                    ┌───────────────┼───────────────┐
-                    │               │               │
-            ┌───────▼──────┐  ┌────▼────────┐  ┌──▼──────────┐
-            │  Oversight   │  │  Pattern    │  │  Trading    │
-            │  Manager     │  │  Learning   │  │  Execution  │
-            │              │  │  System     │  │  Layer      │
-            └───────┬──────┘  └────┬────────┘  └──┬──────────┘
-                    │              │              │
-        ┌───────────┼──────────────┼──────────────┼──────────┐
-        │           │              │              │           │
-    ┌───▼────┐  ┌──▼────┐  ┌─────▼──┐  ┌───────▼──┐  ┌─────▼─────┐
-    │ Info   │  │ Data  │  │ Market │  │ Sentiment│  │ Trading   │
-    │ Gather │  │ Anal. │  │ Pattern│  │ Analysis │  │ Agents    │
-    │ Agents │  │ Agents│  │ Agents │  │ Agent    │  │ (per pair)│
-    └────────┘  └───────┘  └────────┘  └──────────┘  └───────────┘
+                    ┌───────────────┼────────────────┐
+                    │               │                │
+            ┌───────▼──────┐  ┌────▼──────────┐  ┌─▼──────────────┐
+            │  Oversight   │  │  Memory       │  │  Pattern       │
+            │  Manager     │  │  Managers     │  │  Learning      │
+            │              │  │  (Quorum=3)   │  │  System        │
+            └───────┬──────┘  └────┬──────────┘  └─┬──────────────┘
+                    │              │               │
+        ┌───────────┼──────────────┼───────────────┼──────────┐
+        │           │              │               │           │
+    ┌───▼────┐  ┌──▼────┐  ┌─────▼──┐  ┌────────▼──┐  ┌─────▼─────┐
+    │ Info   │  │ Data  │  │ Market │  │ Sentiment │  │ Trading   │
+    │ Gather │  │ Anal. │  │ Pattern│  │ Analysis  │  │ Agents    │
+    │ Agents │  │ Agents│  │ Agents │  │ Agent     │  │ (per pair)│
+    └────────┘  └───────┘  └────────┘  └───────────┘  └───────────┘
+                                                             │
+                                                             ▼
+                                                    ┌────────────────┐
+                                                    │  Message Bus   │
+                                                    │  (NATS)        │
+                                                    │  Proposals     │
+                                                    │  Votes         │
+                                                    │  Commits       │
+                                                    └────────────────┘
 ```
+
+**Key Addition**: **Memory Managers** form a consensus layer (minimum 3) that govern all memory mutations through quorum voting. See **[Quorum-Governed Memory System](../architecture/quorum-memory-system.md)** for complete specification.
 
 ---
 
@@ -198,7 +209,139 @@ class MonitoringDashboard:
 
 ---
 
-### 3. Information Gathering Agents
+### 3. Memory Managers
+
+**Role**: Consensus-based governance of memory mutations
+
+**Count**: Minimum 3 (typically 3-5 for dev, up to 7 for production)
+
+**Responsibilities**:
+- Evaluate memory change proposals using deterministic decision function
+- Cast votes on proposals (ACCEPT/REJECT with reasoning)
+- Coordinate commits via rotating coordinator
+- Maintain audit trail of all memory mutations
+- Verify read-after-write consistency
+
+**Key Principle**: **No memory mutation without 3 matching votes**
+
+**Decision Function** (deterministic):
+```python
+class MemoryManager:
+    def evaluate_proposal(self, proposal: MemoryProposal) -> Vote:
+        """
+        Deterministic evaluation of memory change proposal
+
+        Same input → same vote (enables audit and replay)
+        """
+
+        checks = [
+            self.check_regime_consistency(proposal),
+            self.check_support(proposal),  # Cluster validity
+            self.check_bounds(proposal),   # Delta and weight limits
+            self.check_impact(proposal),   # Sharpe and drawdown proxy
+            self.check_cooldown(proposal)  # Rate limiting
+        ]
+
+        failures = [reason for ok, reason in checks if not ok]
+
+        if failures:
+            decision = "REJECT"
+            reasons = failures
+        else:
+            decision = "ACCEPT"
+            reasons = []
+
+        # Compute deterministic vote hash
+        payload_norm = normalize_proposal(proposal)
+        vote_hash = hashlib.sha256(
+            f"{decision}||{json.dumps(payload_norm, sort_keys=True)}".encode()
+        ).hexdigest()
+
+        return Vote(
+            manager_id=self.id,
+            change_id=proposal.change_id,
+            decision=decision,
+            reasons=reasons,
+            vote_hash=vote_hash
+        )
+```
+
+**Quorum Protocol**:
+```python
+class QuorumCoordinator:
+    """
+    Accumulate votes and commit on 3 matching votes
+
+    Roles rotate every M commits or time-boxed
+    """
+
+    def __init__(self, quorum_size=3):
+        self.quorum_size = quorum_size
+        self.pending_votes = defaultdict(list)
+
+    def on_vote(self, vote: Vote):
+        change_id = vote.change_id
+        self.pending_votes[change_id].append(vote)
+
+        if len(self.pending_votes[change_id]) >= self.quorum_size:
+            votes = self.pending_votes[change_id][:self.quorum_size]
+
+            # Check consensus
+            vote_hashes = [v.vote_hash for v in votes]
+            decisions = [v.decision for v in votes]
+
+            if len(set(vote_hashes)) == 1 and len(set(decisions)) == 1:
+                # Quorum reached
+                if decisions[0] == 'ACCEPT':
+                    self.apply_change(get_proposal(change_id))
+                    state_hash = compute_state_hash()
+                else:
+                    state_hash = None
+
+                # Broadcast commit
+                self.publish_commit(change_id, decisions[0], votes, state_hash)
+                self.append_audit(change_id, votes)
+            else:
+                # No consensus - reject
+                self.publish_commit(change_id, 'REJECT', votes, None)
+
+            del self.pending_votes[change_id]
+```
+
+**Communication**:
+- **Message Bus**: NATS or Redis Streams
+- **Topics**:
+  - `mem.propose`: Bots → Managers
+  - `mem.vote`: Managers → Coordinator
+  - `mem.commit`: Coordinator → All
+  - `mem.audit`: Append-only log
+
+**Safety Guarantees**:
+1. Read-only mode if < 3 managers online
+2. All commits logged with proposal hash, vote hashes, and state hash
+3. Deterministic decisions enable replay and audit
+4. Byzantine fault-tolerant (handles 1 malicious manager with 3 total)
+
+**Configuration**:
+```yaml
+memory_managers:
+  count: 3
+  quorum_size: 3
+  vote_timeout_ms: 5
+  coordinator_rotation_commits: 100
+  audit_log_retention_days: 365
+```
+
+**See**: **[Quorum-Governed Memory System](../architecture/quorum-memory-system.md)** for complete specification including:
+- Detailed decision function with checks
+- Credit assignment algorithm (kernel-weighted)
+- Pattern maintenance and promotion rules
+- Deployment phases
+- Benchmarking and CI gates
+
+---
+
+### 4. Information Gathering Agents
 
 **Role**: Collect and preprocess raw data from external sources
 

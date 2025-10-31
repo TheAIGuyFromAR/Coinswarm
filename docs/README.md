@@ -79,11 +79,12 @@ Coinswarm is an intelligent, multi-agent cryptocurrency and equities trading sys
 ## Documentation Structure
 
 ### Architecture
+- **[quorum-memory-system.md](architecture/quorum-memory-system.md)**: ⭐⭐ **PRODUCTION SPEC** - Quorum-governed, self-improving memory (18k words, implementation-ready)
+- **[agent-memory-system.md](architecture/agent-memory-system.md)**: Memory-Augmented MARL with Redis vector database (conceptual foundation)
+- **[redis-infrastructure.md](architecture/redis-infrastructure.md)**: Redis deployment, optimization, and benchmarking
 - **[broker-exchange-selection.md](architecture/broker-exchange-selection.md)**: Broker/exchange selection strategy and migration path
 - **[mcp-server-design.md](architecture/mcp-server-design.md)**: Model Context Protocol server for Coinbase API integration
 - **[information-sources.md](architecture/information-sources.md)**: Comprehensive data sources strategy
-- **[agent-memory-system.md](architecture/agent-memory-system.md)**: ⭐ **NEW** - Memory-Augmented MARL with Redis vector database
-- **[redis-infrastructure.md](architecture/redis-infrastructure.md)**: ⭐ **NEW** - Redis deployment, optimization, and benchmarking
 
 ### API Integration
 - **[coinbase-api-integration.md](api/coinbase-api-integration.md)**: Complete Coinbase Advanced Trade API documentation with examples

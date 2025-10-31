@@ -13,9 +13,10 @@ Coinswarm is an AI-powered trading system that uses specialized agents to gather
 - **[Complete Documentation](docs/README.md)** - Architecture overview and system design
 
 **Core Systems**:
-- **[Agent Memory System](docs/architecture/agent-memory-system.md)** - ⭐ Memory-Augmented MARL framework
-- **[Redis Infrastructure](docs/architecture/redis-infrastructure.md)** - ⭐ Vector DB deployment & benchmarking
-- **[Multi-Agent Architecture](docs/agents/multi-agent-architecture.md)** - Agent roles and responsibilities
+- **[Quorum Memory System](docs/architecture/quorum-memory-system.md)** - ⭐⭐ **PRODUCTION SPEC** (18k words)
+- **[Multi-Agent Architecture](docs/agents/multi-agent-architecture.md)** - Agent roles with Memory Managers
+- **[Agent Memory System](docs/architecture/agent-memory-system.md)** - Memory-Augmented MARL (conceptual)
+- **[Redis Infrastructure](docs/architecture/redis-infrastructure.md)** - Vector DB deployment & benchmarking
 - **[Pattern Learning System](docs/patterns/pattern-learning-system.md)** - How the system learns and evolves
 
 **Infrastructure**:
@@ -26,14 +27,14 @@ Coinswarm is an AI-powered trading system that uses specialized agents to gather
 
 ## Core Features
 
-- 🤖 **Memory-Augmented MARL**: Multi-agent reinforcement learning with explicit episodic/semantic memory
-- ⚡ **Ultra-Low Latency**: Redis vector DB for sub-millisecond memory retrieval (3.4× faster than alternatives)
-- 🧠 **Pattern Learning**: Automatically discovers and optimizes profitable trading patterns
-- 🎯 **Regime Adaptation**: Detects market regime changes and adapts strategies accordingly
-- 🛡️ **Risk Management**: Multiple layers of safety controls and circuit breakers
-- 📊 **Comprehensive Data**: Market data, sentiment, on-chain metrics, and fundamentals
-- 🔄 **Continuous Learning**: Agents learn from collective intelligence and past experiences
-- 🔌 **Broker Agnostic**: Unified interface across multiple exchanges and brokers
+- 🤖 **Quorum-Governed Memory**: 3-vote consensus for all memory mutations (Byzantine fault-tolerant)
+- ⚡ **Ultra-Low Latency**: Redis vector DB + NATS message bus (< 2ms end-to-end)
+- 🧠 **Online Learning**: Memory improves with every trade (no weight retrains)
+- 🎯 **Episodic Control**: Neural Episodic Control (NEC) with regime-gated retrieval
+- 🔐 **Audit Trail**: Complete deterministic replay of all memory changes
+- 🛡️ **Safety Overlays**: Independent risk controls + memory quarantine for new patterns
+- 📊 **Pattern Semantics**: Automatic clustering and promotion/deprecation of strategies
+- 🔄 **Collective Intelligence**: Shared memory pool across all agents
 
 ## System Architecture
 
@@ -52,13 +53,14 @@ Master Orchestrator
 ## Technology Stack
 
 - **Language**: Python 3.11+
-- **Framework**: Multi-Agent Reinforcement Learning (MARL)
-- **Memory Layer**: Redis (vector database, sub-ms latency)
+- **Framework**: Memory-Augmented MARL with Quorum Consensus
+- **Memory Layer**: Redis (vector DB) + NATS (message bus)
+- **Governance**: 3-vote quorum (Byzantine fault-tolerant)
 - **Brokers**: Alpaca (equities), Coinbase Advanced (crypto)
 - **Data Storage**: InfluxDB (time-series), MongoDB (documents), PostgreSQL (relational)
 - **MCP**: Model Context Protocol for Claude integration
 - **APIs**: CCXT, NewsAPI, Twitter, Reddit, Etherscan, FRED
-- **ML**: PyTorch (RL policies), scikit-learn (clustering, analysis)
+- **ML**: PyTorch (RL policies), scikit-learn (clustering, pattern extraction)
 
 ## Phase 0 Goals
 
