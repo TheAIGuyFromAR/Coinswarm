@@ -17,6 +17,20 @@ Coinswarm employs a **Memory-Augmented Multi-Agent Reinforcement Learning (MARL)
 
 ```
                         ┌─────────────────────────┐
+                        │  Self-Reflection Layer  │
+                        │  (Alignment Monitor)    │
+                        └───────────┬─────────────┘
+                                    │ Monitors
+                                    │
+                        ┌───────────▼─────────────┐
+                        │  Planners               │
+                        │  (Strategic, Weeks)     │
+                        │  Committee Weights      │
+                        │  Regime Tags            │
+                        └───────────┬─────────────┘
+                                    │ Weights & Thresholds
+                                    ▼
+                        ┌─────────────────────────┐
                         │  Master Orchestrator    │
                         │  (Strategic Coordinator)│
                         └───────────┬─────────────┘
@@ -24,18 +38,22 @@ Coinswarm employs a **Memory-Augmented Multi-Agent Reinforcement Learning (MARL)
                     ┌───────────────┼────────────────┐
                     │               │                │
             ┌───────▼──────┐  ┌────▼──────────┐  ┌─▼──────────────┐
-            │  Oversight   │  │  Memory       │  │  Pattern       │
-            │  Manager     │  │  Managers     │  │  Learning      │
-            │              │  │  (Quorum=3)   │  │  System        │
+            │  Oversight   │  │  Memory       │  │  Committee     │
+            │  Manager     │  │  Managers     │  │  (Tactical)    │
+            │              │  │  (Quorum=3)   │  │  Weighted Vote │
             └───────┬──────┘  └────┬──────────┘  └─┬──────────────┘
                     │              │               │
         ┌───────────┼──────────────┼───────────────┼──────────┐
         │           │              │               │           │
     ┌───▼────┐  ┌──▼────┐  ┌─────▼──┐  ┌────────▼──┐  ┌─────▼─────┐
-    │ Info   │  │ Data  │  │ Market │  │ Sentiment │  │ Trading   │
-    │ Gather │  │ Anal. │  │ Pattern│  │ Analysis  │  │ Agents    │
-    │ Agents │  │ Agents│  │ Agents │  │ Agent     │  │ (per pair)│
-    └────────┘  └───────┘  └────────┘  └───────────┘  └───────────┘
+    │ Info   │  │ Data  │  │ Market │  │ Sentiment │  │ Domain    │
+    │ Gather │  │ Anal. │  │ Pattern│  │ Analysis  │  │ Agents:   │
+    │ Agents │  │ Agents│  │ Agents │  │ Agent     │  │ • Trend   │
+    │        │  │       │  │        │  │           │  │ • Mean-Rev│
+    │        │  │       │  │        │  │           │  │ • Exec    │
+    │        │  │       │  │        │  │           │  │ • Risk    │
+    │        │  │       │  │        │  │           │  │ • Arb     │
+    └────────┘  └───────┘  └────────┘  └───────────┘  └─────┬─────┘
                                                              │
                                                              ▼
                                                     ┌────────────────┐
@@ -45,9 +63,21 @@ Coinswarm employs a **Memory-Augmented Multi-Agent Reinforcement Learning (MARL)
                                                     │  Votes         │
                                                     │  Commits       │
                                                     └────────────────┘
+                                                             │
+                                                             ▼
+                                                    ┌────────────────┐
+                                                    │ Memory         │
+                                                    │ Optimizer      │
+                                                    │ (Execution)    │
+                                                    └────────────────┘
 ```
 
-**Key Addition**: **Memory Managers** form a consensus layer (minimum 3) that govern all memory mutations through quorum voting. See **[Quorum-Governed Memory System](../architecture/quorum-memory-system.md)** for complete specification.
+**Hierarchical Temporal Decision System**:
+- **Planners** (weeks-months): Strategic alignment, committee weight adjustment
+- **Committee** (hours-days): Tactical ensemble of domain agents with weighted voting
+- **Memory Optimizer** (seconds-minutes): Execution-level adaptation
+
+See **[Hierarchical Temporal Decision System](../architecture/hierarchical-temporal-decision-system.md)** for complete specification of this three-layer cognitive hierarchy.
 
 ---
 

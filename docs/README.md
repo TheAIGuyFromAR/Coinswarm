@@ -79,6 +79,7 @@ Coinswarm is an intelligent, multi-agent cryptocurrency and equities trading sys
 ## Documentation Structure
 
 ### Architecture
+- **[hierarchical-temporal-decision-system.md](architecture/hierarchical-temporal-decision-system.md)**: ⭐⭐⭐ **NEW** - 3-layer cognitive hierarchy (Planners/Committee/Memory) with temporal division of labor (11k words)
 - **[quorum-memory-system.md](architecture/quorum-memory-system.md)**: ⭐⭐ **PRODUCTION SPEC** - Quorum-governed, self-improving memory (18k words, implementation-ready)
 - **[agent-memory-system.md](architecture/agent-memory-system.md)**: Memory-Augmented MARL with Redis vector database (conceptual foundation)
 - **[redis-infrastructure.md](architecture/redis-infrastructure.md)**: Redis deployment, optimization, and benchmarking

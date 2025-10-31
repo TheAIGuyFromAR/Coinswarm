@@ -13,9 +13,9 @@ Coinswarm is an AI-powered trading system that uses specialized agents to gather
 - **[Complete Documentation](docs/README.md)** - Architecture overview and system design
 
 **Core Systems**:
+- **[Hierarchical Temporal Decision System](docs/architecture/hierarchical-temporal-decision-system.md)** - ⭐⭐⭐ **NEW** 3-layer cognitive hierarchy (11k words)
 - **[Quorum Memory System](docs/architecture/quorum-memory-system.md)** - ⭐⭐ **PRODUCTION SPEC** (18k words)
-- **[Multi-Agent Architecture](docs/agents/multi-agent-architecture.md)** - Agent roles with Memory Managers
-- **[Agent Memory System](docs/architecture/agent-memory-system.md)** - Memory-Augmented MARL (conceptual)
+- **[Multi-Agent Architecture](docs/agents/multi-agent-architecture.md)** - Complete agent roles with Planners/Committee/Memory
 - **[Redis Infrastructure](docs/architecture/redis-infrastructure.md)** - Vector DB deployment & benchmarking
 - **[Pattern Learning System](docs/patterns/pattern-learning-system.md)** - How the system learns and evolves
 
@@ -27,27 +27,39 @@ Coinswarm is an AI-powered trading system that uses specialized agents to gather
 
 ## Core Features
 
-- 🤖 **Quorum-Governed Memory**: 3-vote consensus for all memory mutations (Byzantine fault-tolerant)
-- ⚡ **Ultra-Low Latency**: Redis vector DB + NATS message bus (< 2ms end-to-end)
+- 🧬 **3-Layer Cognitive Hierarchy**: Planners (strategic, weeks) → Committee (tactical, hours) → Memory (execution, seconds)
+- 🤖 **Quorum-Governed Memory**: 3-vote consensus for all mutations (Byzantine fault-tolerant)
+- ⚡ **Ultra-Low Latency**: Redis vector DB + NATS (< 2ms end-to-end)
+- 🎯 **Temporal Division of Labor**: Each layer optimizes its own timescale without interference
 - 🧠 **Online Learning**: Memory improves with every trade (no weight retrains)
-- 🎯 **Episodic Control**: Neural Episodic Control (NEC) with regime-gated retrieval
-- 🔐 **Audit Trail**: Complete deterministic replay of all memory changes
-- 🛡️ **Safety Overlays**: Independent risk controls + memory quarantine for new patterns
-- 📊 **Pattern Semantics**: Automatic clustering and promotion/deprecation of strategies
-- 🔄 **Collective Intelligence**: Shared memory pool across all agents
+- 📊 **Strategic Alignment**: Planners adjust committee weights based on macro sentiment/regimes
+- 🎭 **Ensemble Voting**: Committee aggregates specialized agents (Trend, Mean-Rev, Risk, Exec, Arb)
+- 🔐 **Complete Auditability**: Deterministic replay of all decisions and memory changes
 
 ## System Architecture
 
 ```
-Master Orchestrator
+Self-Reflection Layer (Alignment Monitor)
+    ↓
+Planners (Strategic: Weeks-Months)
+    ├─ Adjust Committee Weights
+    ├─ Set Regime Tags
+    └─ Update Thresholds
+    ↓
+Master Orchestrator + Committee (Tactical: Hours-Days)
     ├── Oversight Manager (Risk Controls)
-    ├── Pattern Learning System
-    └── Trading Execution Layer
-        ├── Information Gathering Agents
-        ├── Data Analysis Agents
-        ├── Market Pattern Agents
-        ├── Sentiment Analysis Agent
-        └── Trading Agents (per product)
+    ├── Memory Managers (Quorum=3)
+    └── Domain Agents (Weighted Ensemble)
+        ├── Trend Agent
+        ├── Mean-Reversion Agent
+        ├── Execution Agent
+        ├── Risk Agent
+        └── Arbitrage Agent
+    ↓
+Memory Optimizer (Execution: Seconds-Minutes)
+    ├── Pattern Recall (kNN retrieval)
+    ├── Slippage Modeling
+    └── Execution Heuristics
 ```
 
 ## Technology Stack
