@@ -8,9 +8,15 @@ Coinswarm implements a **three-layer cognitive hierarchy** with temporal divisio
 
 **Status**: Production Specification (Integrated with Quorum System)
 
+**Related Documents**:
+- [Data Feeds Architecture](data-feeds-architecture.md) - Complete specification of data sources, cadences, and storage for each layer
+- [Quorum Memory System](quorum-memory-system.md) - Production memory governance
+
 ---
 
 ## 1. Temporal Division of Labor
+
+**Note**: Each layer consumes data at different cadences and from different sources. See [Data Feeds Architecture](data-feeds-architecture.md) for complete details on data ingestion, storage, and distribution.
 
 ### Three-Layer Hierarchy
 
