@@ -157,6 +157,13 @@ addopts = "-ra -q --strict-markers --cov=src/coinswarm --cov-report=term-missing
 testpaths = ["tests"]
 asyncio_mode = "auto"
 pythonpath = ["src"]
+markers = [
+    "unit: Unit tests (fast, isolated components)",
+    "integration: Integration tests (multi-component)",
+    "performance: Performance and latency tests",
+    "soundness: Economic soundness tests (EDD validation)",
+    "slow: Slow-running tests (backtests, simulations)",
+]
 
 [tool.coverage.run]
 source = ["src/coinswarm"]
