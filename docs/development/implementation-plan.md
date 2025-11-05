@@ -748,3 +748,498 @@ def test_memory_retrieval():
 
 ---
 
+## Phase 2: First Trading Agent (Weeks 5-6)
+
+**Objective**: Build and validate Trend-Following Agent with complete EDD testing suite passing all 7 soundness categories.
+
+**Why This Matters**: This is the first agent that will actually trade. It must be bulletproof. Complete EDD validation here sets the pattern for all future agents.
+
+### Architecture: Agent Base Class + Trend Agent
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    AGENT BASE CLASS                      │
+├─────────────────────────────────────────────────────────┤
+│  Abstract Methods:                                       │
+│  ├── decide(state) -> Action                            │
+│  ├── update(outcome)                                     │
+│  └── get_config() -> dict                               │
+│                                                          │
+│  Shared Infrastructure:                                  │
+│  ├── Safety checks (position/loss limits)               │
+│  ├── Memory integration (episodic recall)               │
+│  └── Metrics (decisions/sec, win rate, Sharpe)          │
+└─────────────────────────────────────────────────────────┘
+                          ▲
+                          │ inherits
+┌─────────────────────────┴───────────────────────────────┐
+│                    TREND AGENT                           │
+├─────────────────────────────────────────────────────────┤
+│  Strategy: Moving Average Crossover + ADX               │
+│  ├── Fast MA (10-period)                                │
+│  ├── Slow MA (20-period)                                │
+│  ├── ADX (14-period) for trend strength                 │
+│  └── Position sizing (Kelly criterion)                  │
+│                                                          │
+│  Entry: Fast MA > Slow MA + ADX > 25                    │
+│  Exit: Fast MA < Slow MA OR stop loss                   │
+│  Position Size: Kelly fraction * risk_scaling           │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Week 5: Agent Implementation
+
+#### Days 21-22: Base Agent Class
+
+**Implementation** (4 atomic commits, ~360 lines)
+
+```python
+# src/coinswarm/agents/base.py (120 lines)
+
+class BaseAgent(ABC):
+    """Base class for all trading agents"""
+
+    def __init__(
+        self,
+        agent_id: str,
+        memory_client: MemoryClient,
+        config: AgentConfig
+    ):
+        self.agent_id = agent_id
+        self.memory = memory_client
+        self.config = config
+
+        # Safety limits
+        self.max_position_size = config.max_position_size
+        self.max_loss_per_trade = config.max_loss_per_trade
+        self.daily_loss_limit = config.daily_loss_limit
+
+        # Metrics
+        self.trades_today = 0
+        self.daily_pnl = 0.0
+        self.decisions_made = 0
+
+    @abstractmethod
+    async def decide(self, state: MarketState) -> Action:
+        """Generate trading decision from market state"""
+        pass
+
+    @abstractmethod
+    async def update(self, outcome: TradeOutcome):
+        """Learn from trade outcome"""
+        pass
+
+    def check_safety_limits(self, action: Action) -> bool:
+        """Validate action against safety constraints"""
+        # Position size check
+        if action.size > self.max_position_size:
+            return False
+
+        # Daily loss limit
+        if self.daily_pnl < -self.daily_loss_limit:
+            return False
+
+        # Max trades per day
+        if self.trades_today >= self.config.max_trades_per_day:
+            return False
+
+        return True
+
+    async def recall_similar_states(self, state: MarketState, k=10):
+        """Query episodic memory for similar states"""
+        embedding = self.embed_state(state)
+        return await self.memory.knn_search(embedding, k=k)
+
+    @abstractmethod
+    def embed_state(self, state: MarketState) -> np.ndarray:
+        """Convert market state to 384-dim embedding"""
+        pass
+
+
+# src/coinswarm/agents/trend.py (240 lines)
+
+class TrendAgent(BaseAgent):
+    """Trend-following agent using MA crossover + ADX"""
+
+    def __init__(
+        self,
+        agent_id: str,
+        memory_client: MemoryClient,
+        config: TrendAgentConfig
+    ):
+        super().__init__(agent_id, memory_client, config)
+
+        # Strategy parameters
+        self.fast_period = config.fast_period  # Default: 10
+        self.slow_period = config.slow_period  # Default: 20
+        self.adx_period = config.adx_period    # Default: 14
+        self.adx_threshold = config.adx_threshold  # Default: 25
+
+        # Position sizing
+        self.kelly_fraction = config.kelly_fraction  # Default: 0.25
+        self.risk_scaling = config.risk_scaling      # Default: 1.0
+
+    async def decide(self, state: MarketState) -> Action:
+        """Generate trading decision"""
+
+        # Calculate indicators
+        fast_ma = self.calculate_ma(state.prices, self.fast_period)
+        slow_ma = self.calculate_ma(state.prices, self.slow_period)
+        adx = self.calculate_adx(state.prices, self.adx_period)
+
+        # Generate signal
+        if fast_ma > slow_ma and adx > self.adx_threshold:
+            signal = "BUY"
+            confidence = min(adx / 50.0, 1.0)  # Normalize ADX to 0-1
+        elif fast_ma < slow_ma and adx > self.adx_threshold:
+            signal = "SELL"
+            confidence = min(adx / 50.0, 1.0)
+        else:
+            signal = "HOLD"
+            confidence = 0.5
+
+        # Recall similar states from memory
+        similar_states = await self.recall_similar_states(state, k=10)
+        memory_adjustment = self.calculate_memory_adjustment(similar_states)
+
+        # Adjust confidence based on memory
+        confidence *= memory_adjustment
+
+        # Calculate position size
+        size = self.calculate_position_size(
+            confidence=confidence,
+            volatility=state.volatility,
+            account_value=state.account_value
+        )
+
+        # Create action
+        action = Action(
+            type=signal,
+            confidence=confidence,
+            size=size,
+            stop_loss=self.calculate_stop_loss(state),
+            take_profit=self.calculate_take_profit(state)
+        )
+
+        # Safety check
+        if not self.check_safety_limits(action):
+            return Action(type="HOLD", confidence=0.0, size=0)
+
+        return action
+
+    def calculate_position_size(self, confidence, volatility, account_value):
+        """Kelly criterion position sizing"""
+        # Kelly: f = (p * b - q) / b
+        # Where p = win probability, q = 1 - p, b = win/loss ratio
+
+        # Estimate win probability from confidence
+        win_prob = 0.5 + (confidence - 0.5) * 0.3  # 0.5-0.65 range
+
+        # Use historical win/loss ratio (from memory or default)
+        win_loss_ratio = 1.5  # TODO: Calculate from memory
+
+        # Kelly fraction
+        kelly = (win_prob * win_loss_ratio - (1 - win_prob)) / win_loss_ratio
+        kelly = max(0, kelly) * self.kelly_fraction  # Fractional Kelly
+
+        # Adjust for volatility
+        volatility_adjustment = 1.0 / (1.0 + volatility)
+
+        # Calculate size
+        size = account_value * kelly * volatility_adjustment * self.risk_scaling
+
+        return min(size, self.max_position_size)
+
+    def calculate_stop_loss(self, state: MarketState) -> float:
+        """ATR-based stop loss"""
+        atr = self.calculate_atr(state.prices, period=14)
+        return state.current_price - (2.0 * atr)  # 2 ATR stop
+
+    def calculate_take_profit(self, state: MarketState) -> float:
+        """Risk/reward based take profit"""
+        atr = self.calculate_atr(state.prices, period=14)
+        return state.current_price + (3.0 * atr)  # 3 ATR target (1.5:1 R:R)
+
+    # Technical indicators (moving averages, ADX, ATR)
+    # ... implementation details ...
+```
+
+**Checkpoint**: Agent base class + Trend Agent implemented
+
+#### Days 23-24: Unit Tests
+
+**Unit Tests** (3 atomic commits, ~135 lines)
+
+```python
+# tests/unit/agents/test_trend.py
+
+def test_indicator_calculation():
+    """Test MA, ADX, ATR calculations"""
+    agent = TrendAgent(config=test_config)
+    prices = load_fixture("golden_cross.csv")
+
+    fast_ma = agent.calculate_ma(prices, period=10)
+    slow_ma = agent.calculate_ma(prices, period=20)
+    adx = agent.calculate_adx(prices, period=14)
+
+    assert len(fast_ma) == len(prices)
+    assert fast_ma[-1] > slow_ma[-1]  # Golden cross scenario
+    assert 0 <= adx[-1] <= 100
+
+def test_signal_generation():
+    """Test BUY/SELL/HOLD signal logic"""
+    agent = TrendAgent(config=test_config)
+    state = load_market_state("trending_up.json")
+
+    action = agent.decide(state)
+
+    assert action.type == "BUY"
+    assert 0.5 <= action.confidence <= 1.0
+    assert action.size <= agent.max_position_size
+
+def test_position_sizing():
+    """Test Kelly criterion sizing"""
+    agent = TrendAgent(config=test_config)
+
+    size = agent.calculate_position_size(
+        confidence=0.7,
+        volatility=0.02,
+        account_value=10000
+    )
+
+    assert 0 <= size <= agent.max_position_size
+    assert size < 10000 * 0.5  # No more than 50% of account
+
+def test_safety_limits():
+    """Test position and loss limit enforcement"""
+    agent = TrendAgent(config=test_config)
+    agent.daily_pnl = -agent.daily_loss_limit * 0.99  # Near limit
+
+    action = Action(type="BUY", size=1000, confidence=0.8)
+
+    assert not agent.check_safety_limits(action)
+```
+
+### Week 6: Full EDD Validation
+
+#### Days 25-26: Soundness Tests
+
+**7 EDD Soundness Categories** (3 atomic commits, ~180 lines)
+
+```python
+# tests/soundness/test_trend_soundness.py
+
+# 1. Determinism
+def test_trend_agent_determinism():
+    """Same inputs → same outputs (no hidden randomness)"""
+    agent = TrendAgent(seed=42, config=test_config)
+    state = load_market_state("test_case_1.json")
+
+    action1 = agent.decide(state)
+    action2 = agent.decide(state)
+
+    assert action1 == action2
+    assert action1.type == action2.type
+    assert abs(action1.confidence - action2.confidence) < 1e-9
+
+# 2. Statistical Sanity
+def test_trend_agent_statistical_sanity():
+    """Backtest shows realistic performance metrics"""
+    agent = TrendAgent(config=test_config)
+    backtest = run_backtest(agent, dataset="2024_Q1_out_of_sample")
+
+    assert 0.5 <= backtest.sharpe_ratio <= 3.0  # Realistic Sharpe
+    assert backtest.max_drawdown <= 0.15        # Max 15% DD
+    assert 0.50 <= backtest.win_rate <= 0.70    # Realistic win rate
+    assert backtest.turnover <= 50              # Not overtrading
+    assert backtest.total_trades >= 20          # Enough samples
+
+# 3. Safety Invariants
+def test_trend_agent_safety_invariants():
+    """Agent never violates position or loss limits"""
+    agent = TrendAgent(config=test_config)
+    backtest = run_backtest(agent, dataset="2024_Q1")
+
+    for trade in backtest.trades:
+        assert trade.size <= agent.max_position_size
+        assert trade.loss <= agent.max_loss_per_trade
+
+    assert backtest.max_daily_loss <= agent.daily_loss_limit
+
+# 4. Latency (Performance)
+def test_trend_agent_latency():
+    """Decision making is fast enough for live trading"""
+    agent = TrendAgent(config=test_config)
+    state = load_market_state("test_case_1.json")
+
+    latencies = []
+    for _ in range(100):
+        start = time.perf_counter()
+        action = agent.decide(state)
+        latency = time.perf_counter() - start
+        latencies.append(latency)
+
+    p50 = np.percentile(latencies, 50)
+    p99 = np.percentile(latencies, 99)
+
+    assert p50 < 0.010  # 10ms P50
+    assert p99 < 0.050  # 50ms P99
+
+# 5. Economic Realism
+def test_trend_agent_economic_realism():
+    """Accounts for slippage, fees, realistic fills"""
+    agent = TrendAgent(config=test_config)
+    backtest = run_backtest(
+        agent,
+        dataset="2024_Q1",
+        slippage_model=realistic_slippage,
+        fee_bps=10  # 0.1% fees
+    )
+
+    # Should still be profitable after costs
+    assert backtest.net_pnl > 0
+    assert backtest.sharpe_ratio > 1.0
+
+    # Slippage should be realistic
+    assert backtest.avg_slippage_bps < 50  # < 0.5%
+
+# 6. Memory Stability
+def test_trend_agent_memory_convergence():
+    """Memory-augmented decisions improve over time"""
+    agent = TrendAgent(config=test_config)
+
+    # Run backtest in two phases
+    phase1 = run_backtest(agent, dataset="2024_Q1_first_half")
+    phase2 = run_backtest(agent, dataset="2024_Q1_second_half")
+
+    # Performance should improve (or at least not degrade)
+    assert phase2.sharpe_ratio >= phase1.sharpe_ratio * 0.8
+
+# 7. Robustness
+def test_trend_agent_regime_robustness():
+    """Works across multiple market regimes"""
+    agent = TrendAgent(config=test_config)
+
+    regimes = ["trending_up", "range_bound", "trending_down", "high_volatility"]
+
+    for regime in regimes:
+        backtest = run_backtest(agent, dataset=f"regime_{regime}")
+
+        # Should not blow up in any regime
+        assert backtest.max_drawdown <= 0.20
+        assert backtest.sharpe_ratio > 0  # At least positive
+```
+
+#### Days 27-28: Backtesting & Integration
+
+**Backtest Tests** (2 atomic commits, ~200 lines)
+
+```python
+# tests/backtest/test_trend_backtest.py
+
+def test_golden_cross_scenario():
+    """Test on golden cross pattern"""
+    agent = TrendAgent(config=test_config)
+    fixture = load_fixture("golden_cross")
+
+    backtest = run_backtest(agent, data=fixture)
+
+    assert backtest.sharpe_ratio > 1.5
+    assert backtest.win_rate > 0.55
+    assert backtest.max_drawdown < 0.10
+
+def test_mean_reversion_scenario():
+    """Test on mean reversion pattern (should avoid)"""
+    agent = TrendAgent(config=test_config)
+    fixture = load_fixture("mean_reversion")
+
+    backtest = run_backtest(agent, data=fixture)
+
+    # Should mostly HOLD (not catch whipsaws)
+    assert backtest.total_trades < 10
+    assert backtest.max_drawdown < 0.10
+
+def test_high_volatility_scenario():
+    """Test during volatility spike"""
+    agent = TrendAgent(config=test_config)
+    fixture = load_fixture("high_volatility")
+
+    backtest = run_backtest(agent, data=fixture)
+
+    # Should reduce position sizes
+    assert backtest.avg_position_size < agent.max_position_size * 0.5
+
+def test_live_paper_trading_integration():
+    """Test with live Coinbase sandbox data"""
+    agent = TrendAgent(config=test_config)
+    coinbase_client = CoinbaseClient(sandbox=True)
+
+    # Run for 1 hour in paper trading mode
+    results = await run_paper_trading(
+        agent=agent,
+        data_client=coinbase_client,
+        duration_minutes=60
+    )
+
+    assert results.decisions_made > 0
+    assert results.trades_executed >= 0
+    assert results.no_errors
+```
+
+**Performance Tests** (1 atomic commit, ~45 lines)
+
+```python
+# tests/performance/test_trend_perf.py
+
+def test_decision_throughput():
+    """Test decisions per second"""
+    agent = TrendAgent(config=test_config)
+    states = load_market_states(count=1000)
+
+    start = time.time()
+    for state in states:
+        action = agent.decide(state)
+    duration = time.time() - start
+
+    decisions_per_sec = 1000 / duration
+
+    assert decisions_per_sec > 100  # At least 100 decisions/sec
+```
+
+### Phase 2 Success Criteria
+
+**Must Pass Before Phase 3**:
+1. ✅ All 7 EDD soundness categories passing
+   - Determinism ✅
+   - Statistical Sanity ✅ (Sharpe > 1.5, Win rate > 55%)
+   - Safety Invariants ✅ (No limit violations)
+   - Latency ✅ (P50 < 10ms)
+   - Economic Realism ✅ (Profitable after fees/slippage)
+   - Memory Stability ✅ (Improves over time)
+   - Robustness ✅ (Works across regimes)
+
+2. ✅ Backtest performance metrics:
+   - Sharpe Ratio ≥ 1.5
+   - Win Rate ≥ 55%
+   - Max Drawdown ≤ 10%
+   - Total Trades ≥ 50 (sufficient sample size)
+
+3. ✅ Paper trading validation:
+   - Runs for 24 hours without errors
+   - Makes sensible decisions (no wild trades)
+   - Respects safety limits
+   - Integrates with memory system
+
+4. ✅ Test coverage ≥ 90% on agent code
+
+**Deliverables**:
+- 12 atomic commits
+- ~600 lines of production code (agent implementation)
+- ~560 lines of test code (unit + soundness + backtest + performance)
+- First agent ready for live trading (with human oversight)
+- EDD validation framework proven
+
+**If Any Fail**: Do not proceed to Phase 3. Fix issues first.
+
+---
+
