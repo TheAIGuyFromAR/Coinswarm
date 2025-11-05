@@ -1243,3 +1243,250 @@ def test_decision_throughput():
 
 ---
 
+## Phase 3: Data Pipeline (Weeks 7-8)
+
+**Objective**: Deploy live data ingestion from 5+ sources feeding all three layers of the hierarchical decision system.
+
+**Why This Matters**: Agents need real-time data to make decisions. Planners need sentiment and macro. Committee needs tick data. Memory needs execution logs.
+
+### Data Architecture (Per data-feeds-architecture.md)
+
+```
+SOURCES → INGESTORS → STORAGE → LAYERS
+─────────────────────────────────────────────────────────
+Exchanges    Binance      InfluxDB    Committee (ms-s)
+(Coinbase)   Coinbase     (OHLCV)     ├── Tick data
+             → Tick-by-tick           └── Order book
+
+News APIs    NewsAPI      MongoDB     Planners (h-d)
+(Twitter)    Twitter      (Documents) ├── Sentiment
+Social       Reddit                   ├── News
+             → Embeddings             └── Social
+
+Macro Data   FRED         PostgreSQL  Self-Reflection
+(FRED)       → Indicators (Structured) └── Aggregates
+
+On-Chain     Etherscan    MongoDB     All Layers
+(Glassnode)  → Metrics    (Documents) └── Context
+```
+
+### Week 7: Core Data Ingestors
+
+#### Days 29-30: Exchange Ingestors (Already have Binance, add Coinbase)
+
+**Coinbase Ingestor** (2 commits, ~200 lines)
+```python
+# src/coinswarm/data_ingest/exchanges/coinbase.py
+class CoinbaseIngestor(DataSource):
+    """Live tick data from Coinbase Advanced"""
+    # WebSocket: trades, order book, ticker
+    # REST fallback for history
+    # Store in InfluxDB (OHLCV), Redis Streams (ticks)
+```
+
+**Tests** (2 commits, ~100 lines)
+- Unit: WebSocket parsing, reconnection logic
+- Integration: Live connection to sandbox
+- Soundness: Latency < 100ms, data quality (OHLCV validation)
+
+#### Days 31-32: Sentiment Ingestors (3 data sources)
+
+**NewsAPI Ingestor** (2 commits, ~180 lines)
+```python
+# src/coinswarm/data_ingest/news/newsapi.py
+class NewsAPIIngestor(DataSource):
+    """Crypto news from NewsAPI"""
+    # Poll every 5 minutes
+    # Extract: headline, content, timestamp, source
+    # Generate embeddings (sentence-transformers)
+    # Store in MongoDB
+```
+
+**Twitter/X Ingestor** (2 commits, ~200 lines)
+```python
+# src/coinswarm/data_ingest/social/twitter.py
+class TwitterIngestor(DataSource):
+    """Sentiment from crypto Twitter"""
+    # Track keywords: #BTC, #ETH, major influencers
+    # Extract: tweet text, engagement, timestamp
+    # Sentiment scoring (vader or transformer)
+    # Store in MongoDB
+```
+
+**Reddit Ingestor** (2 commits, ~180 lines)
+```python
+# src/coinswarm/data_ingest/social/reddit.py
+class RedditIngestor(DataSource):
+    """Community sentiment from r/cryptocurrency, r/bitcoin"""
+    # Poll every 10 minutes
+    # Extract: post/comment text, upvotes, timestamp
+    # Sentiment scoring
+    # Store in MongoDB
+```
+
+#### Days 33-34: Macro Data Ingestors
+
+**FRED Ingestor** (2 commits, ~150 lines)
+```python
+# src/coinswarm/data_ingest/macro/fred.py
+class FREDIngestor(DataSource):
+    """Macro indicators from Federal Reserve"""
+    # Daily updates: DXY, interest rates, treasury yields
+    # Store in PostgreSQL
+    # Used by Planners for regime detection
+```
+
+**Tests for All Ingestors** (4 commits, ~250 lines)
+- Unit tests: API parsing, error handling, rate limiting
+- Integration tests: Live API connections (with mocks for CI)
+- Performance tests: Throughput (should handle 1000 ticks/sec)
+
+**Checkpoint**: All ingestors operational, data flowing into storage
+
+### Week 8: Scheduler & Data Distribution
+
+#### Days 35-36: Prefect Scheduler
+
+**Scheduler Setup** (3 commits, ~300 lines)
+```python
+# src/coinswarm/data_ingest/scheduler.py
+
+from prefect import flow, task
+
+@task
+async def ingest_coinbase_ticks():
+    """Run continuously (WebSocket)"""
+    ingestor = CoinbaseIngestor()
+    await ingestor.run()
+
+@task
+async def ingest_news():
+    """Run every 5 minutes"""
+    ingestor = NewsAPIIngestor()
+    await ingestor.fetch()
+
+@task
+async def ingest_macro():
+    """Run daily at 9:00 AM ET"""
+    ingestor = FREDIngestor()
+    await ingestor.fetch()
+
+@flow
+async def data_pipeline():
+    """Orchestrate all data ingestion"""
+    # Continuous tasks
+    await ingest_coinbase_ticks.submit()
+
+    # Scheduled tasks
+    schedule(ingest_news, interval_minutes=5)
+    schedule(ingest_macro, cron="0 9 * * *")
+```
+
+**Monitoring & Alerts** (2 commits, ~200 lines)
+- Prometheus metrics: ingestion rate, latency, errors
+- Grafana dashboards: data freshness, source health
+- Alerts: data stale > 5min, API errors > 10/min
+
+#### Days 37-38: Data Distribution Layer
+
+**Data Clients for Each Layer** (4 commits, ~400 lines)
+
+```python
+# src/coinswarm/data_feeds/committee_client.py
+class CommitteeDataClient:
+    """Real-time data for Committee agents"""
+    async def subscribe_ticks(symbol: str) -> AsyncIterator[Tick]
+    async def get_order_book(symbol: str) -> OrderBook
+    # Reads from: Redis Streams, InfluxDB
+
+# src/coinswarm/data_feeds/planner_client.py
+class PlannerDataClient:
+    """Aggregated data for Planners"""
+    async def get_sentiment_window(days=7) -> SentimentTimeSeries
+    async def get_funding_rates() -> Dict[str, float]
+    async def get_macro_indicators() -> MacroData
+    # Reads from: MongoDB, PostgreSQL
+
+# src/coinswarm/data_feeds/memory_client.py
+class MemoryDataClient:
+    """Execution logs for Memory Optimizer"""
+    async def log_trade(trade: TradeOutcome)
+    async def get_performance_metrics() -> Dict
+    # Reads from: PostgreSQL (trades table)
+```
+
+**End-to-End Tests** (3 commits, ~300 lines)
+```python
+# tests/integration/test_data_pipeline_e2e.py
+
+async def test_tick_to_committee_flow():
+    """Tick data reaches Committee in < 100ms"""
+    # 1. Ingestor receives tick from Coinbase
+    # 2. Stores in Redis Stream
+    # 3. Committee subscribes and receives
+    # 4. Measure end-to-end latency
+
+async def test_sentiment_to_planner_flow():
+    """News → Sentiment → Planner in < 10 seconds"""
+    # 1. NewsAPI returns article
+    # 2. Embedding generated
+    # 3. Stored in MongoDB
+    # 4. Planner queries aggregated sentiment
+    # 5. Validates data freshness
+
+async def test_pipeline_resilience():
+    """Pipeline recovers from failures"""
+    # 1. Kill Redis
+    # 2. Ingestor buffers data
+    # 3. Redis restarts
+    # 4. Buffered data flushed
+    # 5. No data loss
+```
+
+### Phase 3 Success Criteria
+
+**Must Pass Before Phase 4**:
+1. ✅ 5+ data sources operational:
+   - Coinbase ✅ (tick data)
+   - NewsAPI ✅ (news sentiment)
+   - Twitter ✅ (social sentiment)
+   - Reddit ✅ (community sentiment)
+   - FRED ✅ (macro indicators)
+
+2. ✅ Data flowing to correct storage:
+   - InfluxDB: OHLCV (10k+ ticks/sec)
+   - MongoDB: News/social embeddings (100+ docs/min)
+   - PostgreSQL: Macro indicators (daily updates)
+   - Redis Streams: Live ticks (< 50ms latency)
+
+3. ✅ Scheduler orchestrating all ingestors:
+   - Prefect flows running
+   - No crashes for 48 hours
+   - Auto-recovery from API failures
+
+4. ✅ Data clients for all layers:
+   - Committee can subscribe to ticks
+   - Planners can query sentiment
+   - Memory can log trades
+
+5. ✅ Performance metrics:
+   - Tick ingestion: < 100ms P50 latency
+   - Sentiment updates: < 5 min freshness
+   - Macro data: Daily by 10:00 AM ET
+
+6. ✅ Monitoring operational:
+   - Prometheus collecting metrics
+   - Grafana dashboards live
+   - Alerts configured and tested
+
+**Deliverables**:
+- 24 atomic commits
+- ~1,810 lines of production code (ingestors + scheduler + clients)
+- ~650 lines of test code
+- Live data pipeline operational 24/7
+- Ready for multi-agent committee
+
+**If Any Fail**: Do not proceed to Phase 4. Fix issues first.
+
+---
+
