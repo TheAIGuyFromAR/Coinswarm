@@ -4,12 +4,14 @@ News & Sentiment Data Fetcher
 Fetches historical news, tweets, and sentiment data for crypto assets.
 
 Data Sources:
-1. CryptoCompare News API (free tier: 50 req/day)
-2. NewsAPI.org (free tier: 100 req/day)
-3. CoinDesk RSS feeds (unlimited, public)
-4. Cointelegraph RSS feeds (unlimited, public)
-5. Reddit sentiment (via PRAW - free)
-6. Fear & Greed Index (Alternative.me - free)
+1. Google News RSS (unlimited, FREE, no API key) ← BEST FREE OPTION
+2. Google Trends (unlimited, FREE, no API key) ← BEST FREE OPTION
+3. Fear & Greed Index (Alternative.me - free)
+4. CryptoCompare News API (free tier: 50 req/day)
+5. NewsAPI.org (free tier: 100 req/day)
+6. Reddit sentiment (via PRAW - free)
+
+Recommendation: Start with Google News + Google Trends (no setup needed!)
 
 For backtesting, we cache historical sentiment scores aligned with price data.
 """
@@ -28,6 +30,7 @@ except ImportError:
     import requests as httpx  # Fallback
 
 from coinswarm.data_ingest.base import DataPoint
+from coinswarm.data_ingest.google_sentiment_fetcher import GoogleSentimentFetcher
 
 
 logger = logging.getLogger(__name__)
