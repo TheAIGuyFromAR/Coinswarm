@@ -20,6 +20,7 @@ import aiohttp
 
 from coinswarm.data_ingest.base import DataPoint
 from coinswarm.data_ingest.binance_ingestor import BinanceIngestor
+from coinswarm.data_ingest.news_sentiment_fetcher import NewsSentimentFetcher
 
 
 logger = logging.getLogger(__name__)
@@ -36,8 +37,18 @@ class HistoricalDataFetcher:
     - Macro economic data
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        cryptocompare_api_key: Optional[str] = None,
+        newsapi_key: Optional[str] = None,
+        reddit_credentials: Optional[Dict] = None
+    ):
         self.binance = BinanceIngestor()
+        self.sentiment_fetcher = NewsSentimentFetcher(
+            cryptocompare_api_key=cryptocompare_api_key,
+            newsapi_key=newsapi_key,
+            reddit_credentials=reddit_credentials
+        )
 
         # Trading pairs
         self.spot_pairs = [
@@ -65,7 +76,8 @@ class HistoricalDataFetcher:
     async def fetch_all_historical_data(
         self,
         months: int = 3,
-        timeframe: str = "1m"
+        timeframe: str = "1m",
+        include_sentiment: bool = True
     ) -> Dict[str, List[DataPoint]]:
         """
         Fetch historical data for all pairs.
@@ -73,9 +85,10 @@ class HistoricalDataFetcher:
         Args:
             months: How many months of history
             timeframe: Candle interval (1m, 5m, 1h, etc.)
+            include_sentiment: Whether to fetch sentiment data alongside price
 
         Returns:
-            Dict mapping symbol → list of DataPoints
+            Dict mapping symbol → list of DataPoints (includes sentiment if enabled)
         """
 
         end_date = datetime.now()
@@ -117,7 +130,33 @@ class HistoricalDataFetcher:
                 all_data[pair] = data
                 logger.info(f"✓ {pair}: {len(data)} ticks")
 
-        logger.info(f"Fetched data for {len(all_data)} pairs")
+        # Fetch sentiment data in parallel for all symbols
+        if include_sentiment:
+            logger.info("Fetching historical sentiment data...")
+            sentiment_symbols = ["BTC", "ETH", "SOL"]  # Extract from pairs
+
+            sentiment_tasks = [
+                self.sentiment_fetcher.fetch_historical_sentiment(
+                    symbol=symbol,
+                    start_date=start_date,
+                    end_date=end_date,
+                    interval_hours=24  # Daily snapshots
+                )
+                for symbol in sentiment_symbols
+            ]
+
+            sentiment_results = await asyncio.gather(*sentiment_tasks, return_exceptions=True)
+
+            for symbol, sentiment_data in zip(sentiment_symbols, sentiment_results):
+                if isinstance(sentiment_data, Exception):
+                    logger.warning(f"✗ {symbol} sentiment: {sentiment_data}")
+                else:
+                    # Convert to DataPoints
+                    sentiment_points = self.sentiment_fetcher.convert_to_datapoints(sentiment_data)
+                    all_data[f"{symbol}-SENTIMENT"] = sentiment_points
+                    logger.info(f"✓ {symbol} sentiment: {len(sentiment_points)} snapshots")
+
+        logger.info(f"Fetched data for {len(all_data)} data streams")
 
         return all_data
 
@@ -196,7 +235,8 @@ class HistoricalDataFetcher:
         self,
         start_date: datetime,
         end_date: datetime,
-        timeframe: str = "1m"
+        timeframe: str = "1m",
+        include_sentiment: bool = True
     ) -> Dict[str, List[DataPoint]]:
         """
         Fetch data for a specific time window.
@@ -224,41 +264,69 @@ class HistoricalDataFetcher:
             else:
                 all_data[pair] = data
 
+        # Fetch sentiment for this window
+        if include_sentiment:
+            sentiment_symbols = ["BTC", "ETH", "SOL"]
+
+            sentiment_tasks = [
+                self.sentiment_fetcher.fetch_historical_sentiment(
+                    symbol=symbol,
+                    start_date=start_date,
+                    end_date=end_date,
+                    interval_hours=24
+                )
+                for symbol in sentiment_symbols
+            ]
+
+            sentiment_results = await asyncio.gather(*sentiment_tasks, return_exceptions=True)
+
+            for symbol, sentiment_data in zip(sentiment_symbols, sentiment_results):
+                if not isinstance(sentiment_data, Exception):
+                    sentiment_points = self.sentiment_fetcher.convert_to_datapoints(sentiment_data)
+                    all_data[f"{symbol}-SENTIMENT"] = sentiment_points
+
         return all_data
 
     async def fetch_historical_news(
         self,
+        symbol: str,
         start_date: datetime,
-        end_date: datetime,
-        sources: List[str] = None
-    ) -> List[Dict]:
+        end_date: datetime
+    ) -> List[DataPoint]:
         """
-        Fetch historical news articles.
+        Fetch historical news articles with sentiment.
 
-        Sources:
-        - CoinDesk API
-        - Cointelegraph
-        - CryptoSlate
-        - Messari news
+        Uses NewsSentimentFetcher to get news from:
+        - CryptoCompare (if API key available)
+        - NewsAPI.org (if API key available)
+        - Fear & Greed Index (always available)
 
         Returns:
-            List of news articles with timestamp, headline, sentiment
+            List of sentiment DataPoints aligned with price data
         """
 
-        sources = sources or ["coindesk", "cointelegraph", "cryptoslate"]
-
-        logger.info(f"Fetching historical news from {len(sources)} sources...")
+        logger.info(f"Fetching historical news sentiment for {symbol}...")
         logger.info(f"Date range: {start_date.date()} to {end_date.date()}")
 
-        news_articles = []
+        try:
+            # Fetch sentiment snapshots
+            snapshots = await self.sentiment_fetcher.fetch_historical_sentiment(
+                symbol=symbol,
+                start_date=start_date,
+                end_date=end_date,
+                interval_hours=24  # Daily snapshots
+            )
 
-        # TODO: Implement actual news fetching
-        # For now, return placeholder
+            # Convert to DataPoints
+            data_points = self.sentiment_fetcher.convert_to_datapoints(snapshots)
 
-        logger.warning("Historical news fetching not yet implemented")
-        logger.info("Will use CoinDesk API, Cointelegraph, CryptoSlate")
+            logger.info(f"✓ Fetched {len(data_points)} sentiment snapshots for {symbol}")
 
-        return news_articles
+            return data_points
+
+        except Exception as e:
+            logger.error(f"Error fetching news sentiment: {e}")
+            return []
 
     async def fetch_historical_tweets(
         self,
