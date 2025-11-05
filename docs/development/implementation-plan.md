@@ -1490,3 +1490,421 @@ async def test_pipeline_resilience():
 
 ---
 
+## Phase 4: Multi-Agent Committee (Weeks 9-10)
+
+**Objective**: Implement 5 specialized agents with weighted voting committee as specified in hierarchical-temporal-decision-system.md.
+
+**Why This Matters**: Single agent has limited view. Committee aggregates multiple strategies for robustness and better risk-adjusted returns.
+
+### Committee Architecture
+
+```
+┌──────────────────────────────────────────────────────┐
+│              COMMITTEE (Weighted Ensemble)            │
+├──────────────────────────────────────────────────────┤
+│  Agents (with dynamic weights):                      │
+│  ├── Trend Agent (w=0.30)         [Already built]    │
+│  ├── Mean-Reversion Agent (w=0.25)  [New]           │
+│  ├── Risk Agent (w=0.20)             [New]           │
+│  ├── Execution Agent (w=0.15)        [New]           │
+│  └── Arbitrage Agent (w=0.10)        [New]           │
+│                                                       │
+│  Aggregation: action = Σ w_i * agent_i.action       │
+│  Attribution tracking for each agent's contribution  │
+└──────────────────────────────────────────────────────┘
+```
+
+### Week 9: Four New Agents
+
+#### Days 39-40: Mean-Reversion Agent
+**Implementation** (3 commits, ~220 lines)
+```python
+# src/coinswarm/agents/mean_reversion.py
+class MeanReversionAgent(BaseAgent):
+    """Trades overbought/oversold conditions"""
+    # Strategy: RSI + Bollinger Bands + Z-score
+    # Entry: RSI < 30 (oversold) or RSI > 70 (overbought)
+    # Exit: Return to mean OR stop loss
+```
+**Tests** (2 commits, ~150 lines): Unit + soundness (all 7 EDD categories)
+
+#### Days 41-42: Risk Agent
+**Implementation** (3 commits, ~200 lines)
+```python
+# src/coinswarm/agents/risk.py
+class RiskAgent(BaseAgent):
+    """Monitors portfolio risk and suggests hedges"""
+    # Monitors: VaR, correlation matrix, tail risk
+    # Votes SELL/SIZE_DOWN when risk exceeds thresholds
+    # Votes BUY hedges (inverse positions) during high volatility
+```
+**Tests** (2 commits, ~140 lines): Unit + soundness
+
+#### Days 43-44: Execution Agent
+**Implementation** (3 commits, ~180 lines)
+```python
+# src/coinswarm/agents/execution.py
+class ExecutionAgent(BaseAgent):
+    """Optimizes order placement and timing"""
+    # Monitors: slippage, fill rates, queue position
+    # Votes on SIZE adjustments based on liquidity
+    # Suggests HOLD during wide spreads
+```
+**Tests** (2 commits, ~120 lines): Unit + soundness
+
+#### Days 45-46: Arbitrage Agent
+**Implementation** (3 commits, ~160 lines)
+```python
+# src/coinswarm/agents/arbitrage.py
+class ArbitrageAgent(BaseAgent):
+    """Identifies cross-exchange opportunities"""
+    # Monitors: funding rates, basis spreads, price differentials
+    # Opportunistic (low weight)
+    # Only votes BUY/SELL when spread > threshold
+```
+**Tests** (2 commits, ~110 lines): Unit + soundness
+
+**Checkpoint**: All 5 agents operational and tested
+
+### Week 10: Committee Integration
+
+#### Days 47-48: Committee Class
+
+**Implementation** (4 commits, ~350 lines)
+```python
+# src/coinswarm/agents/committee.py
+
+class Committee:
+    """Aggregates decisions from multiple agents"""
+
+    def __init__(self):
+        self.agents = {
+            'trend': TrendAgent(),
+            'mean_rev': MeanReversionAgent(),
+            'risk': RiskAgent(),
+            'execution': ExecutionAgent(),
+            'arbitrage': ArbitrageAgent()
+        }
+
+        # Default weights (overridden by Planner in Phase 5)
+        self.weights = {
+            'trend': 0.30,
+            'mean_rev': 0.25,
+            'risk': 0.20,
+            'execution': 0.15,
+            'arbitrage': 0.10
+        }
+
+    async def decide(self, state: MarketState) -> Action:
+        """Aggregate agent votes with current weights"""
+        votes = {}
+        for name, agent in self.agents.items():
+            votes[name] = await agent.decide(state)
+
+        # Weighted aggregation
+        action_scores = defaultdict(float)
+        for name, action in votes.items():
+            weight = self.weights[name]
+            action_scores[action.type] += weight * action.confidence
+
+        best_action_type = max(action_scores, key=action_scores.get)
+
+        return Action(
+            type=best_action_type,
+            confidence=action_scores[best_action_type],
+            size=self.aggregate_position_size(votes),
+            attribution=self.calculate_attribution(votes)
+        )
+
+    def update_weights(self, new_weights: Dict[str, float]):
+        """Update weights from Planner"""
+        assert abs(sum(new_weights.values()) - 1.0) < 1e-6
+        self.weights = new_weights
+```
+
+**Tests** (4 commits, ~300 lines)
+```python
+# tests/unit/agents/test_committee.py
+
+def test_weighted_aggregation():
+    """Votes aggregate correctly with weights"""
+
+def test_weight_updates():
+    """Weights can be updated dynamically"""
+
+def test_attribution_tracking():
+    """Attribution shows which agents contributed"""
+
+# tests/integration/test_committee_e2e.py
+
+async def test_committee_paper_trading():
+    """Committee runs for 24 hours in paper trading"""
+    # Measure: Sharpe, diversification, correlation
+```
+
+#### Days 49-50: Performance Validation
+
+**Backtesting** (3 commits, ~250 lines)
+```python
+# tests/backtest/test_committee_backtest.py
+
+def test_committee_vs_single_agents():
+    """Committee outperforms any single agent"""
+    # Run all agents individually
+    # Run committee
+    # Assert: Committee Sharpe > max(individual Sharpes)
+
+def test_agent_correlation():
+    """Agents have low correlation (< 0.5)"""
+    # Ensures diversification benefit
+
+def test_regime_adaptability():
+    """Committee works across all regimes"""
+    # Trending, range-bound, high-vol, low-vol
+```
+
+### Phase 4 Success Criteria
+
+**Must Pass Before Phase 5**:
+1. ✅ All 5 agents operational (Trend, Mean-Rev, Risk, Execution, Arb)
+2. ✅ All agents pass 7 EDD soundness categories
+3. ✅ Committee aggregation working (weighted voting)
+4. ✅ Portfolio metrics:
+   - Sharpe Ratio > 2.0 (better than any single agent)
+   - Max Drawdown < 10%
+   - Agent correlation < 0.5 (diversification)
+5. ✅ Paper trading: 48 hours without errors
+6. ✅ Test coverage ≥ 90% on all agent code
+
+**Deliverables**:
+- 30 atomic commits
+- ~1,110 lines production code (4 new agents + committee)
+- ~820 lines test code
+- Multi-agent committee ready for Planner layer
+- Proven diversification benefit
+
+**If Any Fail**: Do not proceed to Phase 5. Fix issues first.
+
+---
+
+## Phase 5: Planners & Production Readiness (Weeks 11-12)
+
+**Objective**: Add strategic Planner layer, self-reflection monitoring, and prepare for live trading with $1,000 seed capital.
+
+**Why This Matters**: Final layer adds regime adaptation. System can now adjust strategy based on macro conditions without human intervention.
+
+### Week 11: Planner Layer
+
+#### Days 51-52: Regime Detection
+
+**Implementation** (3 commits, ~300 lines)
+```python
+# src/coinswarm/planners/regime_detector.py
+
+class RegimeDetector:
+    """Detect market regime from multi-source data"""
+
+    async def detect(self, inputs: PlannerInputs) -> Regime:
+        """Return current regime tags"""
+        # Inputs: sentiment, funding, volatility, correlations
+
+        tags = []
+
+        # Risk sentiment
+        if inputs.twitter_sentiment > 0.6:
+            tags.append('risk-on')
+        elif inputs.twitter_sentiment < 0.4:
+            tags.append('risk-off')
+
+        # Trend detection
+        if inputs.btc_trend_strength > 0.7:
+            tags.append('trending')
+        else:
+            tags.append('range-bound')
+
+        # Volatility
+        if inputs.realized_vol > 0.05:
+            tags.append('high-vol')
+
+        return Regime(
+            volatility='high' if inputs.realized_vol > 0.05 else 'low',
+            trend='up' if inputs.btc_price_change > 0 else 'down',
+            tags=tags
+        )
+```
+
+#### Days 53-54: Planner Implementation
+
+**Implementation** (4 commits, ~450 lines)
+```python
+# src/coinswarm/planners/planner.py
+
+class Planner:
+    """Strategic layer that adjusts committee weights"""
+
+    async def generate_proposal(self) -> PlannerProposal:
+        """Propose new committee configuration"""
+
+        # Collect inputs
+        inputs = await self.collect_inputs()
+
+        # Detect regime
+        regime = self.regime_detector.detect(inputs)
+
+        # Propose weights for this regime
+        if 'trending' in regime.tags:
+            weights = {
+                'trend': 0.50,      # Increase trend-following
+                'mean_rev': 0.10,   # Decrease mean-reversion
+                'risk': 0.15,
+                'execution': 0.15,
+                'arbitrage': 0.10
+            }
+        elif 'range-bound' in regime.tags:
+            weights = {
+                'trend': 0.10,
+                'mean_rev': 0.50,   # Increase mean-reversion
+                'risk': 0.15,
+                'execution': 0.15,
+                'arbitrage': 0.10
+            }
+        elif 'high-vol' in regime.tags:
+            weights = {
+                'trend': 0.20,
+                'mean_rev': 0.15,
+                'risk': 0.40,       # Increase risk management
+                'execution': 0.20,
+                'arbitrage': 0.05
+            }
+        else:
+            weights = self.default_weights
+
+        # Backtest proposal
+        backtest_result = await self.backtest_weights(weights, days=7)
+
+        if backtest_result.sharpe < 1.0:
+            return None  # Reject own proposal
+
+        return PlannerProposal(
+            committee_weights=weights,
+            regime_tags=regime.tags,
+            justification={'backtest_sharpe': backtest_result.sharpe}
+        )
+```
+
+**Tests** (3 commits, ~220 lines): Regime detection, weight proposals, backtest validation
+
+#### Days 55-56: Self-Reflection Layer
+
+**Implementation** (3 commits, ~300 lines)
+```python
+# src/coinswarm/reflection/monitor.py
+
+class SelfReflectionMonitor:
+    """Monitors alignment across all three layers"""
+
+    def check_alignment(self) -> List[str]:
+        """Detect misalignment and trigger interventions"""
+
+        issues = []
+
+        # Planner effectiveness
+        if self.metrics.backtest_vs_live_gap > 0.5:
+            issues.append('planner_overfit')
+            self.trigger_planner_reoptimization()
+
+        # Committee coordination
+        if self.metrics.vote_entropy > 2.0:
+            issues.append('committee_disagreement')
+
+        # Memory-committee alignment
+        if self.metrics.memory_hit_rate < 0.3:
+            issues.append('memory_mismatch')
+            self.refresh_patterns()
+
+        return issues
+```
+
+**Tests** (2 commits, ~150 lines): Alignment checks, intervention triggers
+
+### Week 12: Production Hardening
+
+#### Days 57-58: Security & Compliance
+
+**Implementation** (5 commits, ~400 lines)
+- API key rotation system
+- Encrypted secrets management (AWS Secrets Manager or Vault)
+- Rate limiting per exchange
+- Audit log encryption
+- Position limit enforcement
+
+**Security Audit Checklist**:
+- ✅ No API keys in code
+- ✅ All secrets encrypted at rest
+- ✅ TLS for all external connections
+- ✅ Input validation on all user inputs
+- ✅ SQL injection prevention (parameterized queries)
+- ✅ CSRF protection
+- ✅ Audit trail immutable
+
+#### Days 59-60: Monitoring & Alerting
+
+**Grafana Dashboards** (3 commits)
+1. **Trading Dashboard**: P&L, positions, win rate, Sharpe
+2. **System Health**: CPU, memory, latency, error rates
+3. **Data Pipeline**: Ingestion rates, data freshness, API health
+
+**Alerts** (2 commits)
+- Critical: Daily loss > 4%, position limit breach, API down > 5min
+- Warning: Sharpe drops < 1.0, memory system slow > 10ms P50, data stale > 10min
+
+#### Day 61: Live Trading Preparation
+
+**Final Validation** (1 day)
+1. Run full test suite (1000+ tests)
+2. 72-hour paper trading stability test
+3. Security audit sign-off
+4. Load test: 1000 decisions/sec sustained
+5. Disaster recovery drill (kill each service, verify recovery)
+
+**Go-Live Checklist**:
+- ✅ All tests passing
+- ✅ 72-hour paper trading successful
+- ✅ Security audit complete
+- ✅ Monitoring dashboards operational
+- ✅ Alerts tested and working
+- ✅ Disaster recovery tested
+- ✅ $1,000 seed capital ready
+- ✅ Human oversight dashboard ready
+- ✅ Emergency stop button implemented
+
+### Phase 5 Success Criteria
+
+**Must Pass Before Live Trading**:
+1. ✅ Planner layer operational (adjusting weights hourly)
+2. ✅ Self-reflection detecting misalignments
+3. ✅ Security audit passed (no critical vulnerabilities)
+4. ✅ 72-hour paper trading with Sharpe > 2.0
+5. ✅ Monitoring comprehensive (20+ metrics, 15+ alerts)
+6. ✅ Disaster recovery tested (all services)
+7. ✅ Test coverage ≥ 90% system-wide
+8. ✅ Documentation complete (runbooks, architecture, API docs)
+
+**Deliverables**:
+- 26 atomic commits
+- ~1,450 lines production code (planner + reflection + security)
+- ~370 lines test code
+- System ready for live trading
+- Comprehensive monitoring and alerting
+- Security hardened and audited
+
+**Final Checkpoint: LIVE TRADING**:
+- Start with $1,000 seed capital
+- Max position size: $250 (25% of capital)
+- Max daily loss: $50 (5% of capital)
+- Human oversight: Review decisions daily
+- Emergency stop button accessible
+- Gradual capital increase: +$1,000/month if Sharpe > 1.5
+
+---
+
