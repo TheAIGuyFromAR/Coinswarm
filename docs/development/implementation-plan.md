@@ -342,3 +342,409 @@ docs/testing/test-data-strategy.md             # 250 lines, 25min
 
 ---
 
+## Phase 1: Core Memory System (Weeks 3-4)
+
+**Objective**: Implement the quorum-governed, self-improving memory system as specified in quorum-memory-system.md (18,000 words).
+
+**Why This Matters**: Memory is the brain of Coinswarm. Without it, agents cannot learn from trades, pattern system cannot evolve, and quorum consensus cannot govern decisions.
+
+### Architecture Components
+
+```
+┌────────────────────────────────────────────────────────┐
+│                   MEMORY SYSTEM                        │
+├────────────────────────────────────────────────────────┤
+│  Redis (Hot Storage)          PostgreSQL (Cold)        │
+│  ├── Episodic Memory          ├── Patterns             │
+│  ├── Vector Index (HNSW)      ├── Trades               │
+│  └── Regime State             ├── Regimes              │
+│                                ├── Episodes             │
+│  NATS (Message Bus)           └── Quorum Votes         │
+│  ├── Proposals                                         │
+│  ├── Votes                    Memory Managers (3+)     │
+│  └── Commits                  └── Quorum Voting        │
+└────────────────────────────────────────────────────────┘
+```
+
+### Week 3: Redis Vector Index & PostgreSQL Models
+
+#### Days 11-12: Redis Vector Index
+
+**Sprint 5A: Vector Index Implementation** (6 atomic commits, ~530 lines)
+
+```python
+# src/coinswarm/memory/redis_client.py (100 lines)
+class RedisClient:
+    """Wrapper for Redis with connection pooling"""
+    def __init__(self, host, port, db=0, pool_size=10)
+    async def connect()
+    async def disconnect()
+    async def health_check()
+    # Connection pool management, retry logic
+
+# src/coinswarm/memory/vector_index.py (370 lines)
+class VectorIndex:
+    """Redis-backed HNSW vector index for episodic memory"""
+
+    # Core operations
+    async def create_index(dim=384, m=16, ef_construction=200)
+    async def add_embedding(id, vector, metadata)
+    async def knn_search(query_vector, k=10, filters=None)
+    async def delete_embedding(id)
+
+    # Index management
+    async def get_index_info()
+    async def optimize_index()
+
+    # Health & metrics
+    async def get_stats()  # Returns: total entries, index size, QPS
+```
+
+**Detailed Tasks**:
+```
+Day 11:
+├── Redis client wrapper                    # 100 lines, 30min
+├── Vector index creation                   # 120 lines, 30min
+└── Embedding storage (add/get/delete)      # 80 lines, 25min
+
+Day 12:
+├── kNN search implementation               # 100 lines, 30min
+├── Index management (optimize/rebuild)     # 70 lines, 25min
+└── Health checks & Prometheus metrics      # 60 lines, 20min
+```
+
+**Sprint 5B: Vector Index Tests** (5 atomic commits, ~245 lines)
+
+```python
+# tests/unit/memory/test_vector_index.py
+def test_index_creation()           # Index schema validation
+def test_embedding_crud()            # Add, retrieve, update, delete
+def test_knn_search_accuracy()      # Recall ≥ 0.95 on test vectors
+
+# tests/integration/test_vector_index.py
+def test_redis_connection_pooling() # Concurrent operations
+def test_index_persistence()        # Survives Redis restart
+
+# tests/performance/test_vector_search.py
+def test_search_latency()           # P50 < 1ms, P99 < 5ms
+def test_throughput()                # > 1000 QPS sustained
+```
+
+**Checkpoint**: Redis vector index operational, < 2ms P50 latency
+
+#### Days 13-14: PostgreSQL Models
+
+**Sprint 6A: SQLAlchemy Models** (7 atomic commits, ~425 lines)
+
+```python
+# src/coinswarm/memory/database.py (80 lines)
+class Database:
+    """PostgreSQL connection and session management"""
+    def __init__(self, url, pool_size=5)
+    async def connect()
+    async def create_tables()
+    def get_session() -> Session
+
+# src/coinswarm/memory/models.py (345 lines)
+
+class Trade(Base):
+    """Individual trade record"""
+    id, symbol, side, entry_price, exit_price, pnl,
+    slippage_bps, entry_time, exit_time, agent_id,
+    regime_id, pattern_ids
+
+class Pattern(Base):
+    """Pattern cluster statistics"""
+    id, name, sample_size, mean_pnl, std_dev, sharpe,
+    win_rate, tail_5pct, tail_95pct, mean_slippage,
+    regime, enabled, last_updated
+
+class Regime(Base):
+    """Market regime definition"""
+    id, volatility, spread, trend, session, version,
+    start_time, end_time
+
+class Episode(Base):
+    """Episodic memory metadata"""
+    id, bot_id, embedding_id, action, reward, outcome,
+    timestamp, regime_id, weight
+
+class AgentState(Base):
+    """Agent configuration snapshot"""
+    id, agent_id, weights, thresholds, regime_tags,
+    timestamp, valid_until
+
+class QuorumVote(Base):
+    """Vote record for quorum consensus"""
+    id, proposal_id, manager_id, decision, reasons,
+    timestamp
+```
+
+**Detailed Tasks**:
+```
+Day 13:
+├── Database setup & engine          # 80 lines, 25min
+├── Trade model                      # 60 lines, 20min
+├── Pattern model                    # 70 lines, 25min
+└── Regime model                     # 50 lines, 20min
+
+Day 14:
+├── Episode model                    # 60 lines, 20min
+├── Agent state model                # 55 lines, 20min
+└── Quorum vote model                # 50 lines, 20min
+```
+
+**Sprint 6B: Model Tests** (6 atomic commits, ~285 lines)
+
+```python
+# tests/unit/memory/test_models.py
+def test_trade_model_validation()    # Required fields, constraints
+def test_pattern_statistics()        # Sharpe calculation, win rate
+def test_regime_versioning()         # Version increments
+
+# tests/integration/test_database.py
+def test_database_crud()             # Create, read, update, delete
+def test_transactions_rollback()     # ACID guarantees
+def test_complex_queries()           # Joins, filters, aggregations
+```
+
+**Checkpoint**: PostgreSQL models functional, all CRUD operations tested
+
+### Week 4: NATS Message Bus & Quorum Voting
+
+#### Days 15-16: NATS Client
+
+**Sprint 7A: NATS Implementation** (5 atomic commits, ~330 lines)
+
+```python
+# src/coinswarm/core/nats_client.py (330 lines)
+
+class NATSClient:
+    """NATS message bus client with pub/sub/request-reply"""
+
+    def __init__(self, servers, cluster_id="coinswarm")
+
+    # Connection management
+    async def connect()
+    async def disconnect()
+    async def reconnect_with_backoff()
+
+    # Publishing
+    async def publish(subject, data)
+    async def publish_batch(messages)
+
+    # Subscribing
+    async def subscribe(subject, callback, queue_group=None)
+    async def unsubscribe(subscription_id)
+
+    # Request/Reply
+    async def request(subject, data, timeout=2.0)
+
+    # Error handling
+    async def on_disconnect(callback)
+    async def on_error(callback)
+```
+
+**Message Subjects**:
+```
+mem.propose          # Memory change proposals
+mem.vote             # Manager votes on proposals
+mem.commit           # Coordinator commits accepted changes
+mem.audit            # Audit trail events
+
+planner.propose      # Committee weight changes
+planner.vote         # Manager votes on planner proposals
+planner.commit       # Accepted planner configurations
+
+agent.action         # Agent decisions
+agent.trade          # Trade execution results
+```
+
+**Sprint 7B: NATS Tests** (5 atomic commits, ~255 lines)
+
+```python
+# tests/unit/test_nats_client.py
+def test_connection_management()     # Connect, disconnect, reconnect
+def test_publish_subscribe()         # Message delivery
+
+# tests/integration/test_nats.py
+def test_pubsub_flow()               # Multi-subscriber delivery
+def test_request_reply()             # Synchronous request pattern
+def test_queue_groups()              # Load balancing
+
+# tests/performance/test_nats_perf.py
+def test_throughput()                # > 10k msg/sec
+def test_latency()                   # P50 < 5ms, P99 < 20ms
+```
+
+**Checkpoint**: NATS operational, < 5ms P50 latency
+
+#### Days 17-18: Memory Manager & Quorum Voting
+
+**Implementation** (4 atomic commits, ~600 lines)
+
+```python
+# src/coinswarm/memory/manager.py (300 lines)
+
+class MemoryManager:
+    """Evaluates proposals and votes on memory changes"""
+
+    def __init__(self, manager_id, nats_client, redis_client, db)
+
+    # Proposal evaluation (deterministic)
+    async def evaluate_memory_proposal(proposal) -> Vote
+    async def evaluate_planner_proposal(proposal) -> Vote
+
+    # Validation checks
+    def check_statistical_soundness(proposal) -> (bool, str)
+    def check_safety_invariants(proposal) -> (bool, str)
+    def check_pattern_quality(proposal) -> (bool, str)
+
+    # Voting
+    async def cast_vote(proposal_id, decision, reasons)
+
+# src/coinswarm/memory/coordinator.py (200 lines)
+
+class MemoryCoordinator:
+    """Rotating coordinator that commits accepted proposals"""
+
+    def __init__(self, nats_client, redis_client, db)
+
+    # Quorum logic
+    async def collect_votes(proposal_id, timeout=2.0)
+    def check_quorum(votes, required=3) -> bool
+    def check_consensus(votes) -> bool
+
+    # Commit
+    async def commit_memory_change(proposal)
+    async def broadcast_commit(proposal_id, decision)
+
+    # Audit trail
+    async def log_decision(proposal, votes, decision)
+
+# src/coinswarm/memory/proposals.py (100 lines)
+
+@dataclass
+class MemoryProposal:
+    """Memory change proposal"""
+    id: str
+    change_type: str  # 'add_episode', 'update_pattern', 'deprecate_pattern'
+    data: dict
+    submitter: str
+    timestamp: datetime
+    justification: dict
+```
+
+**Quorum Voting Flow**:
+```
+1. Trading Bot submits proposal
+   └─> NATS: mem.propose
+
+2. Memory Managers (3+) evaluate
+   ├─> Check statistical soundness
+   ├─> Check safety invariants
+   └─> Cast vote: ACCEPT/REJECT
+       └─> NATS: mem.vote
+
+3. Coordinator collects votes
+   ├─> Wait for quorum (3 votes)
+   ├─> Check consensus (all agree)
+   └─> If ACCEPT:
+       ├─> Apply change to Redis/PostgreSQL
+       └─> Broadcast commit
+           └─> NATS: mem.commit
+```
+
+**Tests** (6 atomic commits, ~350 lines)
+
+```python
+# tests/unit/memory/test_manager.py
+def test_proposal_evaluation_determinism()  # Same inputs → same vote
+def test_statistical_checks()               # Sharpe, win rate validation
+def test_safety_checks()                    # Position limits, loss limits
+
+# tests/integration/test_quorum_voting.py
+def test_three_manager_consensus()          # All agree → ACCEPT
+def test_two_manager_disagreement()         # No consensus → REJECT
+def test_coordinator_rotation()             # Leader election works
+
+# tests/soundness/test_quorum_soundness.py
+def test_byzantine_fault_tolerance()        # 1 manager fails → system ok
+def test_network_partition_handling()       # Split brain detection
+```
+
+**Checkpoint**: Quorum voting operational, 3-vote consensus working
+
+#### Days 19-20: End-to-End Memory System Test
+
+**Integration Tests** (3 atomic commits, ~400 lines)
+
+```python
+# tests/integration/test_memory_system_e2e.py
+
+async def test_episodic_memory_full_cycle():
+    """
+    1. Agent executes trade
+    2. Submits memory proposal (add episode)
+    3. Managers vote (all ACCEPT)
+    4. Coordinator commits to Redis
+    5. Episode queryable via kNN search
+    """
+
+async def test_pattern_promotion():
+    """
+    1. Submit pattern promotion proposal
+    2. Managers check: n ≥ 100, SR ≥ 1.5, DD ≤ 0.10
+    3. If pass: pattern enabled
+    4. Pattern appears in PostgreSQL
+    """
+
+async def test_planner_weight_change():
+    """
+    1. Planner proposes new committee weights
+    2. Managers validate: sum=1.0, backtest improvement
+    3. If ACCEPT: weights updated
+    4. Committee uses new weights
+    """
+```
+
+**Performance Validation**:
+```python
+# tests/performance/test_memory_system_perf.py
+
+def test_end_to_end_latency():
+    """Proposal → Vote → Commit: < 10ms P50"""
+
+def test_throughput_under_load():
+    """100 proposals/sec sustained for 1 minute"""
+
+def test_memory_retrieval():
+    """kNN search with 100k entries: < 2ms P50"""
+```
+
+### Phase 1 Success Criteria
+
+**Must Pass Before Phase 2**:
+1. ✅ Redis vector index operational (sub-2ms P50 latency)
+2. ✅ PostgreSQL models functional (all CRUD operations)
+3. ✅ NATS message bus running (< 5ms P50 latency)
+4. ✅ Quorum voting works (3-vote consensus)
+5. ✅ Memory Manager deterministic (same inputs → same vote)
+6. ✅ End-to-end memory cycle tested (proposal → commit)
+7. ✅ Performance: > 100 proposals/sec throughput
+8. ✅ Soundness: Byzantine fault tolerance validated
+9. ✅ All EDD tests passing (determinism, latency, safety)
+10. ✅ Test coverage ≥ 90% on memory system code
+
+**Deliverables**:
+- 37 atomic commits
+- ~2,510 lines of production code
+- ~1,535 lines of test code
+- Quorum-governed memory system operational
+- Sub-2ms memory retrieval latency
+- Ready to build first trading agent
+
+**If Any Fail**: Do not proceed to Phase 2. Fix issues first.
+
+---
+
