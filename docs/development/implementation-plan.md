@@ -140,16 +140,28 @@ Week 11-12 │████████│ Phase 5: Planners + Production
 
 #### Days 1-2: Unit Tests for Existing Code
 
-**Sprint 1A: MCP Server Tests** (6 atomic commits, ~220 lines)
+**Sprint 1A: MCP Server Tests** (6 atomic commits, ~220 lines) ✅ **COMPLETED**
 ```
-tests/unit/test_mcp_server.py
-├── test_mcp_resource_listing()         # 30 lines, 15min
-├── test_mcp_resource_reading()         # 40 lines, 20min
-├── test_mcp_tool_listing()             # 30 lines, 15min
-├── test_mcp_tool_execution()           # 50 lines, 25min
-├── test_mcp_order_validation()         # 40 lines, 20min
-└── test_mcp_error_handling()           # 30 lines, 15min
+tests/unit/test_mcp_server.py (387 lines, 21 tests)
+├── TestMCPResourceListing (5 tests)    # Resource URI and metadata validation
+├── TestMCPResourceReading (4 tests)    # Reading accounts, products, orders, fills
+├── TestMCPToolListing (3 tests)        # Tool availability and schema validation
+├── TestMCPToolExecution (3 tests)      # Market data, orders, cancellation
+├── TestMCPOrderValidation (3 tests)    # Required fields and enum validation
+└── TestMCPErrorHandling (3 tests)      # Invalid URIs, missing params, API errors
 ```
+
+**Blocker Encountered & Resolved**:
+- **Issue**: `pip install -r requirements.txt` took 7+ minutes due to PyTorch (large ML library)
+- **Root Cause**: requirements.txt includes torch>=2.1.0 (multi-GB download)
+- **Solution**: Installed core dependencies without torch for faster test execution:
+  ```bash
+  pip install pydantic pydantic-settings mcp structlog aiohttp ccxt \
+    redis pandas numpy asyncpg motor influxdb-client httpx tenacity \
+    cachetools python-dotenv -q
+  ```
+- **Result**: Installation time reduced from 7+ minutes to ~30 seconds
+- **Future**: Install torch only when ML features (pattern learning) are needed in Phase 4+
 
 **Sprint 1B: Data Ingest Base Tests** (4 atomic commits, ~100 lines)
 ```
