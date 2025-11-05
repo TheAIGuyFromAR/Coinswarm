@@ -1564,9 +1564,14 @@ class ArbitrageAgent(BaseAgent):
 ```
 **Tests** (2 commits, ~110 lines): Unit + soundness
 
-#### Days 46.5-47: Research Agent (NEW - Strategy Bootstrapping)
+#### Days 46.5-47: Research Agent (NEW - Strategy Competition)
 
-**Concept**: Research Agent studies proven tradfi strategies and proposes them as initial patterns. These still require quorum approval and EDD validation - but accelerate learning by leveraging decades of institutional knowledge.
+**Concept**: After 4+ weeks of pure organic learning (Phases 2-3), Research Agent proposes proven tradfi strategies to **compete** against organically-discovered patterns. The system determines which work better in crypto through head-to-head performance comparison.
+
+**Timeline**:
+- ✅ Weeks 5-8: Pure tabula rasa (Trend Agent learns from scratch, patterns emerge)
+- ⭐ Week 9: Research Agent proposes tradfi strategies (Days 46-47)
+- 🔥 Week 10+: Organic vs Tradfi strategies compete for committee weights
 
 **Implementation** (3 commits, ~280 lines)
 ```python
@@ -1731,18 +1736,20 @@ class MomentumStrategy(BaseAgent):
      - Strategy doesn't violate safety invariants
    - If approved: Strategy added to pattern library
 
-4. **Continuous Learning** (Ongoing):
-   - Research Agent monitors pattern performance
-   - If tradfi strategy fails in crypto → deprecated
-   - If tradfi strategy succeeds → kept
-   - **System still learns from actual trades**
+4. **Competition Phase** (Week 10+):
+   - Organic patterns (from Weeks 5-8 trading) vs Tradfi strategies
+   - Committee weights adjusted based on live performance
+   - If organic pattern outperforms → gets higher weight
+   - If tradfi strategy outperforms → gets higher weight
+   - **Best strategies win, regardless of source**
 
 **Key Benefits**:
-- ✅ **Faster Bootstrap**: Don't start from zero, leverage 50+ years of quant research
-- ✅ **Academic Validation**: Strategies have published papers and institutional use
-- ✅ **Still Validated**: Must pass backtest + quorum before deployment
-- ✅ **Learn What Works**: System discovers which tradfi strategies work in crypto
-- ✅ **Complement Organic Learning**: Researched + organic patterns coexist
+- ✅ **Pure Organic First**: 4 weeks of tabula rasa learning (no tradfi bias)
+- ✅ **Head-to-Head Competition**: Empirical test of which strategies work in crypto
+- ✅ **Academic Validation**: Tradfi strategies have 50+ years of research backing
+- ✅ **Still Validated**: All patterns (organic + tradfi) require quorum approval
+- ✅ **Learn What Works**: System discovers if tradfi strategies adapt to crypto
+- ✅ **Meritocracy**: Committee weights follow performance, not pedigree
 
 **Integration with Existing System**:
 ```
@@ -2456,23 +2463,30 @@ After 12 weeks (84 days) of focused development, Coinswarm will be a **productio
 
 ---
 
-## Key Innovation: Hybrid Learning System
+## Key Innovation: Competitive Learning System
 
-**Organic Learning** (from scratch):
+**Phase 1: Pure Organic Learning (Weeks 5-8)**:
+- System starts from zero (tabula rasa)
 - Episodic memory captures every trade
 - Patterns emerge from clustering
-- System improves continuously
+- No tradfi bias or preconceptions
 
-**Research Agent** (tradfi bootstrap):
-- Studies 50+ years of academic research
-- Proposes proven strategies
-- Adapts for crypto markets (24/7, higher vol)
+**Phase 2: Competition Begins (Week 9+)**:
+- Research Agent proposes tradfi strategies
+- Organic patterns vs Academic strategies
+- Committee weights determined by live performance
+- **Best strategies win, regardless of source**
 
-**Both validated by**:
+**Validation (Both Types)**:
 - Quorum voting (3-vote consensus)
-- Backtest requirements
-- EDD soundness tests
+- Backtest requirements (Sharpe > threshold)
+- EDD soundness tests (all 7 categories)
 - Live performance monitoring
 
-**Best of both worlds**: Fast bootstrap + continuous adaptation
+**Outcome**: System empirically learns whether:
+- Organic crypto-native patterns outperform academia
+- Tradfi strategies successfully adapt to crypto
+- Hybrid approach (both) is optimal
+
+**This is true evidence-driven development at the strategy level** 🔬
 
