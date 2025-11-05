@@ -1,0 +1,143 @@
+# GCP Cloud Run Configuration - Single-User Trading Bot
+#
+# Deploy with:
+#   gcloud run services replace cloud-run.yaml --region=us-east4
+#
+# Region: us-east4 (Ashburn, VA)
+# - Co-located with Coinbase API in us-east-1 AWS
+# - Same datacenter park (<1ms latency)
+# - 2-5ms to Coinbase API ✅
+#
+# Resources: 4GB RAM, 2 vCPU
+# - In-memory cache: ~1GB
+# - ML agents: ~1GB
+# - Python runtime: ~500MB
+# - Headroom: ~1.5GB
+#
+# Cost: $0/mo (under 2M requests/mo free tier)
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: coinswarm-bot
+  labels:
+    app: coinswarm
+    tier: single-user
+    version: v1
+spec:
+  template:
+    metadata:
+      annotations:
+        # Always keep 1 instance warm (no cold starts)
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "1"  # Single user = 1 instance
+
+        # CPU always allocated (for ML agents)
+        run.googleapis.com/cpu-throttling: "false"
+
+        # Startup probe (allow 60s for initialization)
+        run.googleapis.com/startup-cpu-boost: "true"
+
+        # Execution environment
+        run.googleapis.com/execution-environment: gen2
+
+        # Network egress (VPC connector not needed for public APIs)
+        run.googleapis.com/network-interfaces: '[{"network":"default","subnetwork":"default"}]'
+
+    spec:
+      # Container specification
+      containers:
+      - name: coinswarm-bot
+        image: gcr.io/YOUR_PROJECT_ID/coinswarm-bot:latest
+
+        # Resources (optimal for single-user bot)
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "2"
+          requests:
+            memory: 4Gi
+            cpu: "2"
+
+        # Environment variables
+        env:
+        - name: LOG_LEVEL
+          value: INFO
+
+        # Azure Cosmos DB (from secret)
+        - name: AZURE_COSMOS_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: cosmos-endpoint
+              key: latest
+        - name: AZURE_COSMOS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cosmos-key
+              key: latest
+
+        # Coinbase API (from secret)
+        - name: COINBASE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: coinbase-api-key
+              key: latest
+        - name: COINBASE_API_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: coinbase-api-secret
+              key: latest
+
+        # Trading configuration
+        - name: TRADING_SYMBOLS
+          value: "BTC-USD,ETH-USD"
+        - name: WATCHDOG_TIMEOUT
+          value: "60"
+
+        # Ports (for health checks)
+        ports:
+        - name: http1
+          containerPort: 8080
+
+        # Startup probe (allow 60s for Cosmos DB connection)
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 12  # 60s total
+
+        # Liveness probe (restart if unhealthy)
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 0
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+
+        # Readiness probe (remove from load balancer if unhealthy)
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 2
+
+      # Service account (for GCP API access)
+      serviceAccountName: coinswarm-bot@YOUR_PROJECT_ID.iam.gserviceaccount.com
+
+      # Timeout (long-running trading bot)
+      timeoutSeconds: 3600  # 1 hour (Cloud Run default)
+
+      # Concurrency (1 for long-running bot)
+      containerConcurrency: 1
+
+  # Traffic routing (100% to latest revision)
+  traffic:
+  - percent: 100
+    latestRevision: true
