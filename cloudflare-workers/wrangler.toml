@@ -1,0 +1,23 @@
+# Cloudflare Workers Configuration
+# Deploy: wrangler publish
+
+name = "coinswarm-data-fetcher"
+main = "data-fetcher.js"
+compatibility_date = "2024-01-01"
+
+# KV namespace for caching
+[[kv_namespaces]]
+binding = "DATA_CACHE"
+id = "your_kv_namespace_id"  # Get from: wrangler kv:namespace create DATA_CACHE
+
+# Routes (optional - deploy to workers.dev subdomain for now)
+# routes = [
+#   { pattern = "data.yoursite.com/*", zone_name = "yoursite.com" }
+# ]
+
+# Free tier limits
+# - 100,000 requests/day
+# - 10ms CPU time per request
+# - 1GB KV storage
+# - 1,000 KV writes/day
+# - 100,000 KV reads/day
