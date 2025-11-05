@@ -1564,7 +1564,204 @@ class ArbitrageAgent(BaseAgent):
 ```
 **Tests** (2 commits, ~110 lines): Unit + soundness
 
-**Checkpoint**: All 5 agents operational and tested
+#### Days 46.5-47: Research Agent (NEW - Strategy Bootstrapping)
+
+**Concept**: Research Agent studies proven tradfi strategies and proposes them as initial patterns. These still require quorum approval and EDD validation - but accelerate learning by leveraging decades of institutional knowledge.
+
+**Implementation** (3 commits, ~280 lines)
+```python
+# src/coinswarm/agents/research.py
+
+class ResearchAgent:
+    """Studies tradfi strategies and proposes them to memory system"""
+
+    STRATEGY_LIBRARY = {
+        'momentum': {
+            'description': 'Buy assets with strong recent performance',
+            'academic_paper': 'Jegadeesh & Titman (1993)',
+            'typical_sharpe': 0.8,
+            'tradfi_validation': 'Proven in equities 1970-2020',
+            'crypto_adaptations': ['shorter lookback', 'higher turnover']
+        },
+        'pairs_trading': {
+            'description': 'Trade correlated pairs when spread widens',
+            'academic_paper': 'Gatev et al. (2006)',
+            'typical_sharpe': 1.2,
+            'tradfi_validation': 'Used by quant hedge funds',
+            'crypto_adaptations': ['BTC/ETH pair', 'stablecoin arbitrage']
+        },
+        'statistical_arbitrage': {
+            'description': 'Mean reversion on cointegrated assets',
+            'academic_paper': 'Avellaneda & Lee (2010)',
+            'typical_sharpe': 1.5,
+            'tradfi_validation': 'Renaissance Technologies',
+            'crypto_adaptations': ['24/7 markets', 'higher volatility']
+        },
+        'carry_trade': {
+            'description': 'Borrow low-yield, lend high-yield',
+            'academic_paper': 'Burnside et al. (2011)',
+            'typical_sharpe': 0.6,
+            'tradfi_validation': 'FX markets since 1980s',
+            'crypto_adaptations': ['funding rate differentials', 'staking yields']
+        },
+        'volatility_targeting': {
+            'description': 'Scale positions inversely with volatility',
+            'academic_paper': 'Moreira & Muir (2017)',
+            'typical_sharpe': 'Improves by 0.3-0.5',
+            'tradfi_validation': 'Risk parity funds',
+            'crypto_adaptations': ['faster vol estimation', 'intraday rebalancing']
+        }
+    }
+
+    async def research_strategies(self) -> List[StrategyProposal]:
+        """Research and propose tradfi strategies adapted for crypto"""
+        proposals = []
+
+        for strategy_name, info in self.STRATEGY_LIBRARY.items():
+            # Check if strategy already exists in pattern library
+            if await self.pattern_exists(strategy_name):
+                continue
+
+            # Create strategy proposal
+            proposal = StrategyProposal(
+                name=strategy_name,
+                description=info['description'],
+                source='tradfi_research',
+                academic_backing=info['academic_paper'],
+                expected_sharpe=info['typical_sharpe'],
+                adaptations=info['crypto_adaptations'],
+
+                # Implementation details
+                entry_rules=self.generate_entry_rules(strategy_name),
+                exit_rules=self.generate_exit_rules(strategy_name),
+                position_sizing=self.generate_sizing_rules(strategy_name),
+
+                # Validation requirements
+                requires_backtest=True,
+                min_sharpe_threshold=1.0,  # Lower than organic patterns (1.5)
+                min_sample_size=50         # Require evidence
+            )
+
+            proposals.append(proposal)
+
+        return proposals
+
+    async def submit_strategy_proposal(self, proposal: StrategyProposal):
+        """Submit strategy to quorum for approval"""
+
+        # Step 1: Backtest on recent data
+        backtest_result = await self.backtest_strategy(
+            proposal,
+            dataset='last_90_days',
+            include_slippage=True,
+            include_fees=True
+        )
+
+        # Step 2: Only submit if backtest passes
+        if backtest_result.sharpe < proposal.min_sharpe_threshold:
+            logger.info(f"Strategy {proposal.name} failed backtest: "
+                       f"Sharpe {backtest_result.sharpe:.2f}")
+            return None
+
+        # Step 3: Create pattern proposal for quorum
+        pattern_proposal = PatternProposal(
+            change_type='add_pattern',
+            pattern_name=proposal.name,
+            source='research_agent',
+            statistics={
+                'backtest_sharpe': backtest_result.sharpe,
+                'backtest_win_rate': backtest_result.win_rate,
+                'backtest_trades': backtest_result.total_trades,
+                'academic_backing': proposal.academic_backing,
+                'tradfi_sharpe': proposal.expected_sharpe
+            },
+            justification={
+                'reason': 'Proven tradfi strategy adapted for crypto',
+                'academic_paper': proposal.academic_backing,
+                'backtest_performance': backtest_result.summary()
+            }
+        )
+
+        # Step 4: Submit to quorum via NATS
+        await self.nats_client.publish('mem.propose', pattern_proposal)
+
+        logger.info(f"Submitted {proposal.name} for quorum approval")
+        return pattern_proposal
+
+# Example: Momentum Strategy Implementation
+class MomentumStrategy(BaseAgent):
+    """Researched strategy: Buy winners, sell losers"""
+
+    def __init__(self):
+        super().__init__()
+        self.lookback_period = 20  # days (shorter than tradfi 12mo)
+        self.holding_period = 5    # days (faster turnover)
+        self.source = 'research_agent'
+
+    async def decide(self, state: MarketState) -> Action:
+        # Calculate momentum score
+        returns = state.prices[-self.lookback_period:].pct_change()
+        momentum_score = returns.mean() / returns.std()
+
+        if momentum_score > 1.5:
+            return Action(type='BUY', confidence=0.7, size=100)
+        elif momentum_score < -1.5:
+            return Action(type='SELL', confidence=0.7, size=100)
+        else:
+            return Action(type='HOLD', confidence=0.5, size=0)
+```
+
+**How It Works**:
+
+1. **Research Phase** (Days 46.5):
+   - Research Agent studies 5 proven tradfi strategies
+   - Each strategy has academic backing (published papers)
+   - Adapts strategy parameters for crypto (24/7, higher vol, etc.)
+
+2. **Backtest Phase** (Days 47):
+   - Backtest each strategy on recent crypto data (90 days)
+   - Include realistic slippage and fees
+   - Only propose strategies with Sharpe > 1.0
+
+3. **Quorum Approval** (Days 47):
+   - Submit proposals to Memory Managers
+   - Managers validate:
+     - Academic backing is legitimate
+     - Backtest performance meets threshold
+     - Strategy doesn't violate safety invariants
+   - If approved: Strategy added to pattern library
+
+4. **Continuous Learning** (Ongoing):
+   - Research Agent monitors pattern performance
+   - If tradfi strategy fails in crypto → deprecated
+   - If tradfi strategy succeeds → kept
+   - **System still learns from actual trades**
+
+**Key Benefits**:
+- ✅ **Faster Bootstrap**: Don't start from zero, leverage 50+ years of quant research
+- ✅ **Academic Validation**: Strategies have published papers and institutional use
+- ✅ **Still Validated**: Must pass backtest + quorum before deployment
+- ✅ **Learn What Works**: System discovers which tradfi strategies work in crypto
+- ✅ **Complement Organic Learning**: Researched + organic patterns coexist
+
+**Integration with Existing System**:
+```
+Trading Agents (Committee)
+├── Organic Patterns (learned from trades)
+│   └── Discovered via episodic memory clustering
+└── Researched Patterns (tradfi strategies)
+    └── Proposed by Research Agent, validated by quorum
+
+Both types require:
+- Backtest validation (Sharpe > threshold)
+- Quorum approval (3-vote consensus)
+- Live performance monitoring
+- Can be deprecated if underperform
+```
+
+**Tests** (2 commits, ~150 lines): Backtest validation, quorum integration
+
+**Checkpoint**: All 6 agents operational (5 trading + 1 research)
 
 ### Week 10: Committee Integration
 
@@ -1677,11 +1874,12 @@ def test_regime_adaptability():
 6. ✅ Test coverage ≥ 90% on all agent code
 
 **Deliverables**:
-- 30 atomic commits
-- ~1,110 lines production code (4 new agents + committee)
-- ~820 lines test code
+- 35 atomic commits (updated with Research Agent)
+- ~1,390 lines production code (4 trading + 1 research agent + committee)
+- ~970 lines test code
 - Multi-agent committee ready for Planner layer
 - Proven diversification benefit
+- 5 tradfi strategies adapted and validated for crypto
 
 **If Any Fail**: Do not proceed to Phase 5. Fix issues first.
 
@@ -1918,39 +2116,41 @@ class SelfReflectionMonitor:
 | **Phase 1** | Weeks 3-4 | 37 | 2,510 | 1,535 | Memory system operational |
 | **Phase 2** | Weeks 5-6 | 12 | 600 | 560 | First agent (Trend) validated |
 | **Phase 3** | Weeks 7-8 | 24 | 1,810 | 650 | Live data pipeline |
-| **Phase 4** | Weeks 9-10 | 30 | 1,110 | 820 | Multi-agent committee |
+| **Phase 4** | Weeks 9-10 | 35 | 1,390 | 970 | Committee + Research Agent |
 | **Phase 5** | Weeks 11-12 | 26 | 1,450 | 370 | Production ready |
-| **TOTAL** | **12 weeks** | **188** | **7,480** | **5,815** | **Live trading system** |
+| **TOTAL** | **12 weeks** | **193** | **7,760** | **5,965** | **Live trading system** |
 
 ### Code Distribution
 
 ```
-Production Code (7,480 lines):
-├── Memory System (2,510 lines)   33.5%
+Production Code (7,760 lines):
+├── Memory System (2,510 lines)   32.4%
 │   ├── Redis vector index
 │   ├── PostgreSQL models
 │   ├── NATS message bus
 │   └── Quorum voting
 │
-├── Data Pipeline (1,810 lines)   24.2%
-│   ├── 5+ data ingestors
-│   ├── Prefect scheduler
-│   └── Data distribution clients
-│
-├── Planners & Reflection (1,450) 19.4%
-│   ├── Regime detection
-│   ├── Planner proposals
-│   ├── Self-reflection
-│   └── Security hardening
-│
-├── Agents (1,710 lines)          22.9%
+├── Agents (1,990 lines)          25.6%
 │   ├── Base agent (120)
 │   ├── Trend (240)
 │   ├── Mean-Rev (220)
 │   ├── Risk (200)
 │   ├── Execution (180)
 │   ├── Arbitrage (160)
-│   └── Committee (350)
+│   ├── Research Agent (280) ⭐ NEW
+│   ├── Committee (350)
+│   └── 5 tradfi strategies (momentum, pairs, stat arb, carry, vol targeting)
+│
+├── Data Pipeline (1,810 lines)   23.3%
+│   ├── 5+ data ingestors
+│   ├── Prefect scheduler
+│   └── Data distribution clients
+│
+├── Planners & Reflection (1,450) 18.7%
+│   ├── Regime detection
+│   ├── Planner proposals
+│   ├── Self-reflection
+│   └── Security hardening
 │
 └── Already Implemented (not counted above)
     ├── Config system
@@ -1959,15 +2159,15 @@ Production Code (7,480 lines):
     └── Binance ingestor
 ```
 
-### Test Coverage (5,815 lines)
+### Test Coverage (5,965 lines)
 
 ```
 Test Code Distribution:
-├── Unit Tests (2,150 lines)      37.0%
-├── Integration Tests (1,750)     30.1%
-├── Soundness Tests (1,100)       18.9%
-├── Performance Tests (565)        9.7%
-└── Backtest Tests (250)           4.3%
+├── Unit Tests (2,200 lines)      36.9%
+├── Integration Tests (1,800)     30.2%
+├── Soundness Tests (1,150)       19.3%
+├── Performance Tests (565)        9.5%
+└── Backtest Tests (250)           4.2%
 ```
 
 ### Technology Stack
@@ -2245,10 +2445,34 @@ After 12 weeks (84 days) of focused development, Coinswarm will be a **productio
 
 **Implementation plan complete. Ready to execute. 🚀**
 
-**Total Document**: ~3,500 lines
+**Total Document**: ~2,450 lines
 **Phases**: 6 (0-5)
 **Timeline**: 12 weeks
-**Commits**: 188 atomic actions
-**Code**: 7,480 production + 5,815 test lines
+**Commits**: 193 atomic actions
+**Code**: 7,760 production + 5,965 test lines
+**Agents**: 5 trading + 1 research (6 total)
+**Tradfi Strategies**: 5 (momentum, pairs trading, stat arb, carry, vol targeting)
 **From Architecture to Live Trading**: 84 days
+
+---
+
+## Key Innovation: Hybrid Learning System
+
+**Organic Learning** (from scratch):
+- Episodic memory captures every trade
+- Patterns emerge from clustering
+- System improves continuously
+
+**Research Agent** (tradfi bootstrap):
+- Studies 50+ years of academic research
+- Proposes proven strategies
+- Adapts for crypto markets (24/7, higher vol)
+
+**Both validated by**:
+- Quorum voting (3-vote consensus)
+- Backtest requirements
+- EDD soundness tests
+- Live performance monitoring
+
+**Best of both worlds**: Fast bootstrap + continuous adaptation
 
