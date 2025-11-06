@@ -3,7 +3,7 @@
 # Configured with account ID and updated API token
 
 name = "coinswarm-evolution-agent"
-main = "evolution-agent.ts"
+main = "evolution-agent-simple.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
