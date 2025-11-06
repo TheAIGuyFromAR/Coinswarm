@@ -84,6 +84,7 @@ export class EvolutionAgent implements DurableObject {
   private state: DurableObjectState;
   private env: Env;
   private evolutionState: EvolutionState;
+  private logs: string[] = [];
 
   constructor(state: DurableObjectState, env: Env) {
     console.log('EvolutionAgent constructor called');
@@ -155,6 +156,16 @@ export class EvolutionAgent implements DurableObject {
             id: this.state.id.toString(),
             hasStorage: !!this.state.storage
           },
+          timestamp: new Date().toISOString()
+        }, null, 2), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      // Logs endpoint
+      if (url.pathname === '/logs') {
+        return new Response(JSON.stringify({
+          logs: this.logs.slice(-100), // Last 100 log entries
           timestamp: new Date().toISOString()
         }, null, 2), {
           headers: { 'Content-Type': 'application/json' }
@@ -277,7 +288,7 @@ export class EvolutionAgent implements DurableObject {
   }
 
   async runEvolutionCycle(): Promise<void> {
-    console.log(`\n=== Evolution Cycle ${this.evolutionState.totalCycles + 1} START ===`);
+    this.log(`\n=== Evolution Cycle ${this.evolutionState.totalCycles + 1} START ===`);
 
     this.evolutionState.isRunning = true;
     this.evolutionState.lastError = undefined;
@@ -285,9 +296,9 @@ export class EvolutionAgent implements DurableObject {
 
     try {
       // Step 1: Generate chaos trades
-      console.log('Step 1: Generating chaos trades...');
+      this.log('Step 1: Generating chaos trades...');
       const tradesGenerated = await this.generateChaosTrades(50);
-      console.log(`✓ Generated ${tradesGenerated} chaos trades`);
+      this.log(`✓ Generated ${tradesGenerated} chaos trades`);
       this.evolutionState.totalTrades += tradesGenerated;
 
       // Step 2: Analyze patterns (every 5 cycles)
@@ -317,17 +328,19 @@ export class EvolutionAgent implements DurableObject {
       }
 
       // Update state
+      this.log(`Incrementing totalCycles from ${this.evolutionState.totalCycles} to ${this.evolutionState.totalCycles + 1}`);
       this.evolutionState.totalCycles++;
       this.evolutionState.lastCycleAt = new Date().toISOString();
       this.evolutionState.isRunning = false;
+      this.log(`State before save: cycles=${this.evolutionState.totalCycles}, trades=${this.evolutionState.totalTrades}`);
       await this.saveState();
 
-      console.log(`✓ Cycle ${this.evolutionState.totalCycles} complete. Total trades: ${this.evolutionState.totalTrades}`);
+      this.log(`✓ Cycle ${this.evolutionState.totalCycles} complete. Total trades: ${this.evolutionState.totalTrades}`);
 
       // Schedule next cycle in 60 seconds
-      console.log('Scheduling next cycle in 60 seconds...');
+      this.log('Scheduling next cycle in 60 seconds...');
       await this.state.storage.setAlarm(Date.now() + 60000);
-      console.log('✓ Next cycle scheduled');
+      this.log('✓ Next cycle scheduled');
 
     } catch (error) {
       console.error('CRITICAL ERROR in evolution cycle:', error);
@@ -732,9 +745,19 @@ export class EvolutionAgent implements DurableObject {
     }
   }
 
+  private log(message: string): void {
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${timestamp}] ${message}`;
+    console.log(logEntry);
+    this.logs.push(logEntry);
+    if (this.logs.length > 200) {
+      this.logs = this.logs.slice(-100); // Keep last 100
+    }
+  }
+
   async saveState(): Promise<void> {
     try {
-      console.log('Saving state:', JSON.stringify(this.evolutionState));
+      this.log(`SAVESTATE: Attempting to save state: ${JSON.stringify(this.evolutionState)}`);
 
       // Save as individual keys for better reliability
       await this.state.storage.put({
@@ -750,15 +773,17 @@ export class EvolutionAgent implements DurableObject {
       // Verify it was saved
       const cycles = await this.state.storage.get<number>('totalCycles');
       const trades = await this.state.storage.get<number>('totalTrades');
-      console.log(`✓ State saved - verified: cycles=${cycles}, trades=${trades}`);
+      this.log(`SAVESTATE: Verified - cycles=${cycles}, trades=${trades}`);
 
       if (cycles !== this.evolutionState.totalCycles || trades !== this.evolutionState.totalTrades) {
-        console.error(`⚠️ State verification mismatch! Expected cycles=${this.evolutionState.totalCycles}, got ${cycles}; Expected trades=${this.evolutionState.totalTrades}, got ${trades}`);
+        this.log(`SAVESTATE ERROR: Verification mismatch! Expected cycles=${this.evolutionState.totalCycles}, got ${cycles}; Expected trades=${this.evolutionState.totalTrades}, got ${trades}`);
+      } else {
+        this.log('SAVESTATE: ✓ Successfully saved and verified');
       }
     } catch (error) {
-      console.error('❌ Failed to save state:', error);
-      console.error('Stack:', error instanceof Error ? error.stack : 'No stack trace');
-      throw error; // Re-throw to make failures visible
+      const errorMsg = error instanceof Error ? `${error.message} | ${error.stack}` : String(error);
+      this.log(`SAVESTATE ERROR: Failed to save - ${errorMsg}`);
+      // Don't re-throw, just log the error
     }
   }
 }
