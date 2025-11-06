@@ -56,6 +56,7 @@ class WindowResult:
     window_id: int
     start_date: datetime
     end_date: datetime
+    window_length_days: int  # NEW: Track window length
     regime: str  # "bull", "bear", "ranging", "volatile"
 
     # Performance metrics
@@ -86,7 +87,8 @@ class RandomWindowValidator:
     def __init__(
         self,
         data: pd.DataFrame,
-        window_size_days: int = 90,  # 3 months
+        window_size_days: Optional[int] = None,  # Fixed size (if specified)
+        window_size_range: Tuple[int, int] = (30, 180),  # Random range (if not fixed)
         n_windows: int = 100,  # Test 100 random windows
         min_data_years: float = 2.0,  # Require 2+ years
         purge_days: int = 5,  # Gap between train/test to prevent leakage
@@ -97,14 +99,23 @@ class RandomWindowValidator:
 
         Args:
             data: Historical price data (must have 2+ years!)
-            window_size_days: Size of each test window
+            window_size_days: Fixed window size (if specified, disables random lengths)
+            window_size_range: Range for random window lengths (min_days, max_days)
             n_windows: Number of random windows to test
             min_data_years: Minimum years of data required
             purge_days: Days to purge between train/test (prevent leakage)
             random_seed: Random seed for reproducibility
+
+        Examples:
+            # Fixed 90-day windows
+            validator = RandomWindowValidator(data, window_size_days=90)
+
+            # Random 30-180 day windows (BETTER!)
+            validator = RandomWindowValidator(data, window_size_range=(30, 180))
         """
         self.data = data
-        self.window_size_days = window_size_days
+        self.window_size_days = window_size_days  # None = random lengths
+        self.window_size_range = window_size_range
         self.n_windows = n_windows
         self.purge_days = purge_days
 
@@ -120,26 +131,40 @@ class RandomWindowValidator:
                 f"Need {min_data_years}+ years for robust validation!"
             )
 
-        logger.info(
-            f"RandomWindowValidator initialized: "
-            f"{data_years:.1f} years of data, "
-            f"{n_windows} random {window_size_days}-day windows"
-        )
+        if self.window_size_days:
+            logger.info(
+                f"RandomWindowValidator initialized: "
+                f"{data_years:.1f} years of data, "
+                f"{n_windows} random {window_size_days}-day windows"
+            )
+        else:
+            logger.info(
+                f"RandomWindowValidator initialized: "
+                f"{data_years:.1f} years of data, "
+                f"{n_windows} random windows with lengths {window_size_range[0]}-{window_size_range[1]} days"
+            )
 
         # Results storage
         self.window_results: List[WindowResult] = []
 
-    def generate_random_windows(self) -> List[Tuple[datetime, datetime]]:
+    def generate_random_windows(self) -> List[Tuple[datetime, datetime, int]]:
         """
-        Generate random non-overlapping time windows.
+        Generate random time windows with RANDOM starts AND lengths.
 
         Ensures:
+        - Random start times across full dataset
+        - Random window lengths (e.g., 30-180 days)
         - No overlap between windows (independent tests)
-        - Purge period between train/test
+        - Covers different timescales (short vs long term)
         - Covers different regimes (bull/bear/ranging)
 
+        Why random lengths matter:
+        - Some strategies work on 30-day windows but not 180-day
+        - Tests robustness across different holding periods
+        - Prevents overfitting to specific timescale
+
         Returns:
-            List of (start_date, end_date) tuples
+            List of (start_date, end_date, window_length_days) tuples
         """
         windows = []
 
@@ -147,21 +172,42 @@ class RandomWindowValidator:
         end = self.data.index[-1]
         total_days = (end - start).days
 
-        # Generate random windows
+        # Generate random windows with random lengths
         for i in range(self.n_windows):
+            # Random window length
+            if self.window_size_days:
+                # Fixed length mode
+                window_length = self.window_size_days
+            else:
+                # Random length mode (BETTER!)
+                window_length = random.randint(
+                    self.window_size_range[0],
+                    self.window_size_range[1]
+                )
+
             # Random start within available range
-            max_start_offset = total_days - self.window_size_days
+            max_start_offset = total_days - window_length
+            if max_start_offset <= 0:
+                logger.warning(f"Window {i}: Not enough data for {window_length}-day window")
+                continue
+
             random_offset = random.randint(0, max_start_offset)
 
             window_start = start + timedelta(days=random_offset)
-            window_end = window_start + timedelta(days=self.window_size_days)
+            window_end = window_start + timedelta(days=window_length)
 
-            windows.append((window_start, window_end))
+            windows.append((window_start, window_end, window_length))
 
         # Sort by start date
         windows.sort(key=lambda w: w[0])
 
-        logger.info(f"Generated {len(windows)} random windows")
+        # Log distribution of window lengths
+        lengths = [w[2] for w in windows]
+        logger.info(
+            f"Generated {len(windows)} random windows: "
+            f"lengths {min(lengths)}-{max(lengths)} days "
+            f"(avg={np.mean(lengths):.0f} days)"
+        )
 
         return windows
 
@@ -195,8 +241,11 @@ class RandomWindowValidator:
         passed_windows = 0
         failed_windows = 0
 
-        for window_id, (start, end) in enumerate(windows):
-            logger.info(f"Testing window {window_id+1}/{len(windows)}: {start.date()} to {end.date()}")
+        for window_id, (start, end, window_length) in enumerate(windows):
+            logger.info(
+                f"Testing window {window_id+1}/{len(windows)}: "
+                f"{start.date()} to {end.date()} ({window_length} days)"
+            )
 
             # Get data for this window
             window_data = self.data[start:end]
@@ -313,6 +362,7 @@ class RandomWindowValidator:
             window_id=window_id,
             start_date=start,
             end_date=end,
+            window_length_days=(end - start).days,
             regime=regime,
             total_trades=len(trades),
             win_rate=win_rate,
