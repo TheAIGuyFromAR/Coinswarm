@@ -36,7 +36,24 @@ venv.bak/
 *.swp
 *.swo
 *~
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# OS
 .DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 
 # Testing
 .pytest_cache/
@@ -58,17 +75,8 @@ dmypy.json
 # Linting
 .ruff_cache/
 
-# Environment variables
-.env
-.env.local
-.env.*.local
-
 # Docker volumes
 docker-volumes/
-
-# Logs
-*.log
-logs/
 
 # Database
 *.db
@@ -79,16 +87,11 @@ logs/
 .ipynb_checkpoints
 *.ipynb
 
-# MacOS
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-$RECYCLE.BIN/
+# Credentials
+credentials.json
+*_credentials.json
+*.pem
+*.key
 
 # Project specific
 data/

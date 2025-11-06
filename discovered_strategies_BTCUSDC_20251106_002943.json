@@ -1,0 +1,93 @@
+{
+  "discovered_at": "2025-11-06T00:29:43.856001",
+  "symbol": "BTC-USDC",
+  "test_days": 180,
+  "total_tests": 480,
+  "strategies": [
+    {
+      "rank": 1,
+      "vs_hodl_multiple": 10.037741573547713,
+      "return_pct": 0.010051572911786497,
+      "hodl_return_pct": -0.2663262807280522,
+      "sharpe_ratio": 16.905859454552196,
+      "win_rate": 0.6666666666666666,
+      "max_drawdown_pct": 0.10222387640502227,
+      "total_trades": 3,
+      "market_regime": "sideways",
+      "config": {
+        "trend_weight": 3.3527100175654367,
+        "risk_weight": 3.822788290639604,
+        "arbitrage_weight": 1.5346253348862606,
+        "confidence_threshold": 0.7253461139798346
+      }
+    },
+    {
+      "rank": 2,
+      "vs_hodl_multiple": 10.059470202530173,
+      "return_pct": 0.011415344161642716,
+      "hodl_return_pct": -0.19195065219176105,
+      "sharpe_ratio": 14.550044511813654,
+      "win_rate": 0.6666666666666666,
+      "max_drawdown_pct": 0.10332724570125305,
+      "total_trades": 3,
+      "market_regime": "sideways",
+      "config": {
+        "trend_weight": 3.409764009173447,
+        "risk_weight": 3.3684730438950394,
+        "arbitrage_weight": 1.7254447933826338,
+        "confidence_threshold": 0.6973076978158599
+      }
+    },
+    {
+      "rank": 3,
+      "vs_hodl_multiple": 10.03464184502751,
+      "return_pct": 0.016190654777112942,
+      "hodl_return_pct": -0.4673727615909373,
+      "sharpe_ratio": 21.009610732607527,
+      "win_rate": 0.75,
+      "max_drawdown_pct": 0.10332988945568293,
+      "total_trades": 4,
+      "market_regime": "sideways",
+      "config": {
+        "trend_weight": 3.1442356582636695,
+        "risk_weight": 3.711283494473385,
+        "arbitrage_weight": 1.3369279347175047,
+        "confidence_threshold": 0.6974001075893694
+      }
+    },
+    {
+      "rank": 4,
+      "vs_hodl_multiple": 10.025267586447722,
+      "return_pct": 0.009884230430074385,
+      "hodl_return_pct": -0.3911822148318217,
+      "sharpe_ratio": 16.617512104638386,
+      "win_rate": 0.6666666666666666,
+      "max_drawdown_pct": 0.10228389567414983,
+      "total_trades": 3,
+      "market_regime": "sideways",
+      "config": {
+        "trend_weight": 3.738145797823536,
+        "risk_weight": 3.826604385772348,
+        "arbitrage_weight": 1.6935396523021788,
+        "confidence_threshold": 0.6733902705093537
+      }
+    },
+    {
+      "rank": 5,
+      "vs_hodl_multiple": 10.276132624317917,
+      "return_pct": 0.05536498393301095,
+      "hodl_return_pct": -0.20050142235010965,
+      "sharpe_ratio": 10.251887705234077,
+      "win_rate": 0.5714285714285714,
+      "max_drawdown_pct": 0.11035016607336472,
+      "total_trades": 21,
+      "market_regime": "bull",
+      "config": {
+        "trend_weight": 3.9371989383335118,
+        "risk_weight": 3.513299381471343,
+        "arbitrage_weight": 1.7592073922817724,
+        "confidence_threshold": 0.6920976838013219
+      }
+    }
+  ]
+}

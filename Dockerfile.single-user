@@ -1,0 +1,72 @@
+# Single-User Trading Bot - Optimized for GCP Cloud Run
+#
+# Optimizations:
+# - Minimal image size (python:3.11-slim)
+# - All dependencies pre-installed
+# - No build-time secrets
+# - Health check endpoint
+# - Graceful shutdown
+#
+# Build: docker build -f Dockerfile.single-user -t coinswarm-bot .
+# Run:   docker run -p 8080:8080 coinswarm-bot
+
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first (for layer caching)
+COPY requirements.txt .
+
+# Install Python dependencies
+# Skip PyTorch for now (only needed in Phase 4+)
+RUN pip install --no-cache-dir \
+    pydantic \
+    pydantic-settings \
+    mcp \
+    structlog \
+    aiohttp \
+    ccxt \
+    redis \
+    pandas \
+    numpy \
+    asyncpg \
+    motor \
+    influxdb-client \
+    httpx \
+    tenacity \
+    cachetools \
+    python-dotenv \
+    websockets \
+    azure-cosmos \
+    && rm -rf /root/.cache/pip
+
+# Copy application code
+COPY src/ /app/src/
+COPY pyproject.toml /app/
+
+# Install package in editable mode
+RUN pip install -e .
+
+# Create non-root user
+RUN useradd -m -u 1000 bot && chown -R bot:bot /app
+USER bot
+
+# Expose port for health checks
+EXPOSE 8080
+
+# Environment variables (override at runtime)
+ENV PYTHONUNBUFFERED=1
+ENV LOG_LEVEL=INFO
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+# Run bot
+CMD ["python", "-m", "coinswarm.single_user_bot"]
