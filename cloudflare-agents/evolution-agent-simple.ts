@@ -112,10 +112,25 @@ export class EvolutionAgent implements DurableObject {
       if (this.evolutionState.lastCycleAt === 'never') {
         console.log('First access - loading stored state...');
         try {
-          const stored = await this.state.storage.get<EvolutionState>('evolutionState');
-          if (stored) {
-            this.evolutionState = stored;
-            console.log('State loaded from storage:', this.evolutionState);
+          const cycles = await this.state.storage.get<number>('totalCycles');
+          const trades = await this.state.storage.get<number>('totalTrades');
+          const patterns = await this.state.storage.get<number>('patternsDiscovered');
+          const winners = await this.state.storage.get<number>('winningStrategies');
+          const lastCycle = await this.state.storage.get<string>('lastCycleAt');
+          const running = await this.state.storage.get<boolean>('isRunning');
+          const error = await this.state.storage.get<string>('lastError');
+
+          if (cycles !== undefined && cycles !== null) {
+            this.evolutionState = {
+              totalCycles: cycles,
+              totalTrades: trades || 0,
+              patternsDiscovered: patterns || 0,
+              winningStrategies: winners || 0,
+              lastCycleAt: lastCycle || 'never',
+              isRunning: running || false,
+              lastError: error || undefined
+            };
+            console.log('State loaded from storage:', JSON.stringify(this.evolutionState));
           } else {
             console.log('No stored state found, using defaults');
           }
@@ -720,14 +735,25 @@ export class EvolutionAgent implements DurableObject {
   async saveState(): Promise<void> {
     try {
       console.log('Saving state:', JSON.stringify(this.evolutionState));
-      await this.state.storage.put('evolutionState', this.evolutionState);
+
+      // Save as individual keys for better reliability
+      await this.state.storage.put({
+        'totalCycles': this.evolutionState.totalCycles,
+        'totalTrades': this.evolutionState.totalTrades,
+        'patternsDiscovered': this.evolutionState.patternsDiscovered,
+        'winningStrategies': this.evolutionState.winningStrategies,
+        'lastCycleAt': this.evolutionState.lastCycleAt,
+        'isRunning': this.evolutionState.isRunning,
+        'lastError': this.evolutionState.lastError || null
+      });
 
       // Verify it was saved
-      const verification = await this.state.storage.get<EvolutionState>('evolutionState');
-      if (verification) {
-        console.log('✓ State saved and verified:', JSON.stringify(verification));
-      } else {
-        console.error('⚠️ State save verification failed - storage is empty!');
+      const cycles = await this.state.storage.get<number>('totalCycles');
+      const trades = await this.state.storage.get<number>('totalTrades');
+      console.log(`✓ State saved - verified: cycles=${cycles}, trades=${trades}`);
+
+      if (cycles !== this.evolutionState.totalCycles || trades !== this.evolutionState.totalTrades) {
+        console.error(`⚠️ State verification mismatch! Expected cycles=${this.evolutionState.totalCycles}, got ${cycles}; Expected trades=${this.evolutionState.totalTrades}, got ${trades}`);
       }
     } catch (error) {
       console.error('❌ Failed to save state:', error);
