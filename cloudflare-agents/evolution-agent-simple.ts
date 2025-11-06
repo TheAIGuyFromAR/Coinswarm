@@ -631,24 +631,44 @@ export class EvolutionAgent implements DurableObject {
 
         console.log(`Testing pattern: ${pattern.name}`);
 
-        const patternPerformance = await this.testPatternPerformance();
-        const randomPerformance = await this.testRandomPerformance();
+        // Run multiple test iterations to get performance metrics
+        const numTestRuns = 10;
+        const testResults: number[] = [];
 
-        let vote = 0;
-        if (patternPerformance > randomPerformance) {
-          vote = 1;
-          winnersFound++;
-          console.log(`✓ ${pattern.name}: Winner! (${(patternPerformance * 100).toFixed(2)}% vs ${(randomPerformance * 100).toFixed(2)}%)`);
-        } else {
-          vote = -1;
-          console.log(`✗ ${pattern.name}: Loser (${(patternPerformance * 100).toFixed(2)}% vs ${(randomPerformance * 100).toFixed(2)}%)`);
+        for (let i = 0; i < numTestRuns; i++) {
+          const result = await this.testPatternPerformance();
+          testResults.push(result);
         }
 
+        const randomPerformance = await this.testRandomPerformance();
+
+        // Calculate metrics
+        const avgPerformance = testResults.reduce((a, b) => a + b, 0) / testResults.length;
+        const maxPerformance = Math.max(...testResults);
+        const avgRoiPct = avgPerformance * 100;
+
+        let vote = 0;
+        if (avgPerformance > randomPerformance) {
+          vote = 1;
+          winnersFound++;
+          console.log(`✓ ${pattern.name}: Winner! (avg: ${(avgPerformance * 100).toFixed(2)}%, max: ${(maxPerformance * 100).toFixed(2)}% vs random ${(randomPerformance * 100).toFixed(2)}%)`);
+        } else {
+          vote = -1;
+          console.log(`✗ ${pattern.name}: Loser (avg: ${(avgPerformance * 100).toFixed(2)}%, max: ${(maxPerformance * 100).toFixed(2)}% vs random ${(randomPerformance * 100).toFixed(2)}%)`);
+        }
+
+        // Update with performance tracking
         await this.env.DB.prepare(`
           UPDATE discovered_patterns
-          SET tested = 1, votes = votes + ?, accuracy = ?
+          SET tested = 1,
+              votes = votes + ?,
+              accuracy = ?,
+              number_of_runs = number_of_runs + ?,
+              max_ending_value = CASE WHEN max_ending_value IS NULL OR ? > max_ending_value THEN ? ELSE max_ending_value END,
+              average_ending_value = ?,
+              average_roi_pct = ?
           WHERE pattern_id = ?
-        `).bind(vote, patternPerformance, pattern.patternId).run();
+        `).bind(vote, avgPerformance, numTestRuns, maxPerformance, maxPerformance, avgPerformance, avgRoiPct, pattern.patternId).run();
       }
 
       return winnersFound;
