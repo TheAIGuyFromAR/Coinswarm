@@ -5,7 +5,7 @@
  * Enhances statistical analysis with LLM-based insights
  */
 
-import { MarketState } from './evolution-agent';
+import { MarketState } from './evolution-agent-simple';
 
 export interface PatternInsight {
   patternName: string;

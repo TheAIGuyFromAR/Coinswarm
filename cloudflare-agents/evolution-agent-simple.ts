@@ -1,7 +1,10 @@
 /**
  * Evolution Agent - Simplified Durable Objects Implementation
  * WITH COMPREHENSIVE ERROR HANDLING AND DEBUGGING
+ * WITH AI-POWERED PATTERN ANALYSIS
  */
+
+import { analyzeWithAI, validatePattern, scorePattern, generatePatternId } from './ai-pattern-analyzer';
 
 // Environment bindings interface
 interface Env {
@@ -489,11 +492,64 @@ export class EvolutionAgent implements DurableObject {
           votes: 0
         };
         patternsFound.push(pattern);
-        console.log('Found pattern:', pattern.name);
+        console.log('Found statistical pattern:', pattern.name);
+      }
+
+      // AI-powered pattern discovery
+      if (this.env.AI) {
+        console.log('🤖 Using AI for pattern discovery...');
+        try {
+          const aiPatterns = await analyzeWithAI(
+            this.env.AI,
+            winnerAvg,
+            loserAvg,
+            winners.results.length + losers.results.length
+          );
+
+          console.log(`AI suggested ${aiPatterns.length} patterns`);
+
+          // Validate and add AI-discovered patterns
+          for (const aiPattern of aiPatterns) {
+            if (validatePattern(aiPattern)) {
+              const maxDiff = Math.max(momentumDiff, 0.01);
+              const quality = scorePattern(aiPattern, maxDiff, winners.results.length + losers.results.length);
+
+              if (quality > 0.5) {
+                const pattern = {
+                  patternId: generatePatternId(aiPattern.patternName),
+                  name: `[AI] ${aiPattern.patternName}`,
+                  conditions: {
+                    ...aiPattern.conditions,
+                    aiReasoning: aiPattern.reasoning,
+                    aiConfidence: aiPattern.confidence,
+                    description: aiPattern.description
+                  },
+                  winRate: winners.results.length / (winners.results.length + losers.results.length),
+                  sampleSize: winners.results.length + losers.results.length,
+                  discoveredAt: new Date().toISOString(),
+                  tested: false,
+                  votes: 0
+                };
+                patternsFound.push(pattern);
+                console.log(`✓ AI discovered: ${aiPattern.patternName} (confidence: ${(aiPattern.confidence * 100).toFixed(0)}%, quality: ${(quality * 100).toFixed(0)}%)`);
+                console.log(`  Reasoning: ${aiPattern.reasoning}`);
+              } else {
+                console.log(`✗ AI pattern rejected: ${aiPattern.patternName} (quality too low: ${(quality * 100).toFixed(0)}%)`);
+              }
+            } else {
+              console.log(`✗ AI pattern failed validation: ${aiPattern.patternName}`);
+            }
+          }
+        } catch (error) {
+          console.error('AI pattern discovery failed:', error);
+          // Continue with statistical patterns only
+        }
+      } else {
+        console.log('⚠️ AI binding not available, using statistical analysis only');
       }
 
       if (patternsFound.length > 0) {
-        console.log(`Storing ${patternsFound.length} patterns...`);
+        console.log(`Storing ${patternsFound.length} total patterns (statistical + AI)...`);
         await this.storePatterns(patternsFound);
         console.log('✓ Patterns stored');
       }
