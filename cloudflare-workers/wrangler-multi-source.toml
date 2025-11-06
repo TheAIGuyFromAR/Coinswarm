@@ -1,0 +1,32 @@
+# Cloudflare Workers Configuration for Multi-Source Data Fetcher
+# Deploy: wrangler deploy --config wrangler-multi-source.toml
+
+name = "coinswarm-multi-source"
+main = "multi-source-data-fetcher.js"
+compatibility_date = "2024-01-01"
+
+# Routes (optional - deploy to workers.dev subdomain for now)
+# routes = [
+#   { pattern = "data.coinswarm.com/*", zone_name = "coinswarm.com" }
+# ]
+
+# Environment variables (optional)
+[vars]
+# No vars needed for basic functionality
+
+# KV namespace for caching (optional but recommended)
+# [[kv_namespaces]]
+# binding = "DATA_CACHE"
+# id = "your_kv_namespace_id"  # Get from: wrangler kv:namespace create DATA_CACHE
+
+# D1 database for long-term storage (optional)
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "coinswarm-historical-data"
+# database_id = "your-database-id"
+
+# Free tier limits
+# - 100,000 requests/day
+# - 10ms CPU time per request (may need to optimize for 2+ years)
+# - 1GB KV storage (if using cache)
+# - Unlimited egress bandwidth
