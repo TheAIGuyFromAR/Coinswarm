@@ -1,12 +1,17 @@
 """
-Simple data fetcher using your existing Cloudflare Worker.
+Simple data fetcher using Cloudflare Worker with multi-source support.
 
 No dependencies needed - uses only Python stdlib.
 
-Fetches 2+ years data for:
-- BTC-USDT, BTC-USDC
-- SOL-USDT, SOL-USDC
-- BTC-SOL
+Fetches 2+ years data from multiple sources:
+- CryptoCompare (2000 hours/call, goes back years)
+- CoinGecko (365 days/call, goes back years)
+- Kraken + Coinbase (backup)
+
+Supports:
+- BTC, SOL, ETH, and more
+- 2+ years historical data
+- Hourly candles
 
 Saves to JSON for testing.
 """
@@ -20,21 +25,26 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # Your Cloudflare Worker endpoint
+# NOTE: After deploying multi-source-data-fetcher.js, update this URL
 WORKER_URL = "https://coinswarm.bamn86.workers.dev"
+
+# Use multi-source endpoint for 2+ years (after deploying enhanced worker)
+USE_MULTI_SOURCE = True  # Set to True to use /multi-price (2+ years)
 
 # Data directory
 DATA_DIR = Path(__file__).parent / "data" / "historical"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Symbols to fetch - Worker API uses base symbols (BTC, SOL, ETH)
-# Worker automatically aggregates from multiple stablecoin pairs (USDT, USDC, etc.)
+# Worker automatically aggregates from multiple sources
 SYMBOLS = ["BTC", "SOL", "ETH"]
 
 # SSL context that skips cert verification (needed for proxy)
 ssl_context = ssl._create_unverified_context()
 
-# Worker limit is 365 days per request
-MAX_DAYS_PER_REQUEST = 365
+# Original Worker: 365 days max
+# Multi-source Worker: 730+ days (2+ years)
+MAX_DAYS_PER_REQUEST = 730 if USE_MULTI_SOURCE else 365
 
 
 def fetch_with_retry(symbol: str, days: int, max_retries: int = 5) -> dict:
@@ -43,7 +53,7 @@ def fetch_with_retry(symbol: str, days: int, max_retries: int = 5) -> dict:
 
     Args:
         symbol: Base symbol
-        days: Days to fetch (max 365)
+        days: Days to fetch (365 for /price, 730+ for /multi-price)
         max_retries: Maximum retry attempts
 
     Returns:
@@ -55,7 +65,9 @@ def fetch_with_retry(symbol: str, days: int, max_retries: int = 5) -> dict:
         "aggregate": "true"
     }
 
-    url = f"{WORKER_URL}/price?{urllib.parse.urlencode(params)}"
+    # Use multi-source endpoint if enabled (requires enhanced Worker deployed)
+    endpoint = "/multi-price" if USE_MULTI_SOURCE else "/price"
+    url = f"{WORKER_URL}{endpoint}?{urllib.parse.urlencode(params)}"
 
     for attempt in range(max_retries):
         try:
@@ -157,11 +169,20 @@ def main():
     print("="*80)
     print("MULTI-ASSET HISTORICAL DATA FETCHER")
     print("="*80)
-    print(f"Fetching {len(SYMBOLS)} symbols (Worker aggregates from all stablecoin pairs)")
+    print(f"Fetching {len(SYMBOLS)} symbols")
     print(f"Target: 2+ years (730+ days) of 1h candles")
     print(f"Data directory: {DATA_DIR}")
     print(f"Cloudflare Worker: {WORKER_URL}")
-    print(f"Note: Worker limit = 365 days/request, will fetch multiple chunks")
+
+    if USE_MULTI_SOURCE:
+        print(f"Mode: Multi-source (/multi-price)")
+        print(f"  Sources: CryptoCompare, CoinGecko, Kraken, Coinbase")
+        print(f"  Limit: 730+ days per request (2+ years)")
+    else:
+        print(f"Mode: Original (/price)")
+        print(f"  Sources: Kraken, Coinbase only")
+        print(f"  Limit: 365 days/request, will fetch multiple chunks")
+
     print("="*80 + "\n")
 
     results = {}
