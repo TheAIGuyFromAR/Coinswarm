@@ -107,21 +107,19 @@ export class EvolutionAgent implements DurableObject {
       const url = new URL(request.url);
       console.log(`Pathname: ${url.pathname}`);
 
-      // Load state on first request
-      if (this.evolutionState.lastCycleAt === 'never') {
-        console.log('Loading stored state...');
-        try {
-          const stored = await this.state.storage.get<EvolutionState>('evolutionState');
-          if (stored) {
-            this.evolutionState = stored;
-            console.log('State loaded:', this.evolutionState);
-          } else {
-            console.log('No stored state found, using defaults');
-          }
-        } catch (error) {
-          console.error('Error loading state:', error);
-          this.evolutionState.lastError = `Failed to load state: ${error}`;
+      // Always reload state from storage to ensure consistency
+      console.log('Loading stored state...');
+      try {
+        const stored = await this.state.storage.get<EvolutionState>('evolutionState');
+        if (stored) {
+          this.evolutionState = stored;
+          console.log('State loaded:', this.evolutionState);
+        } else {
+          console.log('No stored state found, using defaults');
         }
+      } catch (error) {
+        console.error('Error loading state:', error);
+        this.evolutionState.lastError = `Failed to load state: ${error}`;
       }
 
       // Debug endpoint
@@ -250,6 +248,18 @@ export class EvolutionAgent implements DurableObject {
 
   async alarm(): Promise<void> {
     console.log('Alarm triggered');
+
+    // Load latest state from storage before running cycle
+    try {
+      const stored = await this.state.storage.get<EvolutionState>('evolutionState');
+      if (stored) {
+        this.evolutionState = stored;
+        console.log('State loaded in alarm:', this.evolutionState);
+      }
+    } catch (error) {
+      console.error('Failed to load state in alarm:', error);
+    }
+
     try {
       await this.runEvolutionCycle();
     } catch (error) {
