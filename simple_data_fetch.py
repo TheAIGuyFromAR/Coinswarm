@@ -24,12 +24,12 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Your Cloudflare Worker endpoint
-# NOTE: After deploying multi-source-data-fetcher.js, update this URL
+# Your Cloudflare Worker endpoint - Using original working Worker
+# Multi-source Worker deployed but external APIs blocked/timing out
 WORKER_URL = "https://coinswarm.bamn86.workers.dev"
 
-# Use multi-source endpoint for 2+ years (after deploying enhanced worker)
-USE_MULTI_SOURCE = True  # Set to True to use /multi-price (2+ years)
+# Use original endpoint (multi-source has external API issues)
+USE_MULTI_SOURCE = False  # Using original /price for now (30 days)
 
 # Data directory
 DATA_DIR = Path(__file__).parent / "data" / "historical"
