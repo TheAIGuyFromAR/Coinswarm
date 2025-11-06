@@ -1,6 +1,6 @@
 # Wrangler configuration for Evolution Agent
 # Uses Cloudflare Agents SDK with Durable Objects
-# Ready to deploy with updated API token permissions
+# Configured with account ID and updated API token
 
 name = "coinswarm-evolution-agent"
 main = "evolution-agent.ts"
