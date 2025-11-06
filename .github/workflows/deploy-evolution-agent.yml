@@ -38,10 +38,9 @@ jobs:
           wranglerVersion: "4.45.4"
           command: deploy
 
-      - name: Trigger First Cycle
+      - name: Deployment Complete
         run: |
-          echo "Waiting 10 seconds for deployment to complete..."
-          sleep 10
-          echo "Triggering first evolution cycle..."
-          curl -X POST https://coinswarm-evolution-agent.theaiguyfrom-ar.workers.dev/trigger || echo "Trigger will work once deployed"
-        continue-on-error: true
+          echo "✅ Deployment successful!"
+          echo "Check your worker at: https://dash.cloudflare.com/8a330fc6c339f031a73905d4ca2f3e5d/workers/services/view/coinswarm-evolution-agent"
+          echo "Find the worker URL in Cloudflare Dashboard and trigger with:"
+          echo "curl -X POST https://YOUR-WORKER-URL/trigger"
