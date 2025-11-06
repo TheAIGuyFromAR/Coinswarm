@@ -38,13 +38,13 @@ CREATE TABLE IF NOT EXISTS discovered_patterns (
     max_ending_value REAL,  -- Best performance achieved
     average_ending_value REAL,  -- Average performance across runs
     average_roi_pct REAL,  -- Average ROI percentage across all runs
+    annualized_roi_pct REAL,  -- Annualized ROI percentage (primary sort metric)
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_patterns_votes ON discovered_patterns(votes DESC);
 CREATE INDEX IF NOT EXISTS idx_patterns_tested ON discovered_patterns(tested);
-CREATE INDEX IF NOT EXISTS idx_patterns_roi ON discovered_patterns(average_roi_pct DESC);
-CREATE INDEX IF NOT EXISTS idx_patterns_performance ON discovered_patterns(average_ending_value DESC);
+CREATE INDEX IF NOT EXISTS idx_patterns_best ON discovered_patterns(annualized_roi_pct DESC, number_of_runs DESC, max_ending_value DESC);
 
 -- System stats table
 CREATE TABLE IF NOT EXISTS system_stats (

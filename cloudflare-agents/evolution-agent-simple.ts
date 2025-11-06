@@ -207,7 +207,7 @@ export class EvolutionAgent implements DurableObject {
           ).first();
 
           const topPatterns = await this.env.DB.prepare(
-            'SELECT pattern_id, name, votes, accuracy, number_of_runs, max_ending_value, average_ending_value, average_roi_pct FROM discovered_patterns ORDER BY average_roi_pct DESC, votes DESC LIMIT 20'
+            'SELECT pattern_id, name, votes, accuracy, number_of_runs, max_ending_value, average_ending_value, average_roi_pct, annualized_roi_pct FROM discovered_patterns ORDER BY annualized_roi_pct DESC, number_of_runs DESC, max_ending_value DESC LIMIT 20'
           ).all();
 
           return new Response(JSON.stringify({
@@ -647,6 +647,10 @@ export class EvolutionAgent implements DurableObject {
         const maxPerformance = Math.max(...testResults);
         const avgRoiPct = avgPerformance * 100;
 
+        // Annualize ROI (assuming average trade duration from chaos trades)
+        // For now, assume ~1 hour average hold time, annualize to 365 days
+        const annualizedRoiPct = avgRoiPct * (365 * 24);
+
         let vote = 0;
         if (avgPerformance > randomPerformance) {
           vote = 1;
@@ -666,9 +670,10 @@ export class EvolutionAgent implements DurableObject {
               number_of_runs = number_of_runs + ?,
               max_ending_value = CASE WHEN max_ending_value IS NULL OR ? > max_ending_value THEN ? ELSE max_ending_value END,
               average_ending_value = ?,
-              average_roi_pct = ?
+              average_roi_pct = ?,
+              annualized_roi_pct = ?
           WHERE pattern_id = ?
-        `).bind(vote, avgPerformance, numTestRuns, maxPerformance, maxPerformance, avgPerformance, avgRoiPct, pattern.patternId).run();
+        `).bind(vote, avgPerformance, numTestRuns, maxPerformance, maxPerformance, avgPerformance, avgRoiPct, annualizedRoiPct, pattern.patternId).run();
       }
 
       return winnersFound;
