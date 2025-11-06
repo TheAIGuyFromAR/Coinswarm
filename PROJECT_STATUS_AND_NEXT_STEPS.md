@@ -85,70 +85,112 @@
 
 ---
 
-## 🎯 **TOMORROW: Azure + GCP Deployment**
+## 🎯 **Azure + GCP Free Tier Deployment**
 
-When you provide Azure and GCP accounts, we'll set up:
+**Personal use staying within free tier limits - $0/month! 🎉**
 
-### **Azure Deployment**
+### **Azure Free Tier Deployment**
 
-**Option A: Azure Container Instances**
+**Option A: Azure App Service (Free F1 Tier)**
 ```bash
-# Deploy backtesting service
-az container create \
+# Create free tier app service plan
+az appservice plan create \
+  --name coinswarm-plan \
   --resource-group coinswarm \
-  --name coinswarm-backtest \
-  --image ghcr.io/your-org/coinswarm:latest \
-  --cpu 4 --memory 8
-```
+  --sku FREE
 
-**Option B: Azure App Service**
-```bash
 # Deploy as web app
 az webapp create \
   --resource-group coinswarm \
   --plan coinswarm-plan \
-  --name coinswarm-api
+  --name coinswarm-api \
+  --runtime "PYTHON:3.11"
 ```
 
-**Option C: Azure Functions**
-- Serverless backtesting
-- Pay per execution
-- Auto-scaling
+**Free Tier Limits:**
+- 1 GB RAM
+- 1 GB storage
+- 60 CPU minutes/day
+- Perfect for lightweight backtesting API
 
-**What we'll use Azure for:**
-- ✅ Continuous backtesting workers (24/7)
-- ✅ Strategy evolution (genetic algorithms)
-- ✅ Heavy compute tasks
-- ✅ PostgreSQL database (managed)
-- ✅ Redis cache (managed)
-
-### **GCP Deployment**
-
-**Option A: Cloud Run**
+**Option B: Azure VM B1S (Free for 12 months)**
 ```bash
-# Deploy container
+# Create free B1S VM (750 hours/month free)
+az vm create \
+  --resource-group coinswarm \
+  --name coinswarm-vm \
+  --image Ubuntu2204 \
+  --size Standard_B1s \
+  --admin-username azureuser
+```
+
+**Free Tier Limits:**
+- 1 vCPU, 1 GB RAM
+- 750 hours/month (first 12 months)
+- Good for periodic backtesting jobs
+
+**What we'll use Azure for (Free Tier):**
+- ✅ Lightweight backtesting API (App Service F1)
+- ✅ Periodic strategy validation (B1S VM, 750 hrs/month)
+- ✅ File storage (5GB free blob storage)
+- ✅ Small database workloads (250GB SQL Database free)
+- ❌ Skip Redis (not available in free tier, use GCP Memorystore)
+
+### **GCP Free Tier Deployment**
+
+**Option A: Cloud Run (Always Free)**
+```bash
+# Deploy container (2M requests/month free)
 gcloud run deploy coinswarm \
   --source . \
   --region us-central1 \
+  --allow-unauthenticated \
+  --memory 512Mi \
+  --cpu 1
+```
+
+**Free Tier Limits:**
+- 2 million requests/month
+- 360,000 GB-seconds memory
+- 180,000 vCPU-seconds compute time
+- Perfect for backtesting API
+
+**Option B: Compute Engine f1-micro (Always Free)**
+```bash
+# Create free f1-micro VM
+gcloud compute instances create coinswarm-vm \
+  --machine-type f1-micro \
+  --zone us-west1-b \
+  --image-family ubuntu-2204-lts \
+  --image-project ubuntu-os-cloud
+```
+
+**Free Tier Limits:**
+- 1 f1-micro instance (0.6 GB RAM)
+- 30 GB HDD storage
+- Available in us-west1, us-central1, us-east1
+- Good for continuous low-intensity tasks
+
+**Option C: Cloud Functions (Always Free)**
+```bash
+# Deploy function (2M invocations/month free)
+gcloud functions deploy coinswarm-backtest \
+  --runtime python311 \
+  --trigger-http \
   --allow-unauthenticated
 ```
 
-**Option B: Compute Engine**
-- Custom VMs
-- Full control
-- Good for long-running processes
+**Free Tier Limits:**
+- 2 million invocations/month
+- 400,000 GB-seconds, 200,000 GHz-seconds compute
+- Perfect for scheduled backtesting jobs
 
-**Option C: Kubernetes Engine**
-- For production scale
-- Auto-scaling
-- High availability
-
-**What we'll use GCP for:**
-- ✅ Live trading API
-- ✅ Real-time data pipeline
-- ✅ BigQuery for analytics
-- ✅ Cloud Scheduler for cron jobs
-- ✅ Backup and disaster recovery
+**What we'll use GCP for (Free Tier):**
+- ✅ Backtesting API (Cloud Run - 2M requests/month)
+- ✅ Continuous monitoring (f1-micro VM always-free)
+- ✅ Data analytics (BigQuery - 1TB queries/month free)
+- ✅ Scheduled jobs (Cloud Scheduler + Functions)
+- ✅ Small database (Firestore - 1GB storage free)
 
 ---
 
@@ -162,61 +204,83 @@ gcloud run deploy coinswarm \
 - ✅ D1 database schema ready
 - ✅ Mock data testing
 
-### **Phase 2: Tomorrow (Azure + GCP)**
+### **Phase 2: Azure + GCP Free Tier Deployment**
 **Morning:**
-1. Deploy Cloudflare D1 database
-2. Populate D1 with 3-6 months of BTC/ETH/SOL data
+1. Deploy Cloudflare D1 database (free tier)
+2. Populate D1 with 6-12 months of BTC/ETH/SOL data
 3. Test backtesting with D1 data
 
 **Afternoon:**
-4. Set up Azure Container Instances
-5. Deploy continuous backtester to Azure
-6. Start 24/7 strategy evolution
+4. Set up GCP f1-micro VM (always free)
+5. Deploy continuous strategy discovery system
+6. Start automated search for 10x strategies
 
 **Evening:**
-7. Set up GCP Cloud Run
-8. Deploy live trading API
-9. Connect to exchanges (sandbox mode)
+7. Set up GCP Cloud Run (free tier)
+8. Deploy backtesting API
+9. Monitor strategy discovery progress
 
-### **Phase 3: This Week**
-1. Populate D1 with 2 years of historical data
-2. Validate strategies across multiple years
-3. Find profitable configurations
-4. Run continuous backtesting for 48+ hours
-5. Paper trading with live data
+### **Phase 3: Strategy Discovery (Week 1-2)**
+1. Populate D1 with 1-2 years of historical data
+2. Run automated strategy search 24/7 on GCP f1-micro
+3. Test thousands of parameter combinations
+4. Target: Find strategies with 5-10x HODL performance
+5. Track top 10 best performing configurations
 
-### **Phase 4: Next Week**
-1. Production monitoring (Prometheus + Grafana)
-2. Alert system
-3. Performance optimization
-4. Security audit
-5. Live trading with small capital ($100-1000)
+**Success Metrics:**
+- Test >1000 different configurations
+- Find >5 strategies beating HODL by 3x+
+- Identify >1 strategy beating HODL by 10x+
+- All with Sharpe >1.5, max drawdown <25%
+
+### **Phase 4: Validation & Paper Trading (Week 3-4)**
+1. Validate discovered strategies on new/unseen data
+2. Paper trading with top 3 strategies
+3. Monitor for 7+ days continuously
+4. Compare paper trading vs backtest results
+5. Decide if ready for live trading with $100
 
 ---
 
-## 💰 **Cost Estimates**
+## 💰 **Cost Estimates (Free Tier Only)**
 
-### **Cloudflare (Current)**
+### **Cloudflare (Free Tier)**
 - Worker: Free tier (100K requests/day)
 - D1 Database: Free tier (5GB, 5M reads/day)
-- **Total: $0/month**
+- **Total: $0/month** ✅
 
-### **Azure (Tomorrow)**
-- Container Instances (4 vCPU, 8GB RAM): ~$150/month
-- PostgreSQL: ~$30/month
-- Redis Cache: ~$15/month
-- **Total: ~$195/month**
+### **Azure (Free Tier)**
+- App Service (F1): Free tier (60 CPU min/day, 1GB storage)
+- B1S VM: Free tier (750 hours/month, first 12 months)
+- Blob Storage: Free tier (5GB)
+- SQL Database: Free tier (250GB)
+- **Total: $0/month** ✅
 
-### **GCP (Tomorrow)**
-- Cloud Run: ~$50/month (with free tier)
-- BigQuery: ~$10/month
-- Compute: ~$50/month
-- **Total: ~$110/month**
+### **GCP (Always Free)**
+- Cloud Run: Free tier (2M requests/month)
+- f1-micro VM: Always free (0.6GB RAM)
+- Cloud Functions: Free tier (2M invocations/month)
+- BigQuery: Free tier (1TB queries/month, 10GB storage)
+- Firestore: Free tier (1GB storage)
+- Cloud Scheduler: Free tier (3 jobs)
+- **Total: $0/month** ✅
 
-### **Combined Monthly**
-- **Development**: $0 (Cloudflare free tier only)
-- **Production**: ~$300/month (Azure + GCP + Cloudflare)
-- **At Scale**: ~$500-1000/month (with high-availability, backups)
+### **Combined Monthly Cost**
+- **Personal Use (Free Tier)**: **$0/month** 🎉
+- Perfect for individual trading and strategy development
+- Sufficient for 24/7 backtesting and paper trading
+- Can handle thousands of backtests per month
+
+### **Free Tier Limits Summary**
+| Service | Limit | Good For |
+|---------|-------|----------|
+| Cloudflare D1 | 5GB, 5M reads/day | 100+ years of OHLCV data |
+| GCP Cloud Run | 2M requests/month | 67K requests/day |
+| GCP f1-micro VM | 0.6GB RAM, 24/7 | Continuous monitoring |
+| Azure B1S VM | 1GB RAM, 750 hrs/mo | Periodic backtesting |
+| BigQuery | 1TB queries/month | Extensive analytics |
+
+**Conclusion**: Completely free for personal use! 🚀
 
 ---
 
@@ -325,30 +389,56 @@ Look for:
 
 ---
 
-## 🎯 **Key Decisions for Tomorrow**
+## 🎯 **Key Decisions (Free Tier Strategy)**
 
 ### **1. Which Cloud Platform for What?**
 
-**Recommendation:**
-- **Cloudflare**: Historical data storage (D1)
-- **Azure**: Continuous backtesting & compute
-- **GCP**: Live trading & real-time data
+**Free Tier Recommendation:**
+- **Cloudflare**: Historical data storage (D1 - 5GB free)
+- **GCP f1-micro VM**: 24/7 strategy discovery & monitoring (always free)
+- **GCP Cloud Run**: On-demand backtesting API (2M requests/month free)
+- **Azure B1S VM**: Periodic heavy compute (750 hrs/month, first 12 months)
+- **BigQuery**: Analytics and data exploration (1TB queries/month free)
+
+**Why this combination?**
+- Cloudflare D1 stores years of historical data for free
+- GCP f1-micro runs continuously without cost
+- Cloud Run handles API requests efficiently
+- Azure B1S provides occasional heavy compute
+- Total cost: **$0/month**
 
 ### **2. How Much Historical Data?**
 
-**Recommendation:**
-- Start: 3 months (immediate validation)
-- Week 1: 6 months (more market conditions)
-- Month 1: 1 year (full cycle)
-- Month 2: 2 years (robust testing)
+**Free Tier Recommendation:**
+- Start: 6 months (D1 has 5GB free = 100+ years capacity)
+- Week 1: 1 year (validate across full cycle)
+- Month 1: 2 years (robust multi-cycle testing)
+- No limit: Store as much as needed (5GB is huge for OHLCV)
 
-### **3. When to Go Live?**
+### **3. Strategy Discovery Approach**
 
-**Recommendation:**
-- Week 1: Paper trading only
-- Week 2: Live with $100-500
-- Week 3: Scale to $1000-5000 if profitable
-- Month 2: Evaluate for larger capital
+**Automated 10x Strategy Search:**
+- Run continuous backtesting with random configurations
+- Target: 10x better than HODL over 6 months
+- Test thousands of parameter combinations
+- Use genetic algorithms for evolution
+- Focus on: BTC, ETH, SOL (high volatility = opportunity)
+
+**Success Criteria:**
+- HODL baseline: ~0-50% over 6 months (varies by period)
+- Target: 5-10x HODL returns (e.g., if HODL = 20%, target = 200%)
+- Sharpe ratio: >2.0
+- Max drawdown: <25%
+- Win rate: >55%
+
+### **4. When to Go Live?**
+
+**Conservative Approach:**
+- Week 1-2: Discover profitable strategies (automated search)
+- Week 3-4: Validate discovered strategies on new data
+- Month 2: Paper trading with best strategies
+- Month 3: Live with $100 if paper trading profitable
+- Month 4+: Scale gradually based on results
 
 ---
 
@@ -378,26 +468,34 @@ Look for:
 ## ✅ **Summary**
 
 ### **You Have:**
-- Complete backtesting system
-- 7 trading agents
+- Complete backtesting system (75M× real-time)
+- 7 trading agents (Trend, Risk, Arb, Analysis, Research, Learning, Hedge)
 - Strategy validation tools
-- Real data integration
-- D1 database ready to deploy
+- Real data integration (Cloudflare Worker)
+- D1 database ready to deploy (free tier)
 - 70k+ words of documentation
 
-### **You Need (Tomorrow):**
-- Azure account → Deploy continuous backtester
-- GCP account → Deploy live trading API
-- 30 minutes → Set up D1 and populate with data
+### **Your Free Tier Resources:**
+- **Cloudflare**: 5GB D1 storage, 5M reads/day → 100+ years of data
+- **GCP**: f1-micro VM (always free) → 24/7 strategy discovery
+- **Azure**: B1S VM (750 hrs/mo, 12 months) → Heavy compute
+- **Total Cost**: **$0/month** ✅
 
-### **Then You Can:**
-- ✅ Test strategies on 2+ years of real data
-- ✅ Run 24/7 strategy evolution
-- ✅ Paper trade with live data
-- ✅ Scale to live trading when ready
+### **The Plan:**
+1. **Deploy D1** → Store 1-2 years of BTC/ETH/SOL data (free)
+2. **Setup GCP f1-micro** → Run continuous strategy search (free)
+3. **Discover 10x strategies** → Automated search, thousands of tests
+4. **Validate** → Test on new data, paper trade
+5. **Go live** → Start with $100 when confident
+
+### **Goal:**
+Find strategies that beat HODL by 10x over 6 months through automated discovery!
 
 ---
 
-**Ready to build profitable trading strategies! 🚀**
+**Ready to discover profitable trading strategies at $0/month! 🚀**
 
-**Next Action:** Deploy Cloudflare D1 database (10 minutes) or continue testing with mock data!
+**Next Actions:**
+1. Deploy Cloudflare D1 database (10 minutes)
+2. Start automated strategy discovery (run continuously)
+3. Monitor for 10x strategies
