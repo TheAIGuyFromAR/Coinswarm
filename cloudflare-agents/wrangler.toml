@@ -22,7 +22,7 @@ new_sqlite_classes = ["EvolutionAgent"]
 [[d1_databases]]
 binding = "DB"
 database_name = "coinswarm-evolution"
-database_id = "YOUR_DATABASE_ID_HERE"  # Create with: wrangler d1 create coinswarm-evolution
+database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"  # Using existing database
 
 # AI binding for pattern analysis
 # Uses Cloudflare Workers AI for intelligent pattern discovery

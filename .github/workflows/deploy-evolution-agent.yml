@@ -1,0 +1,46 @@
+name: Deploy Evolution Agent (Agents SDK)
+
+on:
+  push:
+    branches:
+      - claude/debug-cloudflare-historical-data-011CUqugUynEoovcsiVnoaPB
+      - main
+      - master
+    paths:
+      - 'cloudflare-agents/**'
+      - '.github/workflows/deploy-evolution-agent.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy Evolution Agent
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          cd cloudflare-agents
+          npm install
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy
+
+      - name: Trigger First Cycle
+        run: |
+          echo "Waiting 10 seconds for deployment to complete..."
+          sleep 10
+          echo "Triggering first evolution cycle..."
+          curl -X POST https://coinswarm-evolution-agent.theaiguyfrom-ar.workers.dev/trigger || echo "Trigger will work once deployed"
+        continue-on-error: true
