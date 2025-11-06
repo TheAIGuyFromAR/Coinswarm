@@ -33,6 +33,10 @@ CREATE TABLE IF NOT EXISTS discovered_patterns (
     accuracy REAL,
     votes INTEGER DEFAULT 0,  -- Upvotes - downvotes
     tested_at TEXT,
+    -- Performance tracking columns
+    number_of_runs INTEGER DEFAULT 0,  -- How many times tested
+    max_ending_value REAL,  -- Best performance achieved
+    average_ending_value REAL,  -- Average performance across runs
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
