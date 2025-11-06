@@ -719,11 +719,20 @@ export class EvolutionAgent implements DurableObject {
 
   async saveState(): Promise<void> {
     try {
-      console.log('Saving state...');
+      console.log('Saving state:', JSON.stringify(this.evolutionState));
       await this.state.storage.put('evolutionState', this.evolutionState);
-      console.log('✓ State saved');
+
+      // Verify it was saved
+      const verification = await this.state.storage.get<EvolutionState>('evolutionState');
+      if (verification) {
+        console.log('✓ State saved and verified:', JSON.stringify(verification));
+      } else {
+        console.error('⚠️ State save verification failed - storage is empty!');
+      }
     } catch (error) {
-      console.error('Failed to save state:', error);
+      console.error('❌ Failed to save state:', error);
+      console.error('Stack:', error instanceof Error ? error.stack : 'No stack trace');
+      throw error; // Re-throw to make failures visible
     }
   }
 }
