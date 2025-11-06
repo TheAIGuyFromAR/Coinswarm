@@ -108,35 +108,23 @@ export class EvolutionAgent implements DurableObject {
       const url = new URL(request.url);
       console.log(`Pathname: ${url.pathname}`);
 
-      // Load state from storage only on first access (when lastCycleAt is 'never')
+      // Load state from D1 database only on first access (when lastCycleAt is 'never')
       // After that, rely on in-memory state which is maintained by the Durable Object
       if (this.evolutionState.lastCycleAt === 'never') {
-        console.log('First access - loading stored state...');
+        console.log('First access - loading stored state from D1...');
         try {
-          const cycles = await this.state.storage.get<number>('totalCycles');
-          const trades = await this.state.storage.get<number>('totalTrades');
-          const patterns = await this.state.storage.get<number>('patternsDiscovered');
-          const winners = await this.state.storage.get<number>('winningStrategies');
-          const lastCycle = await this.state.storage.get<string>('lastCycleAt');
-          const running = await this.state.storage.get<boolean>('isRunning');
-          const error = await this.state.storage.get<string>('lastError');
+          const result = await this.env.DB.prepare(`
+            SELECT value FROM system_state WHERE key = 'evolutionState'
+          `).first<{ value: string }>();
 
-          if (cycles !== undefined && cycles !== null) {
-            this.evolutionState = {
-              totalCycles: cycles,
-              totalTrades: trades || 0,
-              patternsDiscovered: patterns || 0,
-              winningStrategies: winners || 0,
-              lastCycleAt: lastCycle || 'never',
-              isRunning: running || false,
-              lastError: error || undefined
-            };
-            console.log('State loaded from storage:', JSON.stringify(this.evolutionState));
+          if (result && result.value) {
+            this.evolutionState = JSON.parse(result.value);
+            console.log('State loaded from D1:', JSON.stringify(this.evolutionState));
           } else {
-            console.log('No stored state found, using defaults');
+            console.log('No stored state found in D1, using defaults');
           }
         } catch (error) {
-          console.error('Error loading state:', error);
+          console.error('Error loading state from D1:', error);
           this.evolutionState.lastError = `Failed to load state: ${error}`;
         }
       }
@@ -759,26 +747,30 @@ export class EvolutionAgent implements DurableObject {
     try {
       this.log(`SAVESTATE: Attempting to save state: ${JSON.stringify(this.evolutionState)}`);
 
-      // Save as individual keys for better reliability
-      await this.state.storage.put({
-        'totalCycles': this.evolutionState.totalCycles,
-        'totalTrades': this.evolutionState.totalTrades,
-        'patternsDiscovered': this.evolutionState.patternsDiscovered,
-        'winningStrategies': this.evolutionState.winningStrategies,
-        'lastCycleAt': this.evolutionState.lastCycleAt,
-        'isRunning': this.evolutionState.isRunning,
-        'lastError': this.evolutionState.lastError || null
-      });
+      // Save state to D1 database for reliable persistence
+      const stateJson = JSON.stringify(this.evolutionState);
+      await this.env.DB.prepare(`
+        INSERT INTO system_state (key, value, updated_at)
+        VALUES ('evolutionState', ?, datetime('now'))
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+      `).bind(stateJson).run();
 
       // Verify it was saved
-      const cycles = await this.state.storage.get<number>('totalCycles');
-      const trades = await this.state.storage.get<number>('totalTrades');
-      this.log(`SAVESTATE: Verified - cycles=${cycles}, trades=${trades}`);
+      const result = await this.env.DB.prepare(`
+        SELECT value FROM system_state WHERE key = 'evolutionState'
+      `).first<{ value: string }>();
 
-      if (cycles !== this.evolutionState.totalCycles || trades !== this.evolutionState.totalTrades) {
-        this.log(`SAVESTATE ERROR: Verification mismatch! Expected cycles=${this.evolutionState.totalCycles}, got ${cycles}; Expected trades=${this.evolutionState.totalTrades}, got ${trades}`);
+      if (result) {
+        const saved = JSON.parse(result.value);
+        this.log(`SAVESTATE: Verified - cycles=${saved.totalCycles}, trades=${saved.totalTrades}`);
+
+        if (saved.totalCycles !== this.evolutionState.totalCycles || saved.totalTrades !== this.evolutionState.totalTrades) {
+          this.log(`SAVESTATE ERROR: Verification mismatch!`);
+        } else {
+          this.log('SAVESTATE: ✓ Successfully saved and verified in D1');
+        }
       } else {
-        this.log('SAVESTATE: ✓ Successfully saved and verified');
+        this.log('SAVESTATE ERROR: State not found in D1 after save!');
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? `${error.message} | ${error.stack}` : String(error);

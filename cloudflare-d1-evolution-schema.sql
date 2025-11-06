@@ -58,3 +58,11 @@ CREATE TABLE IF NOT EXISTS system_stats (
 INSERT OR IGNORE INTO system_stats (stat_name, stat_value) VALUES ('total_cycles', '0');
 INSERT OR IGNORE INTO system_stats (stat_name, stat_value) VALUES ('last_run', 'never');
 INSERT OR IGNORE INTO system_stats (stat_name, stat_value) VALUES ('winning_strategies', '0');
+
+-- System state table for persistent state storage
+-- Using D1 instead of Durable Object storage for better reliability
+CREATE TABLE IF NOT EXISTS system_state (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
