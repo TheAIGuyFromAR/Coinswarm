@@ -14,96 +14,161 @@ Saves to JSON for testing.
 import json
 import urllib.request
 import urllib.parse
+import ssl
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
 # Your Cloudflare Worker endpoint
-WORKER_URL = "https://coinswarm-data.YOURUSERNAME.workers.dev"  # TODO: Update with your Worker URL
+WORKER_URL = "https://coinswarm.bamn86.workers.dev"
 
 # Data directory
 DATA_DIR = Path(__file__).parent / "data" / "historical"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Pairs to fetch
-PAIRS = [
-    "BTCUSDT",
-    "BTCUSDC",
-    "SOLUSDT",
-    "SOLUSDC",
-]
+# Symbols to fetch - Worker API uses base symbols (BTC, SOL, ETH)
+# Worker automatically aggregates from multiple stablecoin pairs (USDT, USDC, etc.)
+SYMBOLS = ["BTC", "SOL", "ETH"]
+
+# SSL context that skips cert verification (needed for proxy)
+ssl_context = ssl._create_unverified_context()
+
+# Worker limit is 365 days per request
+MAX_DAYS_PER_REQUEST = 365
 
 
-def fetch_historical_data(symbol: str, days: int = 1095):
+def fetch_with_retry(symbol: str, days: int, max_retries: int = 5) -> dict:
+    """
+    Fetch data with exponential backoff retry for 503 errors.
+
+    Args:
+        symbol: Base symbol
+        days: Days to fetch (max 365)
+        max_retries: Maximum retry attempts
+
+    Returns:
+        API response dict
+    """
+    params = {
+        "symbol": symbol,
+        "days": min(days, MAX_DAYS_PER_REQUEST),
+        "aggregate": "true"
+    }
+
+    url = f"{WORKER_URL}/price?{urllib.parse.urlencode(params)}"
+
+    for attempt in range(max_retries):
+        try:
+            with urllib.request.urlopen(url, timeout=60, context=ssl_context) as response:
+                return json.loads(response.read())
+
+        except urllib.error.HTTPError as e:
+            if e.code == 503:
+                # Service unavailable - exponential backoff
+                wait_time = 2 ** attempt  # 1s, 2s, 4s, 8s, 16s
+                print(f"  ⚠️  503 error, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})...")
+                time.sleep(wait_time)
+            else:
+                raise  # Other HTTP errors, don't retry
+
+        except Exception as e:
+            # Non-HTTP errors
+            print(f"  ❌ Error: {e}")
+            return {"success": False, "error": str(e)}
+
+    # All retries exhausted
+    return {"success": False, "error": "Max retries reached (503 errors)"}
+
+
+def fetch_historical_data(symbol: str, target_days: int = 730):
     """
     Fetch historical data from Cloudflare Worker.
 
+    Worker limit: 365 days per request. This function fetches multiple
+    chunks if needed to reach target_days.
+
     Args:
-        symbol: Trading pair (e.g., "BTCUSDT")
-        days: Number of days to fetch (default: 3 years)
+        symbol: Base symbol (e.g., "BTC", "SOL", "ETH")
+        target_days: Total days to fetch (will fetch in 365-day chunks)
 
     Returns:
         List of candles or None if failed
     """
-    print(f"Fetching {symbol} ({days} days)...")
+    print(f"Fetching {symbol} ({target_days} days total)...")
 
-    # Build request
-    params = {
-        "symbol": symbol,
-        "interval": "1h",
-        "days": days
-    }
+    # Calculate how many chunks we need
+    num_chunks = (target_days + MAX_DAYS_PER_REQUEST - 1) // MAX_DAYS_PER_REQUEST
+    all_candles = []
 
-    url = f"{WORKER_URL}?{urllib.parse.urlencode(params)}"
+    for chunk in range(num_chunks):
+        days_this_chunk = min(MAX_DAYS_PER_REQUEST, target_days - (chunk * MAX_DAYS_PER_REQUEST))
 
-    try:
-        with urllib.request.urlopen(url, timeout=30) as response:
-            data = json.loads(response.read())
+        if chunk > 0:
+            print(f"  Fetching chunk {chunk + 1}/{num_chunks} ({days_this_chunk} days)...")
+            time.sleep(1)  # Rate limit between chunks
 
-            if "data" in data and len(data["data"]) > 0:
-                candles = data["data"]
-                print(f"  ✅ Fetched {len(candles)} candles")
+        data = fetch_with_retry(symbol, days_this_chunk)
 
-                # Calculate date range
-                start_date = datetime.fromtimestamp(candles[0]["timestamp"] / 1000)
-                end_date = datetime.fromtimestamp(candles[-1]["timestamp"] / 1000)
-                actual_days = (end_date - start_date).days
-                actual_years = actual_days / 365.25
+        if data.get("success") and "data" in data:
+            candles = data["data"]
+            all_candles.extend(candles)
 
-                print(f"  Date range: {start_date.date()} to {end_date.date()}")
-                print(f"  Coverage: {actual_days} days ({actual_years:.1f} years)")
-
-                if actual_years < 2.0:
-                    print(f"  ⚠️  Only {actual_years:.1f} years - need 2+ for robust validation!")
-                else:
-                    print(f"  ✅ Sufficient data for validation")
-
-                return candles
+            if chunk == 0:
+                print(f"  ✅ Chunk 1: {len(candles)} candles")
+                print(f"  Providers: {', '.join(data.get('providersUsed', []))}")
+        else:
+            error = data.get("error", "Unknown error")
+            print(f"  ❌ Chunk {chunk + 1} failed: {error}")
+            if chunk == 0:
+                return None  # First chunk failed, abort
             else:
-                print(f"  ❌ No data returned")
-                return None
+                break  # Later chunks failed, return what we have
 
-    except Exception as e:
-        print(f"  ❌ Error: {e}")
+    # Summary
+    if all_candles:
+        start_date = datetime.fromisoformat(all_candles[0]["timestamp"].replace('Z', '+00:00'))
+        end_date = datetime.fromisoformat(all_candles[-1]["timestamp"].replace('Z', '+00:00'))
+        actual_days = (end_date - start_date).days
+        actual_years = actual_days / 365.25
+
+        print(f"  📊 Total: {len(all_candles)} candles across {actual_days} days ({actual_years:.1f} years)")
+        print(f"  Date range: {start_date.date()} to {end_date.date()}")
+
+        # Get first and last prices from chunks
+        first_price = all_candles[0]["price"]
+        last_price = all_candles[-1]["price"]
+        price_change = ((last_price - first_price) / first_price) * 100
+
+        print(f"  Price: ${first_price:,.2f} → ${last_price:,.2f} ({price_change:+.2f}%)")
+
+        if actual_years < 2.0:
+            print(f"  ⚠️  Only {actual_years:.1f} years - need 2+ for robust validation!")
+        else:
+            print(f"  ✅ Sufficient data for validation")
+
+        return all_candles
+    else:
         return None
 
 
 def main():
-    """Fetch all pairs"""
+    """Fetch all symbols"""
 
     print("="*80)
-    print("MULTI-PAIR HISTORICAL DATA FETCHER")
+    print("MULTI-ASSET HISTORICAL DATA FETCHER")
     print("="*80)
-    print(f"Fetching {len(PAIRS)} trading pairs")
-    print(f"Target: 3 years (1095 days) of 1h candles")
+    print(f"Fetching {len(SYMBOLS)} symbols (Worker aggregates from all stablecoin pairs)")
+    print(f"Target: 2+ years (730+ days) of 1h candles")
     print(f"Data directory: {DATA_DIR}")
     print(f"Cloudflare Worker: {WORKER_URL}")
+    print(f"Note: Worker limit = 365 days/request, will fetch multiple chunks")
     print("="*80 + "\n")
 
     results = {}
 
-    for symbol in PAIRS:
+    for symbol in SYMBOLS:
         # Check if already downloaded
-        filename = DATA_DIR / f"{symbol}_1h.json"
+        filename = DATA_DIR / f"{symbol}-USD_1h.json"
 
         if filename.exists():
             print(f"Loading cached {symbol} from {filename}")
@@ -113,8 +178,8 @@ def main():
                 print(f"  Loaded {len(data)} candles from cache\n")
             continue
 
-        # Fetch from Worker
-        candles = fetch_historical_data(symbol, days=1095)
+        # Fetch from Worker (target 2 years = 730 days)
+        candles = fetch_historical_data(symbol, target_days=730)
 
         if candles:
             # Save to JSON
@@ -125,6 +190,10 @@ def main():
         else:
             print(f"  Skipped {symbol} (no data)\n")
 
+        # Rate limit between symbols
+        if symbol != SYMBOLS[-1]:  # Don't sleep after last one
+            time.sleep(2)
+
     # Summary
     print("\n" + "="*80)
     print("DATA FETCH SUMMARY")
@@ -132,8 +201,9 @@ def main():
 
     for symbol, candles in results.items():
         if candles:
-            start = datetime.fromtimestamp(candles[0]["timestamp"] / 1000)
-            end = datetime.fromtimestamp(candles[-1]["timestamp"] / 1000)
+            # Parse ISO timestamps
+            start = datetime.fromisoformat(candles[0]["timestamp"].replace('Z', '+00:00'))
+            end = datetime.fromisoformat(candles[-1]["timestamp"].replace('Z', '+00:00'))
             years = (end - start).days / 365.25
 
             status = "✅" if years >= 2.0 else "⚠️ "
@@ -142,7 +212,7 @@ def main():
     print("="*80)
     print(f"\n✅ Data fetch complete! Saved to: {DATA_DIR}")
     print("\nNext step: Run random window validation with:")
-    print("  python test_memory_simple.py")
+    print("  python test_memory_on_real_data.py")
 
 
 if __name__ == "__main__":
