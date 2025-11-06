@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS discovered_patterns (
 
 CREATE INDEX IF NOT EXISTS idx_patterns_votes ON discovered_patterns(votes DESC);
 CREATE INDEX IF NOT EXISTS idx_patterns_tested ON discovered_patterns(tested);
+CREATE INDEX IF NOT EXISTS idx_patterns_roi ON discovered_patterns(average_roi_pct DESC);
+CREATE INDEX IF NOT EXISTS idx_patterns_performance ON discovered_patterns(average_ending_value DESC);
 
 -- System stats table
 CREATE TABLE IF NOT EXISTS system_stats (

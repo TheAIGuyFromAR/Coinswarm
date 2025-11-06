@@ -207,7 +207,7 @@ export class EvolutionAgent implements DurableObject {
           ).first();
 
           const topPatterns = await this.env.DB.prepare(
-            'SELECT pattern_id, name, votes, accuracy FROM discovered_patterns ORDER BY votes DESC LIMIT 10'
+            'SELECT pattern_id, name, votes, accuracy, number_of_runs, max_ending_value, average_ending_value, average_roi_pct FROM discovered_patterns ORDER BY average_roi_pct DESC, votes DESC LIMIT 20'
           ).all();
 
           return new Response(JSON.stringify({
