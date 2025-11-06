@@ -9,7 +9,8 @@
  * Endpoints:
  * - GET /data?symbol=BTC&days=180  (up to 365 days)
  *
- * Deploy: Copy to Cloudflare Dashboard Quick Edit
+ * Deploy: Auto-deployed via GitHub Actions
+ * Last updated: 2025-11-06
  */
 
 export default {
