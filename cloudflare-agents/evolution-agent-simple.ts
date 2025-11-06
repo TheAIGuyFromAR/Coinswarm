@@ -266,6 +266,25 @@ export class EvolutionAgent implements DurableObject {
   async alarm(): Promise<void> {
     console.log('Alarm triggered');
 
+    // Load state from D1 if this is first access after DO restart
+    if (this.evolutionState.lastCycleAt === 'never') {
+      this.log('Alarm: First access after restart - loading state from D1...');
+      try {
+        const result = await this.env.DB.prepare(`
+          SELECT value FROM system_state WHERE key = 'evolutionState'
+        `).first<{ value: string }>();
+
+        if (result && result.value) {
+          this.evolutionState = JSON.parse(result.value);
+          this.log(`Alarm: State loaded from D1 - cycles=${this.evolutionState.totalCycles}, trades=${this.evolutionState.totalTrades}`);
+        } else {
+          this.log('Alarm: No stored state in D1, using defaults');
+        }
+      } catch (error) {
+        this.log(`Alarm: Error loading state - ${error}`);
+      }
+    }
+
     try {
       await this.runEvolutionCycle();
     } catch (error) {
