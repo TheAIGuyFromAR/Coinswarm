@@ -1,0 +1,41 @@
+name: Initialize Evolution Database
+
+on:
+  push:
+    branches:
+      - claude/debug-cloudflare-historical-data-011CUqugUynEoovcsiVnoaPB
+    paths:
+      - 'cloudflare-d1-evolution-schema.sql'
+      - '.github/workflows/init-evolution-db.yml'
+  workflow_dispatch:
+
+jobs:
+  init-db:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Wrangler
+        run: npm install -g wrangler@4.45.4
+
+      - name: Initialize D1 Database
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "🗄️  Initializing D1 database for evolution system..."
+          wrangler d1 execute coinswarm-evolution --remote --file=cloudflare-d1-evolution-schema.sql
+          echo "✅ Database initialized successfully!"
+
+      - name: Trigger First Evolution Cycle
+        run: |
+          echo "🚀 Starting evolution system..."
+          curl -X POST https://coinswarm-evolution-agent.bamn86.workers.dev/trigger
+          sleep 3
+          echo "📊 Checking status..."
+          curl https://coinswarm-evolution-agent.bamn86.workers.dev/status
