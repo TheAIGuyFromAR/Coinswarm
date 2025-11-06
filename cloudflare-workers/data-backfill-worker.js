@@ -4,6 +4,8 @@
  * Runs frequently (every minute) to backfill 2 years of historical data
  * into Cloudflare D1 database as fast as possible without hitting 429 rate limits.
  *
+ * Deployment: Triggered by GitHub Actions
+ *
  * Features:
  * - Intelligent rate limiting (backs off on 429)
  * - Progress tracking
