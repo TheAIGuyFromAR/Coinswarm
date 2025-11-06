@@ -25,19 +25,56 @@ from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
 
 
 async def fetch_real_data(symbol: str, days: int) -> List[DataPoint]:
-    """Fetch real historical data from Cloudflare Worker"""
+    """
+    Fetch real historical data from Cloudflare Worker
+
+    Worker has timeout limits at ~50 days, so fetch in 30-day chunks
+    """
     client = CoinswarmWorkerClient()
 
     print(f"📡 Fetching {days} days of real {symbol} data from Cloudflare Worker...")
 
-    try:
-        data = await client.fetch_price_data(symbol=symbol, days=days, aggregate=True)
-        print(f"✅ Received {len(data)} hourly candles ({len(data)/24:.1f} days)")
-        return data
-    except Exception as e:
-        print(f"❌ Error fetching data: {e}")
-        print(f"   Worker may be rate-limited or down. Using fallback mock data for demo.")
-        return None
+    # For requests under 30 days, fetch directly
+    if days <= 30:
+        try:
+            data = await client.fetch_price_data(symbol=symbol, days=days, aggregate=True)
+            print(f"✅ Received {len(data)} hourly candles ({len(data)/24:.1f} days)")
+            return data
+        except Exception as e:
+            print(f"❌ Error fetching data: {e}")
+            return None
+
+    # For larger requests, fetch in 30-day chunks
+    print(f"   Fetching in 30-day chunks to avoid Worker timeout...")
+    chunk_size = 30
+    all_data = []
+
+    chunks_needed = (days + chunk_size - 1) // chunk_size
+
+    for i in range(chunks_needed):
+        chunk_days = min(chunk_size, days - i * chunk_size)
+        print(f"   Chunk {i+1}/{chunks_needed}: {chunk_days} days...", end=" ")
+
+        try:
+            chunk_data = await client.fetch_price_data(symbol=symbol, days=chunk_days, aggregate=True)
+            all_data.extend(chunk_data)
+            print(f"✅ {len(chunk_data)} candles")
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            if len(all_data) == 0:
+                return None
+            break
+
+    if all_data:
+        # Remove duplicates and sort
+        unique_data = {}
+        for point in all_data:
+            unique_data[point.timestamp] = point
+        sorted_data = sorted(unique_data.values(), key=lambda p: p.timestamp)
+        print(f"✅ Total: {len(sorted_data)} candles ({len(sorted_data)/24:.1f} days)")
+        return sorted_data
+
+    return None
 
 
 def create_1month_windows(data: List[DataPoint], window_days: int = 30) -> List[tuple]:
@@ -110,7 +147,17 @@ async def test_window(
     result = await engine.run_backtest(committee, historical_data)
 
     # Calculate vs HODL
-    vs_hodl = result.total_return_pct / hodl_return if hodl_return != 0 else 0
+    # If HODL lost money and strategy did better (even 0%), that's a win
+    if hodl_return < 0:
+        if result.total_return_pct >= hodl_return:
+            # Strategy beat HODL by preserving capital
+            vs_hodl = abs(hodl_return) / max(abs(result.total_return_pct), 0.0001)
+        else:
+            vs_hodl = result.total_return_pct / hodl_return
+    elif hodl_return > 0:
+        vs_hodl = result.total_return_pct / hodl_return if hodl_return != 0 else 0
+    else:
+        vs_hodl = 0
 
     return {
         "start_date": window_data[0].timestamp,
@@ -148,12 +195,12 @@ async def main():
     print(f"  Arbitrage Weight: {strategy['config']['arbitrage_weight']:.3f}")
     print(f"  Confidence Threshold: {strategy['config']['confidence_threshold']:.3f}\n")
 
-    # Fetch real data - start with 60 days, will expand to more
+    # Fetch real data - start with 90 days for multiple test windows
     print("="*90)
-    print("PHASE 1: Fetching initial dataset (60 days)")
+    print("PHASE 1: Fetching initial dataset (90 days)")
     print("="*90 + "\n")
 
-    real_data = await fetch_real_data(symbol="BTC", days=60)
+    real_data = await fetch_real_data(symbol="BTC", days=90)
 
     if real_data is None:
         print("\n⚠️  Could not fetch real data. Please check:")
