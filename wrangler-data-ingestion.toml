@@ -16,9 +16,9 @@ binding = "DB"  # Available in worker as env.DB
 database_name = "coinswarm-historical-data"
 database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
 
-# Environment variables (set via dashboard or wrangler secret)
-# CRYPTOCOMPARE_API_KEY is required - set via:
-# wrangler secret put CRYPTOCOMPARE_API_KEY --name coinswarm-data-ingestion
+# Environment variables
+[vars]
+CRYPTOCOMPARE_API_KEY = "da672b9999120841fbd4427fa4550b83b5f23e017c5c03ff33bafe09064abe83"
 
 [env.production]
 name = "coinswarm-data-ingestion"
