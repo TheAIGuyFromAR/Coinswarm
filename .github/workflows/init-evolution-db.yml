@@ -29,7 +29,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           echo "🗄️  Initializing D1 database for evolution system..."
-          wrangler d1 execute coinswarm-evolution --remote --file=cloudflare-d1-evolution-schema.sql
+          cd cloudflare-agents
+          wrangler d1 execute coinswarm-evolution --remote --file=../cloudflare-d1-evolution-schema.sql
           echo "✅ Database initialized successfully!"
 
       - name: Trigger First Evolution Cycle
