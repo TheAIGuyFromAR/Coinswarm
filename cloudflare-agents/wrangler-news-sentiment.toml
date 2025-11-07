@@ -1,0 +1,40 @@
+# Wrangler configuration for News & Sentiment Agent
+# Provides sentiment analysis and committee weighting for multi-agent system
+
+name = "news-sentiment-agent"
+main = "news-sentiment-agent.ts"
+compatibility_date = "2024-11-01"
+
+# Environment variables (set in Cloudflare dashboard or via wrangler secret)
+# - CRYPTOCOMPARE_API_KEY (optional, for news sentiment)
+# - FRED_API_KEY (optional, for macro indicators)
+# Both are free API keys, but system works without them (using Fear & Greed Index only)
+
+[vars]
+ENVIRONMENT = "production"
+
+# D1 Database binding for storing sentiment snapshots
+[[d1_databases]]
+binding = "DB"
+database_name = "coinswarm-evolution-db"
+database_id = "YOUR_D1_DATABASE_ID"  # Replace with your actual D1 database ID
+
+# KV namespace for caching sentiment data (optional)
+[[kv_namespaces]]
+binding = "SENTIMENT_CACHE"
+id = "YOUR_KV_NAMESPACE_ID"  # Replace with your KV namespace ID
+
+# Cron trigger to fetch sentiment every 6 hours
+[triggers]
+crons = ["0 */6 * * *"]  # Every 6 hours
+
+# Routes (uncomment to bind to custom domain)
+# routes = [
+#   { pattern = "sentiment.coinswarm.com/*", zone_name = "coinswarm.com" }
+# ]
+
+# Usage limits (all generous on free tier)
+# - Fear & Greed API: Unlimited, no key needed
+# - CryptoCompare: 50 requests/day (free tier)
+# - FRED: Unlimited (free tier, key required)
+# Total cost: $0/month

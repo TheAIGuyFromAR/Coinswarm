@@ -24,6 +24,7 @@ import { runTechnicalResearch } from './technical-patterns-agent';
 import { runHeadToHeadCompetition } from './head-to-head-testing';
 import { runCompetitionCycle } from './agent-competition';
 import { runModelResearch } from './model-research-agent';
+import { runCrossAgentLearning } from './cross-agent-learning';
 import { calculateAllIndicators, generateTradeRationalization, type TechnicalIndicators } from './technical-indicators';
 
 // Environment bindings interface
@@ -31,6 +32,7 @@ interface Env {
   DB: D1Database;
   EVOLUTION_AGENT: DurableObjectNamespace;
   AI?: any;
+  SENTIMENT_AGENT_URL?: string; // Optional: news-sentiment-agent worker URL
 }
 
 // Agent state interface
@@ -59,6 +61,16 @@ interface ChaosTrade {
   sellRationalization: string[];  // What indicators suggested selling
   buyReason: string;  // Human readable summary
   sellReason: string;  // Human readable summary
+  // Sentiment context (for pattern discovery)
+  sentimentFearGreed?: number;  // 0-100
+  sentimentOverall?: number;  // -1 to +1
+  sentimentRegime?: string;  // 'bull', 'bear', 'sideways', 'volatile'
+  sentimentClassification?: string;  // 'Extreme Fear', 'Fear', 'Neutral', 'Greed', 'Extreme Greed'
+  sentimentNewsScore?: number;  // -1 to +1 (news sentiment only)
+  macroFedRate?: number;
+  macroCPI?: number;
+  macroUnemployment?: number;
+  macro10yYield?: number;
 }
 
 // Market state at decision time
@@ -579,6 +591,18 @@ export class EvolutionAgent implements DurableObject {
         }
       }
 
+      // Step 7.5: Cross-agent learning (every 25 cycles)
+      if (this.evolutionState.totalCycles % 25 === 0 && this.evolutionState.totalCycles > 0) {
+        this.log('Step 7.5: Running cross-agent learning...');
+        try {
+          await runCrossAgentLearning(this.env.DB);
+          this.log('✓ Cross-agent learning complete');
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          this.log(`❌ Cross-agent learning failed: ${errorMsg}`);
+        }
+      }
+
       // Step 8: Model research agent (every 50 cycles)
       if (this.evolutionState.totalCycles % 50 === 0) {
         this.log('Step 8: Running model research...');
@@ -623,6 +647,38 @@ export class EvolutionAgent implements DurableObject {
   }
 
   /**
+   * Fetch current sentiment data from news-sentiment-agent
+   * Returns null if sentiment agent is not configured or fails
+   */
+  private async fetchSentimentData(): Promise<any | null> {
+    if (!this.env.SENTIMENT_AGENT_URL) {
+      this.log('Sentiment agent URL not configured, skipping sentiment data');
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${this.env.SENTIMENT_AGENT_URL}/current`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        this.log(`Sentiment agent returned ${response.status}, skipping sentiment data`);
+        return null;
+      }
+
+      const data = await response.json();
+      this.log(`✓ Fetched sentiment: ${data.fear_greed_classification} (${data.fear_greed_index}), Regime: ${data.market_regime}`);
+      return data;
+    } catch (error) {
+      this.log(`Failed to fetch sentiment data: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
+  }
+
+  /**
    * Generate historical trades with realistic price movements
    * - Random entry times over past 30 days
    * - Random hold durations (1 min to 24 hours)
@@ -630,6 +686,12 @@ export class EvolutionAgent implements DurableObject {
    */
   async generateHistoricalTrades(count: number): Promise<number> {
     this.log(`Generating ${count} chaos trades using REAL historical data...`);
+
+    // Fetch current sentiment data (optional, for pattern discovery)
+    const sentimentData = await this.fetchSentimentData();
+    if (sentimentData) {
+      this.log(`Sentiment context: ${sentimentData.fear_greed_classification} | Regime: ${sentimentData.market_regime} | Overall: ${sentimentData.overall_sentiment.toFixed(2)}`);
+    }
 
     try {
       const trades: ChaosTrade[] = [];
@@ -704,7 +766,8 @@ export class EvolutionAgent implements DurableObject {
           const buyReason = `Random chaos trade on ${pair} at $${entryPrice.toFixed(2)} (hold ${holdCandles} candles / ${holdDurationMinutes}min)`;
           const sellReason = `Exit ${pair} after ${holdCandles} candles: ${profitable ? 'profit' : 'loss'} ${pnlPct.toFixed(2)}%`;
 
-          trades.push({
+          // Add sentiment data if available (for pattern discovery like "RSI oversold + extreme fear = 78% win")
+          const trade: ChaosTrade = {
             pair,
             entryTime: entryTime.toISOString(),
             exitTime: exitTime.toISOString(),
@@ -718,7 +781,27 @@ export class EvolutionAgent implements DurableObject {
             sellRationalization,
             buyReason,
             sellReason
-          });
+          };
+
+          if (sentimentData) {
+            trade.sentimentFearGreed = sentimentData.fear_greed_index;
+            trade.sentimentOverall = sentimentData.overall_sentiment;
+            trade.sentimentRegime = sentimentData.market_regime;
+            trade.sentimentClassification = sentimentData.fear_greed_classification;
+            trade.sentimentNewsScore = sentimentData.news_sentiment;
+
+            // Add macro indicators if available
+            if (sentimentData.macro_indicators && sentimentData.macro_indicators.length > 0) {
+              for (const macro of sentimentData.macro_indicators) {
+                if (macro.indicator_code === 'FEDFUNDS') trade.macroFedRate = macro.value;
+                else if (macro.indicator_code === 'CPIAUCSL') trade.macroCPI = macro.value;
+                else if (macro.indicator_code === 'UNRATE') trade.macroUnemployment = macro.value;
+                else if (macro.indicator_code === 'DGS10') trade.macro10yYield = macro.value;
+              }
+            }
+          }
+
+          trades.push(trade);
 
         } catch (tradeError) {
           this.log(`Error generating trade ${i}: ${tradeError}`);
@@ -838,7 +921,10 @@ export class EvolutionAgent implements DurableObject {
           entry_is_weekend, entry_is_monday, entry_is_tuesday, entry_is_wednesday,
           entry_is_thursday, entry_is_friday, entry_is_market_hours,
           entry_near_recent_high, entry_near_recent_low, entry_at_resistance, entry_at_support,
-          buy_rationalization, sell_rationalization
+          buy_rationalization, sell_rationalization,
+          sentiment_fear_greed, sentiment_overall, sentiment_regime,
+          sentiment_classification, sentiment_news_score,
+          macro_fed_rate, macro_cpi, macro_unemployment, macro_10y_yield
         ) VALUES (
           ?, ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?, ?, ?, ?,
@@ -857,7 +943,9 @@ export class EvolutionAgent implements DurableObject {
           ?, ?, ?,
           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?,
-          ?, ?
+          ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?
         )
       `);
 
@@ -949,7 +1037,18 @@ export class EvolutionAgent implements DurableObject {
           ind.at_support ? 1 : 0,
           // Rationalization
           JSON.stringify(t.buyRationalization),
-          JSON.stringify(t.sellRationalization)
+          JSON.stringify(t.sellRationalization),
+          // Sentiment (optional - for pattern discovery like "RSI oversold + extreme fear = 78% win")
+          t.sentimentFearGreed ?? null,
+          t.sentimentOverall ?? null,
+          t.sentimentRegime ?? null,
+          t.sentimentClassification ?? null,
+          t.sentimentNewsScore ?? null,
+          // Macro indicators (optional)
+          t.macroFedRate ?? null,
+          t.macroCPI ?? null,
+          t.macroUnemployment ?? null,
+          t.macro10yYield ?? null
         )
       );
 

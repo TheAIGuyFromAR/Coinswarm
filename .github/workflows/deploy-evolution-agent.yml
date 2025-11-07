@@ -1,4 +1,4 @@
-name: Deploy Evolution Agent (Agents SDK)
+name: Deploy Evolution System (All Workers)
 
 on:
   push:
@@ -14,7 +14,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy Evolution Agent
+    name: Deploy All Evolution Workers
 
     steps:
       - name: Checkout code
@@ -30,18 +30,53 @@ jobs:
           cd cloudflare-agents
           npm install
 
-      - name: Deploy to Cloudflare Workers
+      - name: Deploy Evolution Agent
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'cloudflare-agents'
           wranglerVersion: "4.45.4"
-          command: deploy
+          command: deploy --config wrangler.toml
+
+      - name: Deploy News & Sentiment Agent
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-news-sentiment.toml
+
+      - name: Deploy Multi-Exchange Data Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-multi-exchange.toml
+
+      - name: Deploy Solana DEX Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-solana-dex.toml
 
       - name: Deployment Complete
         run: |
-          echo "✅ Deployment successful!"
-          echo "Check your worker at: https://dash.cloudflare.com/8a330fc6c339f031a73905d4ca2f3e5d/workers/services/view/coinswarm-evolution-agent"
-          echo "Find the worker URL in Cloudflare Dashboard and trigger with:"
-          echo "curl -X POST https://YOUR-WORKER-URL/trigger"
+          echo "✅ All workers deployed successfully!"
+          echo ""
+          echo "Deployed Workers:"
+          echo "1. Evolution Agent (main orchestrator)"
+          echo "2. News & Sentiment Agent (committee weighting)"
+          echo "3. Multi-Exchange Data Worker (Binance + Coinbase)"
+          echo "4. Solana DEX Worker (Jupiter, Raydium, Orca)"
+          echo ""
+          echo "Check your workers at: https://dash.cloudflare.com/8a330fc6c339f031a73905d4ca2f3e5d/workers"
+          echo ""
+          echo "Trigger evolution cycle:"
+          echo "curl -X POST https://YOUR-EVOLUTION-AGENT-URL/trigger"
