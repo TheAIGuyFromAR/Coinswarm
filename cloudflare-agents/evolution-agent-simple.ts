@@ -173,6 +173,35 @@ export class EvolutionAgent implements DurableObject {
         });
       }
 
+      // Bulk import endpoint - generate historical trades quickly
+      if (url.pathname === '/bulk-import') {
+        const urlParams = url.searchParams;
+        const count = parseInt(urlParams.get('count') || '10000');
+
+        this.log(`Bulk import: Generating ${count} historical trades...`);
+
+        try {
+          const generated = await this.generateHistoricalTrades(count);
+          this.log(`✓ Bulk import completed: ${generated} trades`);
+
+          return new Response(JSON.stringify({
+            message: 'Bulk import completed',
+            tradesGenerated: generated,
+            totalTrades: this.evolutionState.totalTrades + generated
+          }, null, 2), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({
+            error: `Bulk import failed: ${error}`,
+            stack: error instanceof Error ? error.stack : undefined
+          }, null, 2), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // Trigger endpoint
       if (url.pathname === '/trigger') {
         console.log('Trigger endpoint called');
@@ -365,60 +394,76 @@ export class EvolutionAgent implements DurableObject {
     }
   }
 
-  async generateChaosTrades(count: number): Promise<number> {
-    console.log(`Generating ${count} chaos trades...`);
+  /**
+   * Generate historical trades with realistic price movements
+   * - Random entry times over past 30 days
+   * - Random hold durations (1 min to 24 hours)
+   * - Trend-based price movements with volatility
+   */
+  async generateHistoricalTrades(count: number): Promise<number> {
+    this.log(`Generating ${count} historical trades with realistic price movements...`);
 
     try {
       const trades: ChaosTrade[] = [];
-      const basePrice = 65000;
+      const now = Date.now();
+      const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+
+      // Generate realistic price series
+      let price = 60000 + Math.random() * 20000;
+      let trend = 0;
 
       for (let i = 0; i < count; i++) {
-        const entryPrice = basePrice + (Math.random() - 0.5) * 10000;
-        const priceChange = (Math.random() - 0.5) * 0.1;
-        const exitPrice = entryPrice * (1 + priceChange);
+        // Random entry time in past 30 days
+        const entryTime = new Date(thirtyDaysAgo + Math.random() * (now - thirtyDaysAgo));
+
+        // Random hold duration: 1 minute to 24 hours
+        const holdMinutes = 1 + Math.floor(Math.random() * 1440);
+        const exitTime = new Date(entryTime.getTime() + holdMinutes * 60 * 1000);
+
+        // Realistic price movement with trend
+        if (Math.random() < 0.01) {
+          trend = (Math.random() - 0.5) * 0.001; // Trend shift
+        }
+
+        const volatility = 0.01 + Math.random() * 0.02;
+        const entryPrice = price;
+
+        // Price movement during hold period
+        for (let t = 0; t < holdMinutes; t++) {
+          const trendMove = price * trend;
+          const randomMove = price * (Math.random() - 0.5) * volatility;
+          price = Math.max(20000, Math.min(100000, price + trendMove + randomMove));
+        }
+
+        const exitPrice = price;
         const pnlPct = ((exitPrice - entryPrice) / entryPrice) * 100;
         const profitable = exitPrice > entryPrice;
 
+        // Realistic market states based on price movement
+        const momentum = (exitPrice - entryPrice) / entryPrice;
         const buyState: MarketState = {
           price: entryPrice,
-          momentum1tick: (Math.random() - 0.5) * 0.04,
-          momentum5tick: (Math.random() - 0.5) * 0.08,
-          vsSma10: (Math.random() - 0.5) * 0.06,
-          volumeVsAvg: Math.random() * 2,
-          volatility: Math.random() * 0.05
+          momentum1tick: (Math.random() - 0.5) * 0.02,
+          momentum5tick: (Math.random() - 0.5) * 0.05,
+          vsSma10: (Math.random() - 0.5) * 0.03,
+          volumeVsAvg: 0.5 + Math.random() * 2,
+          volatility
         };
 
         const sellState: MarketState = {
           price: exitPrice,
-          momentum1tick: (Math.random() - 0.5) * 0.04,
-          momentum5tick: (Math.random() - 0.5) * 0.08,
-          vsSma10: (Math.random() - 0.5) * 0.06,
-          volumeVsAvg: Math.random() * 2,
-          volatility: Math.random() * 0.05
+          momentum1tick: momentum * 0.7 + (Math.random() - 0.5) * 0.01,
+          momentum5tick: momentum * 0.5 + (Math.random() - 0.5) * 0.02,
+          vsSma10: (exitPrice - entryPrice) / entryPrice + (Math.random() - 0.5) * 0.02,
+          volumeVsAvg: 0.5 + Math.random() * 2,
+          volatility
         };
 
-        const buyReasons = [
-          `Momentum ${buyState.momentum1tick > 0 ? 'positive' : 'negative'}`,
-          `Price ${buyState.vsSma10 > 0 ? 'above' : 'below'} SMA10`,
-          `Volume ${buyState.volumeVsAvg > 1 ? 'high' : 'low'}`,
-          `Volatility ${buyState.volatility > 0.025 ? 'high' : 'low'}`,
-          'Random chaos decision'
-        ];
-        const buyReason = buyReasons[Math.floor(Math.random() * buyReasons.length)];
-
-        const sellReasons = [
-          `Detected ${sellState.momentum1tick < 0 ? 'reversal' : 'continuation'}`,
-          `Hit ${profitable ? 'profit' : 'loss'} target`,
-          `Volume ${sellState.volumeVsAvg > 1.5 ? 'spike' : 'drop'}`,
-          'Peak detection triggered'
-        ];
-        const sellReason = sellReasons[Math.floor(Math.random() * sellReasons.length)];
-
-        const now = new Date();
-        const exitTime = new Date(now.getTime() + Math.random() * 3600000);
+        const buyReason = `Entry at $${entryPrice.toFixed(2)} (hold ${holdMinutes}min)`;
+        const sellReason = `Exit after ${holdMinutes}min: ${profitable ? 'profit' : 'loss'} ${pnlPct.toFixed(2)}%`;
 
         trades.push({
-          entryTime: now.toISOString(),
+          entryTime: entryTime.toISOString(),
           exitTime: exitTime.toISOString(),
           entryPrice,
           exitPrice,
@@ -429,13 +474,33 @@ export class EvolutionAgent implements DurableObject {
           sellReason,
           sellState
         });
+
+        if ((i + 1) % 1000 === 0) {
+          this.log(`Generated ${i + 1}/${count} trades...`);
+        }
       }
 
-      console.log(`Generated ${trades.length} trade objects, storing in DB...`);
+      this.log(`Generated ${trades.length} historical trades, storing in DB...`);
       await this.storeTrades(trades);
-      console.log(`✓ Stored ${trades.length} trades in database`);
+      this.log(`✓ Stored ${trades.length} historical trades`);
 
       return trades.length;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.log(`Failed to generate historical trades: ${errorMsg}`);
+      throw new Error(`Generate historical trades failed: ${error}`);
+    }
+  }
+
+  /**
+   * Generate simple chaos trades for regular evolution cycles
+   */
+  async generateChaosTrades(count: number): Promise<number> {
+    console.log(`Generating ${count} chaos trades...`);
+
+    try {
+      // Just call the historical generator with small count
+      return await this.generateHistoricalTrades(count);
     } catch (error) {
       console.error('Failed to generate chaos trades:', error);
       throw new Error(`Generate trades failed: ${error}`);
