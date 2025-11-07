@@ -24,6 +24,7 @@ import { runTechnicalResearch } from './technical-patterns-agent';
 import { runHeadToHeadCompetition } from './head-to-head-testing';
 import { runCompetitionCycle } from './agent-competition';
 import { runModelResearch } from './model-research-agent';
+import { calculateAllIndicators, generateTradeRationalization, type TechnicalIndicators } from './technical-indicators';
 
 // Environment bindings interface
 interface Env {
@@ -45,16 +46,19 @@ interface EvolutionState {
 
 // Trade data structure
 interface ChaosTrade {
+  pair: string;
   entryTime: string;
   exitTime: string;
   entryPrice: number;
   exitPrice: number;
   pnlPct: number;
   profitable: boolean;
-  buyReason: string;
-  buyState: MarketState;
-  sellReason: string;
-  sellState: MarketState;
+  holdDurationMinutes: number;
+  entryIndicators: TechnicalIndicators;
+  buyRationalization: string[];  // What indicators suggested buying
+  sellRationalization: string[];  // What indicators suggested selling
+  buyReason: string;  // Human readable summary
+  sellReason: string;  // Human readable summary
 }
 
 // Market state at decision time
@@ -688,24 +692,32 @@ export class EvolutionAgent implements DurableObject {
           const pnlPct = ((exitPrice - entryPrice) / entryPrice) * 100;
           const profitable = exitPrice > entryPrice;
 
-          // Calculate REAL market indicators from historical data
-          const buyState = this.calculateMarketState(candles, entryIndex);
-          const sellState = this.calculateMarketState(candles, exitIndex);
+          // Calculate ALL technical indicators at entry
+          const entryIndicators = calculateAllIndicators(candles, entryIndex);
 
-          const buyReason = `Random chaos trade on ${pair} at $${entryPrice.toFixed(2)} (hold ${holdCandles} candles / ${(holdCandles * 5)}min)`;
+          // Generate rationalization: what indicators would have suggested this trade?
+          const buyRationalization = generateTradeRationalization(entryIndicators, 'BUY');
+          const sellRationalization = generateTradeRationalization(entryIndicators, 'SELL');
+
+          const holdDurationMinutes = holdCandles * 5;
+
+          const buyReason = `Random chaos trade on ${pair} at $${entryPrice.toFixed(2)} (hold ${holdCandles} candles / ${holdDurationMinutes}min)`;
           const sellReason = `Exit ${pair} after ${holdCandles} candles: ${profitable ? 'profit' : 'loss'} ${pnlPct.toFixed(2)}%`;
 
           trades.push({
+            pair,
             entryTime: entryTime.toISOString(),
             exitTime: exitTime.toISOString(),
             entryPrice,
             exitPrice,
             pnlPct,
             profitable,
+            holdDurationMinutes,
+            entryIndicators,
+            buyRationalization,
+            sellRationalization,
             buyReason,
-            buyState,
-            sellReason,
-            sellState
+            sellReason
           });
 
         } catch (tradeError) {
@@ -794,7 +806,7 @@ export class EvolutionAgent implements DurableObject {
   }
 
   async storeTrades(trades: ChaosTrade[]): Promise<void> {
-    console.log(`Storing ${trades.length} trades in D1...`);
+    console.log(`Storing ${trades.length} trades with ALL indicators in D1...`);
 
     try {
       if (!this.env.DB) {
@@ -803,23 +815,141 @@ export class EvolutionAgent implements DurableObject {
 
       const stmt = this.env.DB.prepare(`
         INSERT INTO chaos_trades (
-          entry_time, exit_time, entry_price, exit_price,
-          pnl_pct, profitable, buy_reason, buy_state, sell_reason, sell_state
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          pair, entry_time, exit_time, entry_price, exit_price,
+          pnl_pct, profitable, hold_duration_minutes,
+          entry_rsi_14, entry_rsi_oversold, entry_rsi_overbought,
+          entry_macd_line, entry_macd_signal, entry_macd_histogram,
+          entry_macd_bullish_cross, entry_macd_bearish_cross,
+          entry_bb_upper, entry_bb_middle, entry_bb_lower, entry_bb_position,
+          entry_bb_squeeze, entry_bb_at_lower, entry_bb_at_upper,
+          entry_sma_10, entry_sma_50, entry_sma_200, entry_ema_10, entry_ema_50,
+          entry_price_vs_sma10, entry_price_vs_sma50, entry_price_vs_sma200,
+          entry_above_sma10, entry_above_sma50, entry_above_sma200,
+          entry_golden_cross, entry_death_cross,
+          entry_stoch_k, entry_stoch_d, entry_stoch_oversold, entry_stoch_overbought,
+          entry_stoch_bullish_cross, entry_stoch_bearish_cross,
+          entry_atr_14, entry_volatility_regime,
+          entry_volume, entry_volume_sma_20, entry_volume_vs_avg,
+          entry_volume_spike, entry_volume_dry,
+          entry_momentum_1, entry_momentum_5, entry_momentum_10,
+          entry_momentum_positive, entry_momentum_strong,
+          entry_trend_regime, entry_higher_highs, entry_lower_lows,
+          entry_day_of_week, entry_hour_of_day, entry_month, entry_week_of_month,
+          entry_is_weekend, entry_is_monday, entry_is_tuesday, entry_is_wednesday,
+          entry_is_thursday, entry_is_friday, entry_is_market_hours,
+          entry_near_recent_high, entry_near_recent_low, entry_at_resistance, entry_at_support,
+          buy_rationalization, sell_rationalization
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?,
+          ?, ?, ?,
+          ?, ?,
+          ?, ?, ?, ?,
+          ?, ?,
+          ?, ?,
+          ?, ?, ?,
+          ?, ?,
+          ?, ?, ?,
+          ?, ?,
+          ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?,
+          ?, ?
+        )
       `);
 
-      const batch = trades.map(t =>
-        stmt.bind(
+      const batch = trades.map(t => {
+        const ind = t.entryIndicators;
+        return stmt.bind(
+          t.pair,
           t.entryTime,
           t.exitTime,
           t.entryPrice,
           t.exitPrice,
           t.pnlPct,
           t.profitable ? 1 : 0,
-          t.buyReason,
-          JSON.stringify(t.buyState),
-          t.sellReason,
-          JSON.stringify(t.sellState)
+          t.holdDurationMinutes,
+          // RSI
+          ind.rsi_14,
+          ind.rsi_oversold ? 1 : 0,
+          ind.rsi_overbought ? 1 : 0,
+          // MACD
+          ind.macd_line,
+          ind.macd_signal,
+          ind.macd_histogram,
+          ind.macd_bullish_cross ? 1 : 0,
+          ind.macd_bearish_cross ? 1 : 0,
+          // Bollinger Bands
+          ind.bb_upper,
+          ind.bb_middle,
+          ind.bb_lower,
+          ind.bb_position,
+          ind.bb_squeeze ? 1 : 0,
+          ind.bb_at_lower ? 1 : 0,
+          ind.bb_at_upper ? 1 : 0,
+          // Moving Averages
+          ind.sma_10,
+          ind.sma_50,
+          ind.sma_200,
+          ind.ema_10,
+          ind.ema_50,
+          ind.price_vs_sma10,
+          ind.price_vs_sma50,
+          ind.price_vs_sma200,
+          ind.above_sma10 ? 1 : 0,
+          ind.above_sma50 ? 1 : 0,
+          ind.above_sma200 ? 1 : 0,
+          ind.golden_cross ? 1 : 0,
+          ind.death_cross ? 1 : 0,
+          // Stochastic
+          ind.stoch_k,
+          ind.stoch_d,
+          ind.stoch_oversold ? 1 : 0,
+          ind.stoch_overbought ? 1 : 0,
+          ind.stoch_bullish_cross ? 1 : 0,
+          ind.stoch_bearish_cross ? 1 : 0,
+          // ATR / Volatility
+          ind.atr_14,
+          ind.volatility_regime,
+          // Volume
+          ind.volume,
+          ind.volume_sma_20,
+          ind.volume_vs_avg,
+          ind.volume_spike ? 1 : 0,
+          ind.volume_dry ? 1 : 0,
+          // Momentum
+          ind.momentum_1,
+          ind.momentum_5,
+          ind.momentum_10,
+          ind.momentum_positive ? 1 : 0,
+          ind.momentum_strong ? 1 : 0,
+          // Trend
+          ind.trend_regime,
+          ind.higher_highs ? 1 : 0,
+          ind.lower_lows ? 1 : 0,
+          // Temporal
+          ind.day_of_week,
+          ind.hour_of_day,
+          ind.month,
+          ind.week_of_month,
+          ind.is_weekend ? 1 : 0,
+          ind.is_monday ? 1 : 0,
+          ind.is_tuesday ? 1 : 0,
+          ind.is_wednesday ? 1 : 0,
+          ind.is_thursday ? 1 : 0,
+          ind.is_friday ? 1 : 0,
+          ind.is_market_hours ? 1 : 0,
+          // Support/Resistance
+          ind.near_recent_high ? 1 : 0,
+          ind.near_recent_low ? 1 : 0,
+          ind.at_resistance ? 1 : 0,
+          ind.at_support ? 1 : 0,
+          // Rationalization
+          JSON.stringify(t.buyRationalization),
+          JSON.stringify(t.sellRationalization)
         )
       );
 
