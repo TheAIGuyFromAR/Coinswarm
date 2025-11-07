@@ -1,0 +1,22 @@
+# Wrangler configuration for Backtest Worker
+
+name = "coinswarm-backtest"
+main = "backtest-worker.ts"
+compatibility_date = "2024-01-01"
+
+# KV Namespaces
+[[kv_namespaces]]
+binding = "TRADING_KV"
+id = "your_trading_kv_namespace_id"  # Create with: wrangler kv:namespace create TRADING_KV
+
+[[kv_namespaces]]
+binding = "HISTORICAL_PRICES"
+id = "your_historical_prices_kv_id"  # Create with: wrangler kv:namespace create HISTORICAL_PRICES
+
+# Environment variables
+[vars]
+INITIAL_CAPITAL = "100000"
+MAX_POSITIONS = "10"
+MAX_PER_PAIR_PCT = "0.30"
+MIN_PROFIT_THRESHOLD = "0.001"
+HISTORICAL_DATA_URL = "https://coinswarm-historical-data.your-subdomain.workers.dev"

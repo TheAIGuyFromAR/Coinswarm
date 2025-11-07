@@ -141,20 +141,109 @@ class PortfolioManager {
 
 /**
  * Price Fetcher
- * Fetches current prices from exchanges
+ * Fetches current prices from Binance or cached historical data
  */
 class PriceFetcher {
-  async fetchAllPrices(): Promise<Record<string, number>> {
-    // In production, fetch from real exchanges
-    // For now, mock prices with realistic values
+  private binanceApiUrl = 'https://api.binance.com';
+  private historicalDataUrl: string | null = null;
+  private useHistorical: boolean = false;
 
+  constructor(historicalDataUrl?: string) {
+    if (historicalDataUrl) {
+      this.historicalDataUrl = historicalDataUrl;
+      this.useHistorical = true;
+    }
+  }
+
+  /**
+   * Fetch current prices from Binance API
+   */
+  async fetchAllPrices(): Promise<Record<string, number>> {
+    if (this.useHistorical && this.historicalDataUrl) {
+      return await this.fetchFromHistorical();
+    }
+
+    return await this.fetchFromBinance();
+  }
+
+  /**
+   * Fetch live prices from Binance
+   */
+  private async fetchFromBinance(): Promise<Record<string, number>> {
+    const pairs = [
+      'BTCUSDT', 'BTCUSDC', 'BTCBUSD',
+      'SOLUSDT', 'SOLUSDC', 'SOLBUSD',
+      'ETHUSDT', 'ETHUSDC', 'ETHBUSD'
+    ];
+
+    const prices: Record<string, number> = {};
+
+    try {
+      // Fetch all prices in parallel
+      const pricePromises = pairs.map(async (symbol) => {
+        const url = `${this.binanceApiUrl}/api/v3/ticker/price?symbol=${symbol}`;
+        const response = await fetch(url);
+        const data = await response.json() as any;
+        return { symbol, price: parseFloat(data.price) };
+      });
+
+      const results = await Promise.all(pricePromises);
+
+      for (const { symbol, price } of results) {
+        const pair = this.symbolToPair(symbol);
+        prices[pair] = price;
+      }
+
+      // Calculate cross pairs
+      if (prices['BTC-USDT'] && prices['SOL-USDT']) {
+        prices['BTC-SOL'] = prices['BTC-USDT'] / prices['SOL-USDT'];
+      }
+      if (prices['BTC-USDT'] && prices['ETH-USDT']) {
+        prices['BTC-ETH'] = prices['BTC-USDT'] / prices['ETH-USDT'];
+      }
+
+    } catch (error) {
+      console.error('Error fetching Binance prices:', error);
+      // Fallback to mock data if Binance fails
+      return this.mockPrices();
+    }
+
+    return prices;
+  }
+
+  /**
+   * Fetch latest prices from historical data worker
+   */
+  private async fetchFromHistorical(): Promise<Record<string, number>> {
+    try {
+      const response = await fetch(`${this.historicalDataUrl}/random?interval=5m&minDays=1`);
+      const data = await response.json() as any;
+
+      if (data.success && data.dataset && data.dataset.candles.length > 0) {
+        // Get latest candle
+        const latestCandle = data.dataset.candles[data.dataset.candles.length - 1];
+        return {
+          [data.dataset.pair]: latestCandle.close
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching historical data:', error);
+    }
+
+    // Fallback
+    return this.mockPrices();
+  }
+
+  /**
+   * Mock prices for development/fallback
+   */
+  private mockPrices(): Record<string, number> {
     const basePrice = {
       BTC: 50000 + Math.random() * 1000,
       SOL: 100 + Math.random() * 5,
       ETH: 3000 + Math.random() * 100
     };
 
-    // Add small random differences across stablecoins
     return {
       'BTC-USDT': basePrice.BTC,
       'BTC-USDC': basePrice.BTC + (Math.random() - 0.5) * 20,
@@ -167,6 +256,15 @@ class PriceFetcher {
       'BTC-SOL': basePrice.BTC / basePrice.SOL,
       'BTC-ETH': basePrice.BTC / basePrice.ETH,
     };
+  }
+
+  private symbolToPair(symbol: string): string {
+    // Convert BTCUSDT -> BTC-USDT
+    const match = symbol.match(/^([A-Z]+)(USDT|USDC|BUSD)$/);
+    if (match) {
+      return `${match[1]}-${match[2]}`;
+    }
+    return symbol;
   }
 }
 
