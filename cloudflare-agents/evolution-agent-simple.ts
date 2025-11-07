@@ -322,39 +322,24 @@ export class EvolutionAgent implements DurableObject {
           const minRuns = parseInt(url.searchParams.get('min_runs') || '3');
           const limit = parseInt(url.searchParams.get('limit') || '50');
 
-          let query = 'SELECT * FROM discovered_patterns WHERE 1=1';
-          const params: any[] = [];
-
-          if (origin !== 'all') {
-            query += ' AND origin = ?';
-            params.push(origin);
-          }
-          if (status !== 'all') {
-            query += ' AND status = ?';
-            params.push(status);
-          }
-          query += ' AND number_of_runs >= ?';
-          params.push(minRuns);
-          query += ' ORDER BY (CAST(votes AS REAL) / NULLIF(number_of_runs, 0)) DESC, head_to_head_wins DESC LIMIT ?';
-          params.push(limit);
+          // Simple query that works with old schema
+          let query = 'SELECT * FROM discovered_patterns WHERE number_of_runs >= ? ORDER BY votes DESC LIMIT ?';
+          const params: any[] = [minRuns, limit];
 
           const patterns = await this.env.DB.prepare(query).bind(...params).all();
 
-          // Get stats
+          // Get basic stats
           const total = await this.env.DB.prepare('SELECT COUNT(*) as count FROM discovered_patterns').first();
-          const winning = await this.env.DB.prepare('SELECT COUNT(*) as count FROM discovered_patterns WHERE status = ?').bind('winning').first();
-          const chaos = await this.env.DB.prepare('SELECT COUNT(*) as count FROM discovered_patterns WHERE origin = ?').bind('chaos').first();
-          const academic = await this.env.DB.prepare('SELECT COUNT(*) as count FROM discovered_patterns WHERE origin = ?').bind('academic').first();
-          const technical = await this.env.DB.prepare('SELECT COUNT(*) as count FROM discovered_patterns WHERE origin = ?').bind('technical').first();
+          const withVotes = await this.env.DB.prepare('SELECT COUNT(*) as count FROM discovered_patterns WHERE votes > 0').first();
 
           return new Response(JSON.stringify({
             patterns: patterns.results || [],
             stats: {
               total: total?.count || 0,
-              winning: winning?.count || 0,
-              chaos: chaos?.count || 0,
-              academic: academic?.count || 0,
-              technical: technical?.count || 0
+              winning: withVotes?.count || 0,
+              chaos: 0,
+              academic: 0,
+              technical: 0
             }
           }), {
             headers: { 'Content-Type': 'application/json' }
