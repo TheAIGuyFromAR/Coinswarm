@@ -549,21 +549,21 @@ export class EvolutionAgent implements DurableObject {
   }
 
   async analyzePatterns(): Promise<number> {
-    console.log('Analyzing patterns from chaos trades...');
+    this.log('📊 Analyzing patterns from chaos trades...');
 
     try {
       const winners = await this.env.DB.prepare(
-        'SELECT buy_state FROM chaos_trades WHERE profitable = 1'
+        'SELECT buy_state FROM chaos_trades WHERE profitable = 1 LIMIT 5000'
       ).all();
 
       const losers = await this.env.DB.prepare(
-        'SELECT buy_state FROM chaos_trades WHERE profitable = 0'
+        'SELECT buy_state FROM chaos_trades WHERE profitable = 0 LIMIT 5000'
       ).all();
 
-      console.log(`Loaded ${winners.results.length} winners, ${losers.results.length} losers`);
+      this.log(`Loaded ${winners.results.length} winners, ${losers.results.length} losers`);
 
       if (winners.results.length < 10 || losers.results.length < 10) {
-        console.log('Not enough data for pattern analysis');
+        this.log('❌ Not enough data for pattern analysis');
         return 0;
       }
 
@@ -573,18 +573,22 @@ export class EvolutionAgent implements DurableObject {
       const winnerAvg = this.calculateAverageState(winnerStates);
       const loserAvg = this.calculateAverageState(loserStates);
 
-      console.log('Winner avg:', winnerAvg);
-      console.log('Loser avg:', loserAvg);
+      this.log(`Winner avg: momentum=${(winnerAvg.momentum1tick*100).toFixed(3)}%, volatility=${(winnerAvg.volatility*100).toFixed(3)}%`);
+      this.log(`Loser avg:  momentum=${(loserAvg.momentum1tick*100).toFixed(3)}%, volatility=${(loserAvg.volatility*100).toFixed(3)}%`);
 
       const patternsFound: Pattern[] = [];
 
       const momentumDiff = Math.abs(winnerAvg.momentum1tick - loserAvg.momentum1tick);
-      console.log(`Momentum difference: ${momentumDiff}`);
+      const volatilityDiff = Math.abs(winnerAvg.volatility - loserAvg.volatility);
+      const sma10Diff = Math.abs(winnerAvg.vsSma10 - loserAvg.vsSma10);
 
-      if (momentumDiff > 0.005) {
+      this.log(`Differences: momentum=${(momentumDiff*100).toFixed(4)}%, volatility=${(volatilityDiff*100).toFixed(4)}%, sma10=${(sma10Diff*100).toFixed(4)}%`);
+
+      // Lowered threshold from 0.005 to 0.002 (0.2%) to find more patterns
+      if (momentumDiff > 0.002) {
         const pattern = {
           patternId: `momentum-${Date.now()}`,
-          name: 'Momentum Entry Pattern',
+          name: `Momentum ${winnerAvg.momentum1tick > loserAvg.momentum1tick ? 'Positive' : 'Negative'} Entry`,
           conditions: {
             momentum1tick: { target: winnerAvg.momentum1tick, threshold: momentumDiff }
           },
@@ -595,7 +599,43 @@ export class EvolutionAgent implements DurableObject {
           votes: 0
         };
         patternsFound.push(pattern);
-        console.log('Found statistical pattern:', pattern.name);
+        this.log(`✓ Found momentum pattern: ${pattern.name} (${(momentumDiff*100).toFixed(3)}% diff)`);
+      }
+
+      // Check volatility pattern
+      if (volatilityDiff > 0.002) {
+        const pattern = {
+          patternId: `volatility-${Date.now()}`,
+          name: `${winnerAvg.volatility > loserAvg.volatility ? 'High' : 'Low'} Volatility Entry`,
+          conditions: {
+            volatility: { target: winnerAvg.volatility, threshold: volatilityDiff }
+          },
+          winRate: winners.results.length / (winners.results.length + losers.results.length),
+          sampleSize: winners.results.length + losers.results.length,
+          discoveredAt: new Date().toISOString(),
+          tested: false,
+          votes: 0
+        };
+        patternsFound.push(pattern);
+        this.log(`✓ Found volatility pattern: ${pattern.name} (${(volatilityDiff*100).toFixed(3)}% diff)`);
+      }
+
+      // Check SMA10 pattern
+      if (sma10Diff > 0.003) {
+        const pattern = {
+          patternId: `sma10-${Date.now()}`,
+          name: `Price ${winnerAvg.vsSma10 > loserAvg.vsSma10 ? 'Above' : 'Below'} SMA10`,
+          conditions: {
+            vsSma10: { target: winnerAvg.vsSma10, threshold: sma10Diff }
+          },
+          winRate: winners.results.length / (winners.results.length + losers.results.length),
+          sampleSize: winners.results.length + losers.results.length,
+          discoveredAt: new Date().toISOString(),
+          tested: false,
+          votes: 0
+        };
+        patternsFound.push(pattern);
+        this.log(`✓ Found SMA10 pattern: ${pattern.name} (${(sma10Diff*100).toFixed(3)}% diff)`);
       }
 
       // AI-powered pattern discovery
