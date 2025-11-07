@@ -30,6 +30,12 @@ database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"  # Using existing database
 [ai]
 binding = "AI"
 
+# Static assets for dashboards
+# Serves HTML files from public directory
+[assets]
+directory = "public"
+binding = "ASSETS"
+
 # Observability (optional)
 [observability]
 enabled = true
