@@ -339,13 +339,14 @@ export class EvolutionAgent implements DurableObject {
 
       // Step 2: Analyze patterns (every 5 cycles)
       if (this.evolutionState.totalCycles % 5 === 0 && this.evolutionState.totalTrades >= 100) {
-        console.log('Step 2: Analyzing patterns...');
+        this.log(`Step 2: Analyzing patterns (totalCycles=${this.evolutionState.totalCycles})...`);
         try {
           const patternsFound = await this.analyzePatterns();
-          console.log(`✓ Discovered ${patternsFound} new patterns`);
+          this.log(`✓ Pattern analysis complete: discovered ${patternsFound} new patterns`);
           this.evolutionState.patternsDiscovered += patternsFound;
         } catch (error) {
-          console.error('Pattern analysis failed:', error);
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          this.log(`❌ Pattern analysis failed: ${errorMsg}`);
           // Continue despite error
         }
       }
