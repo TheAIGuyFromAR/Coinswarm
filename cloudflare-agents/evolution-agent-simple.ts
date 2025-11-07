@@ -290,29 +290,6 @@ export class EvolutionAgent implements DurableObject {
         }
       }
 
-      // Dashboard info endpoint
-      if (url.pathname.startsWith('/dashboard')) {
-        return new Response(JSON.stringify({
-          message: 'Dashboard HTML files available in cloudflare-agents/dashboards/',
-          note: 'Serve these HTML files via Cloudflare Pages, GitHub Pages, or local HTTP server',
-          dashboards: {
-            architecture: 'dashboards/architecture.html - System architecture visualization',
-            patterns: 'dashboards/patterns.html - Pattern leaderboard with filters',
-            swarm: 'dashboards/swarm.html - Agent swarm live view',
-            agents: 'dashboards/agents.html - Agent leaderboard rankings'
-          },
-          api_endpoints: {
-            stats: '/api/stats - System statistics',
-            patterns: '/api/patterns?origin=all&status=all&min_runs=3&limit=50',
-            agents_all: '/api/agents/all - All agents with stats',
-            agents_leaderboard: '/api/agents/leaderboard - Top 100 active agents'
-          },
-          instructions: 'To use dashboards: 1) Deploy HTML files to static host, 2) Update API URLs in HTML to point to this worker, 3) Access dashboards'
-        }, null, 2), {
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-
       // API endpoints for dashboards
       if (url.pathname === '/api/stats') {
         try {
