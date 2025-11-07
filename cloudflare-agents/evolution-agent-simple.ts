@@ -625,95 +625,157 @@ export class EvolutionAgent implements DurableObject {
    * - Trend-based price movements with volatility
    */
   async generateHistoricalTrades(count: number): Promise<number> {
-    this.log(`Generating ${count} historical trades with realistic price movements...`);
+    this.log(`Generating ${count} chaos trades using REAL historical data...`);
 
     try {
       const trades: ChaosTrade[] = [];
-      const now = Date.now();
-      const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
 
-      // Generate realistic price series
-      let price = 60000 + Math.random() * 20000;
-      let trend = 0;
+      // Multi-pair configuration
+      const pairs = [
+        'BTC-USDT', 'BTC-USDC', 'BTC-BUSD',
+        'SOL-USDT', 'SOL-USDC', 'SOL-BUSD',
+        'ETH-USDT', 'ETH-USDC', 'ETH-BUSD'
+      ];
 
+      // Generate chaos trades
       for (let i = 0; i < count; i++) {
-        // Random entry time in past 30 days
-        const entryTime = new Date(thirtyDaysAgo + Math.random() * (now - thirtyDaysAgo));
+        try {
+          // Random pair selection
+          const pair = pairs[Math.floor(Math.random() * pairs.length)];
 
-        // Random hold duration: 1 minute to 24 hours
-        const holdMinutes = 1 + Math.floor(Math.random() * 1440);
-        const exitTime = new Date(entryTime.getTime() + holdMinutes * 60 * 1000);
+          // Fetch random historical segment (30 days minimum)
+          const historicalDataUrl = 'https://coinswarm-historical-data.your-subdomain.workers.dev';
+          const response = await fetch(`${historicalDataUrl}/random?pair=${pair}&interval=5m&minDays=30`);
 
-        // Realistic price movement with trend
-        if (Math.random() < 0.01) {
-          trend = (Math.random() - 0.5) * 0.001; // Trend shift
+          if (!response.ok) {
+            this.log(`Failed to fetch historical data for ${pair}, using fallback`);
+            continue;
+          }
+
+          const data = await response.json() as any;
+
+          if (!data.success || !data.dataset || !data.dataset.candles || data.dataset.candles.length === 0) {
+            this.log(`No candles available for ${pair}, skipping`);
+            continue;
+          }
+
+          const candles = data.dataset.candles;
+
+          // Random entry point in the historical data
+          // Random hold duration: 1 candle (5min) to 288 candles (24 hours)
+          const maxHoldCandles = Math.min(288, candles.length - 1);
+          const holdCandles = 1 + Math.floor(Math.random() * maxHoldCandles);
+
+          // Pick random entry that allows for hold duration
+          const maxEntryIndex = candles.length - holdCandles - 1;
+          if (maxEntryIndex < 0) {
+            this.log(`Not enough candles for ${pair}, skipping`);
+            continue;
+          }
+
+          const entryIndex = Math.floor(Math.random() * maxEntryIndex);
+          const exitIndex = entryIndex + holdCandles;
+
+          // Get REAL prices from historical data
+          const entryCandle = candles[entryIndex];
+          const exitCandle = candles[exitIndex];
+
+          const entryPrice = entryCandle.close;
+          const exitPrice = exitCandle.close;
+          const entryTime = new Date(entryCandle.timestamp);
+          const exitTime = new Date(exitCandle.timestamp);
+
+          const pnlPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+          const profitable = exitPrice > entryPrice;
+
+          // Calculate REAL market indicators from historical data
+          const buyState = this.calculateMarketState(candles, entryIndex);
+          const sellState = this.calculateMarketState(candles, exitIndex);
+
+          const buyReason = `Random chaos trade on ${pair} at $${entryPrice.toFixed(2)} (hold ${holdCandles} candles / ${(holdCandles * 5)}min)`;
+          const sellReason = `Exit ${pair} after ${holdCandles} candles: ${profitable ? 'profit' : 'loss'} ${pnlPct.toFixed(2)}%`;
+
+          trades.push({
+            entryTime: entryTime.toISOString(),
+            exitTime: exitTime.toISOString(),
+            entryPrice,
+            exitPrice,
+            pnlPct,
+            profitable,
+            buyReason,
+            buyState,
+            sellReason,
+            sellState
+          });
+
+        } catch (tradeError) {
+          this.log(`Error generating trade ${i}: ${tradeError}`);
+          // Continue with next trade
         }
 
-        const volatility = 0.01 + Math.random() * 0.02;
-        const entryPrice = price;
-
-        // Price movement during hold period
-        for (let t = 0; t < holdMinutes; t++) {
-          const trendMove = price * trend;
-          const randomMove = price * (Math.random() - 0.5) * volatility;
-          price = Math.max(20000, Math.min(100000, price + trendMove + randomMove));
-        }
-
-        const exitPrice = price;
-        const pnlPct = ((exitPrice - entryPrice) / entryPrice) * 100;
-        const profitable = exitPrice > entryPrice;
-
-        // Realistic market states based on price movement
-        const momentum = (exitPrice - entryPrice) / entryPrice;
-        const buyState: MarketState = {
-          price: entryPrice,
-          momentum1tick: (Math.random() - 0.5) * 0.02,
-          momentum5tick: (Math.random() - 0.5) * 0.05,
-          vsSma10: (Math.random() - 0.5) * 0.03,
-          volumeVsAvg: 0.5 + Math.random() * 2,
-          volatility
-        };
-
-        const sellState: MarketState = {
-          price: exitPrice,
-          momentum1tick: momentum * 0.7 + (Math.random() - 0.5) * 0.01,
-          momentum5tick: momentum * 0.5 + (Math.random() - 0.5) * 0.02,
-          vsSma10: (exitPrice - entryPrice) / entryPrice + (Math.random() - 0.5) * 0.02,
-          volumeVsAvg: 0.5 + Math.random() * 2,
-          volatility
-        };
-
-        const buyReason = `Entry at $${entryPrice.toFixed(2)} (hold ${holdMinutes}min)`;
-        const sellReason = `Exit after ${holdMinutes}min: ${profitable ? 'profit' : 'loss'} ${pnlPct.toFixed(2)}%`;
-
-        trades.push({
-          entryTime: entryTime.toISOString(),
-          exitTime: exitTime.toISOString(),
-          entryPrice,
-          exitPrice,
-          pnlPct,
-          profitable,
-          buyReason,
-          buyState,
-          sellReason,
-          sellState
-        });
-
-        if ((i + 1) % 1000 === 0) {
-          this.log(`Generated ${i + 1}/${count} trades...`);
+        if ((i + 1) % 100 === 0) {
+          this.log(`Generated ${i + 1}/${count} chaos trades...`);
         }
       }
 
-      this.log(`Generated ${trades.length} historical trades, storing in DB...`);
+      this.log(`Generated ${trades.length} chaos trades from REAL data, storing in DB...`);
       await this.storeTrades(trades);
-      this.log(`✓ Stored ${trades.length} historical trades`);
+      this.log(`✓ Stored ${trades.length} chaos trades`);
 
       return trades.length;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      this.log(`Failed to generate historical trades: ${errorMsg}`);
-      throw new Error(`Generate historical trades failed: ${error}`);
+      this.log(`Failed to generate chaos trades: ${errorMsg}`);
+      throw new Error(`Generate chaos trades failed: ${error}`);
     }
+  }
+
+  /**
+   * Calculate real market indicators from historical candle data
+   */
+  private calculateMarketState(candles: any[], index: number): MarketState {
+    const current = candles[index];
+
+    // Calculate momentum (1 tick = 5 minutes)
+    const momentum1tick = index >= 1
+      ? (candles[index].close - candles[index - 1].close) / candles[index - 1].close
+      : 0;
+
+    const momentum5tick = index >= 5
+      ? (candles[index].close - candles[index - 5].close) / candles[index - 5].close
+      : 0;
+
+    // Calculate SMA10 (10 candles = 50 minutes)
+    const sma10Start = Math.max(0, index - 9);
+    const sma10Candles = candles.slice(sma10Start, index + 1);
+    const sma10 = sma10Candles.reduce((sum, c) => sum + c.close, 0) / sma10Candles.length;
+    const vsSma10 = (current.close - sma10) / sma10;
+
+    // Calculate average volume (last 20 candles)
+    const volStart = Math.max(0, index - 19);
+    const volCandles = candles.slice(volStart, index + 1);
+    const avgVolume = volCandles.reduce((sum, c) => sum + c.volume, 0) / volCandles.length;
+    const volumeVsAvg = avgVolume > 0 ? current.volume / avgVolume : 1;
+
+    // Calculate volatility (std dev of last 10 returns)
+    const volatilityStart = Math.max(1, index - 9);
+    const returns = [];
+    for (let i = volatilityStart; i <= index; i++) {
+      const ret = (candles[i].close - candles[i - 1].close) / candles[i - 1].close;
+      returns.push(ret);
+    }
+    const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+    const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
+    const volatility = Math.sqrt(variance);
+
+    return {
+      price: current.close,
+      momentum1tick,
+      momentum5tick,
+      vsSma10,
+      volumeVsAvg,
+      volatility
+    };
   }
 
   /**

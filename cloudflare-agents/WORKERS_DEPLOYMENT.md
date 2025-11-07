@@ -1,6 +1,10 @@
 # Coinswarm Cloudflare Workers Deployment Guide
 
-Complete deployment guide for the Coinswarm multi-worker trading system.
+**IMPORTANT:** See `CHAOS_TRADING_ARCHITECTURE.md` for the full philosophical and technical architecture.
+
+## Quick Summary
+
+We use **chaos trading** on **real historical data** to discover novel trading patterns through empirical outcomes, not by curve-fitting to price patterns.
 
 ## System Architecture
 
@@ -10,38 +14,38 @@ Complete deployment guide for the Coinswarm multi-worker trading system.
 └─────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────┐      ┌──────────────────────┐
-│  Historical Data     │──────▶│  Backtest Worker     │
-│  Worker              │      │  (Pattern Testing)   │
-│  - Fetch Binance 5m  │      │  - Random segments   │
-│  - Store in KV       │      │  - Multi-pair tests  │
-│  - Random segments   │      │  - Performance stats │
+│  Historical Data     │──────▶│  Evolution Agent     │
+│  Worker              │      │  (Chaos Discovery)   │
+│  - Fetch Binance 5m  │      │  - Random trades     │
+│  - Store in KV       │      │  - Real data replay  │
+│  - Random segments   │      │  - Pattern discovery │
 └──────────────────────┘      └──────────────────────┘
          │                             │
          │                             │
          ▼                             ▼
 ┌──────────────────────────────────────────────────┐
 │         KV Namespace: HISTORICAL_PRICES           │
-│  - 5-minute candle data                          │
+│  - 5-minute candle data from Binance             │
 │  - BTC, SOL, ETH × USDT, USDC, BUSD             │
 │  - Random time segments (30+ days)               │
 └──────────────────────────────────────────────────┘
          │
          │
          ▼
-┌──────────────────────┐
-│  Trading Worker      │
-│  - Pattern detection │
-│  - Live prices       │
-│  - Portfolio mgmt    │
-│  - Arbitrage exec    │
-└──────────────────────┘
+┌──────────────────────────────────────────────────┐
+│         D1 Database: CHAOS_TRADES                 │
+│  - Random trade outcomes                         │
+│  - Entry/exit prices (REAL historical data)      │
+│  - Market state at entry/exit                    │
+│  - Profit/loss, win rate, patterns              │
+└──────────────────────────────────────────────────┘
          │
          ▼
 ┌──────────────────────────────────────────────────┐
-│         KV Namespace: TRADING_KV                  │
-│  - Portfolio state                               │
-│  - Backtest results                              │
-│  - Trade history                                 │
+│         AI Pattern Analysis                       │
+│  - Find patterns in SUCCESSFUL trades            │
+│  - Not patterns in price data                    │
+│  - Discover novel strategies                     │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -67,56 +71,27 @@ Complete deployment guide for the Coinswarm multi-worker trading system.
 - Random segment selection
 - 30-day KV storage
 
-### 2. Pattern Detector Module
-**File:** `pattern-detector.ts`
-**Purpose:** Detect trading patterns across multiple pairs
-
-**Pattern Types:**
-- **Stablecoin Arbitrage:** BTC-USDT vs BTC-USDC price differences
-- **Triangular Arbitrage:** BTC→SOL→USD loops
-- **Spread Trading:** Mean reversion on cointegrated pairs
-
-**Classes:**
-- `StablecoinArbDetector` - Finds spreads across stablecoins
-- `TriangularArbDetector` - Finds triangular arbitrage loops
-- `SpreadTradingDetector` - Statistical arbitrage opportunities
-- `MultiPatternDetector` - Combines all detectors
-
-### 3. Trading Worker
-**File:** `trading-worker.ts`
-**Config:** `wrangler-trading.toml`
-**Purpose:** Live trading execution and portfolio management
+### 2. Evolution Agent (Durable Object)
+**File:** `evolution-agent-simple.ts`
+**Config:** `wrangler.toml`
+**Purpose:** Chaos discovery and pattern evolution
 
 **Endpoints:**
-- `GET /prices` - Current prices for all pairs
-- `GET /scan` - Scan for current opportunities
-- `GET /portfolio` - Current portfolio state
-- `POST /trade` - Execute trade
+- `GET /status` - System status
+- `GET /debug` - Debug information
+- `GET /logs` - Recent logs
+- `POST /trigger` - Run evolution cycle
+- `GET /bulk-import?count=N` - Generate N chaos trades
 
 **Features:**
-- Live Binance price fetching
-- Multi-pair pattern detection
-- Portfolio management (positions, P&L)
-- Risk management (max positions, position sizing)
-- Fallback to mock data if Binance fails
-
-### 4. Backtest Worker
-**File:** `backtest-worker.ts`
-**Config:** `wrangler-backtest.toml`
-**Purpose:** Test patterns and strategies on historical data
-
-**Endpoints:**
-- `POST /backtest` - Run single backtest on random segment
-- `POST /backtest-multi` - Run multiple backtests (different random segments)
-- `GET /results/{id}` - Get backtest results
-
-**Features:**
-- Random time segment selection (prevents overfitting)
-- Multi-pair testing environment
-- Cross-pair pattern detection
-- Portfolio simulation
-- Comprehensive metrics (Sharpe, drawdown, win rate)
-- Arbitrage and spread trading simulation
+- **Chaos trading** on REAL historical data
+- Random pair, time, entry, hold duration selection
+- Real market indicators calculated from historical candles
+- Pattern discovery from trade OUTCOMES (not price patterns)
+- Agent competition and evolution
+- Academic papers testing
+- Technical patterns testing
+- Multi-layer evolutionary system
 
 ## Deployment Steps
 
@@ -141,26 +116,15 @@ binding = "HISTORICAL_PRICES"
 id = "your_actual_namespace_id_here"  # Replace with ID from step 1
 ```
 
-**wrangler-trading.toml:**
+**wrangler.toml (Evolution Agent):**
 ```toml
-[[kv_namespaces]]
-binding = "TRADING_KV"
-id = "your_trading_kv_id_here"  # Replace with ID from step 1
+[[d1_databases]]
+binding = "DB"
+database_id = "your_d1_database_id"  # Replace with your D1 database ID
 
 [[kv_namespaces]]
 binding = "HISTORICAL_PRICES"
 id = "your_historical_prices_id_here"  # Same as historical worker
-```
-
-**wrangler-backtest.toml:**
-```toml
-[[kv_namespaces]]
-binding = "TRADING_KV"
-id = "your_trading_kv_id_here"
-
-[[kv_namespaces]]
-binding = "HISTORICAL_PRICES"
-id = "your_historical_prices_id_here"
 ```
 
 ### 3. Deploy Workers
@@ -169,11 +133,8 @@ id = "your_historical_prices_id_here"
 # Deploy historical data worker
 wrangler deploy --config wrangler-historical.toml
 
-# Deploy trading worker
-wrangler deploy --config wrangler-trading.toml
-
-# Deploy backtest worker
-wrangler deploy --config wrangler-backtest.toml
+# Deploy evolution agent
+wrangler deploy --config wrangler.toml
 ```
 
 ### 4. Update URLs
