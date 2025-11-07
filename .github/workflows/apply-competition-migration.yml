@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - claude/debug-cloudflare-historical-data-011CUqugUynEoovcsiVnoaPB
-    paths:
-      - 'cloudflare-d1-competition-migration.sql'
 
 jobs:
   migrate:
