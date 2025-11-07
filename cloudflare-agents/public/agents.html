@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Leaderboard - Coinswarm Evolution</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        nav {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        nav a {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+
+        nav a:hover {
+            background: #5568d3;
+        }
+
+        nav a.active {
+            background: #764ba2;
+        }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .leaderboard {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .leaderboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .leaderboard-title {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .sort-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .sort-btn {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .sort-btn:hover, .sort-btn.active {
+            background: white;
+            color: #667eea;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f5f5f5;
+        }
+
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #667eea;
+            border-bottom: 2px solid #e0e0e0;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        th:hover {
+            background: #efefef;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        tr:hover {
+            background: #f9f9f9;
+        }
+
+        .rank {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+            width: 80px;
+            text-align: center;
+        }
+
+        .rank-1 { color: #FFD700; }
+        .rank-2 { color: #C0C0C0; }
+        .rank-3 { color: #CD7F32; }
+
+        .agent-info {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .agent-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .agent-personality {
+            font-size: 0.85em;
+            color: #666;
+            font-style: italic;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .badge-gen {
+            background: #667eea;
+            color: white;
+        }
+
+        .badge-evolved {
+            background: #ffd93d;
+            color: #333;
+        }
+
+        .metric {
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .metric-positive {
+            color: #51cf66;
+        }
+
+        .metric-negative {
+            color: #ff6b6b;
+        }
+
+        .metric-neutral {
+            color: #666;
+        }
+
+        .fitness-bar {
+            width: 100px;
+            height: 10px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+
+        .fitness-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .lineage {
+            font-size: 0.85em;
+            color: #999;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .expand-btn {
+            background: none;
+            border: none;
+            color: #667eea;
+            cursor: pointer;
+            font-size: 1.2em;
+            padding: 0 10px;
+        }
+
+        .details {
+            background: #f9f9f9;
+            padding: 20px;
+            display: none;
+        }
+
+        .details.show {
+            display: block;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .detail-item {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .detail-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .detail-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+
+            table {
+                font-size: 0.9em;
+            }
+
+            th, td {
+                padding: 10px 8px;
+            }
+
+            .sort-controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏆 Agent Leaderboard</h1>
+            <p class="subtitle">Top performing agents ranked by fitness</p>
+            <nav>
+                <a href="/architecture">Architecture</a>
+                <a href="/patterns">Pattern Leaderboard</a>
+                <a href="/swarm">Agent Swarm</a>
+                <a href="/architecture" class="active">Agent Leaderboard</a>
+            </nav>
+        </header>
+
+        <div class="stats-bar">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-active">-</div>
+                <div class="stat-label">Active Agents</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-avg-fitness">-</div>
+                <div class="stat-label">Avg Fitness</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-top-fitness">-</div>
+                <div class="stat-label">Top Fitness</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-total-trades">-</div>
+                <div class="stat-label">Total Trades</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-avg-roi">-</div>
+                <div class="stat-label">Avg ROI</div>
+            </div>
+        </div>
+
+        <div class="leaderboard">
+            <div class="leaderboard-header">
+                <div class="leaderboard-title">🥇 Top Agents</div>
+                <div class="sort-controls">
+                    <button class="sort-btn active" data-sort="fitness">Fitness</button>
+                    <button class="sort-btn" data-sort="roi">ROI</button>
+                    <button class="sort-btn" data-sort="winrate">Win Rate</button>
+                    <button class="sort-btn" data-sort="trades">Trades</button>
+                </div>
+            </div>
+
+            <div id="table-container">
+                <div class="loading">Loading agents...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let agentsData = [];
+        let currentSort = 'fitness';
+
+        async function fetchAgents() {
+            try {
+                const response = await fetch('/api/agents/leaderboard');
+                const data = await response.json();
+
+                agentsData = data.agents || [];
+                sortAndRender();
+                updateStats(data.stats || {});
+            } catch (error) {
+                console.error('Error fetching agents:', error);
+                document.getElementById('table-container').innerHTML = '<div class="no-data">Error loading agents</div>';
+            }
+        }
+
+        function sortAgents() {
+            agentsData.sort((a, b) => {
+                switch(currentSort) {
+                    case 'fitness':
+                        return (b.fitness_score || 0) - (a.fitness_score || 0);
+                    case 'roi':
+                        return (b.avg_roi_per_trade || 0) - (a.avg_roi_per_trade || 0);
+                    case 'winrate':
+                        const wrA = a.total_trades > 0 ? a.winning_trades / a.total_trades : 0;
+                        const wrB = b.total_trades > 0 ? b.winning_trades / b.total_trades : 0;
+                        return wrB - wrA;
+                    case 'trades':
+                        return (b.total_trades || 0) - (a.total_trades || 0);
+                    default:
+                        return 0;
+                }
+            });
+        }
+
+        function sortAndRender() {
+            sortAgents();
+            renderTable();
+        }
+
+        function renderTable() {
+            if (agentsData.length === 0) {
+                document.getElementById('table-container').innerHTML = '<div class="no-data">No agents found</div>';
+                return;
+            }
+
+            let html = '<table><thead><tr>';
+            html += '<th>Rank</th>';
+            html += '<th>Agent</th>';
+            html += '<th>Generation</th>';
+            html += '<th>Trades</th>';
+            html += '<th>Win Rate</th>';
+            html += '<th>Avg ROI</th>';
+            html += '<th>Fitness Score</th>';
+            html += '<th>Competitions</th>';
+            html += '<th></th>';
+            html += '</tr></thead><tbody>';
+
+            agentsData.forEach((agent, index) => {
+                const rank = index + 1;
+                const rankClass = rank <= 3 ? `rank-${rank}` : '';
+                const winRate = agent.total_trades > 0 ? ((agent.winning_trades / agent.total_trades) * 100).toFixed(1) : 0;
+                const fitness = agent.fitness_score || 0;
+                const record = `${agent.competitions_won || 0}W - ${(agent.competitions_entered - agent.competitions_won) || 0}L`;
+
+                html += `<tr data-agent-id="${agent.agent_id}">`;
+                html += `<td class="rank ${rankClass}">${rank}</td>`;
+                html += `<td>`;
+                html += `<div class="agent-info">`;
+                html += `<div class="agent-name">${agent.agent_name}</div>`;
+                html += `<div class="agent-personality">${agent.personality.replace(/_/g, ' ')}</div>`;
+                html += `</div>`;
+                html += `</td>`;
+                html += `<td><span class="badge badge-gen">Gen ${agent.generation}</span>${agent.parent_id ? ' <span class="badge badge-evolved">EVOLVED</span>' : ''}</td>`;
+                html += `<td class="metric metric-neutral">${agent.total_trades || 0}</td>`;
+                html += `<td class="metric ${winRate > 60 ? 'metric-positive' : winRate < 40 ? 'metric-negative' : 'metric-neutral'}">${winRate}%</td>`;
+                html += `<td class="metric ${agent.avg_roi_per_trade > 2 ? 'metric-positive' : agent.avg_roi_per_trade < 0 ? 'metric-negative' : 'metric-neutral'}">${(agent.avg_roi_per_trade || 0).toFixed(2)}%</td>`;
+                html += `<td>`;
+                html += `<span class="metric metric-positive">${fitness.toFixed(1)}</span>`;
+                html += `<div class="fitness-bar"><div class="fitness-fill" style="width: ${Math.min(fitness, 100)}%"></div></div>`;
+                html += `</td>`;
+                html += `<td class="metric">${record}</td>`;
+                html += `<td><button class="expand-btn" onclick="toggleDetails('${agent.agent_id}')">▼</button></td>`;
+                html += `</tr>`;
+
+                // Details row
+                html += `<tr id="details-${agent.agent_id}" class="details">`;
+                html += `<td colspan="9">`;
+                html += `<div class="details-grid">`;
+                html += `<div class="detail-item"><div class="detail-label">Total ROI</div><div class="detail-value">${(agent.total_roi || 0).toFixed(2)}%</div></div>`;
+                html += `<div class="detail-item"><div class="detail-label">Winning Trades</div><div class="detail-value">${agent.winning_trades || 0}</div></div>`;
+                html += `<div class="detail-item"><div class="detail-label">Losing Trades</div><div class="detail-value">${agent.losing_trades || 0}</div></div>`;
+                html += `<div class="detail-item"><div class="detail-label">Decisions Made</div><div class="detail-value">${agent.decisions_made || 0}</div></div>`;
+                html += `<div class="detail-item"><div class="detail-label">Reflections</div><div class="detail-value">${agent.reflections_completed || 0}</div></div>`;
+                html += `<div class="detail-item"><div class="detail-label">Competitions Entered</div><div class="detail-value">${agent.competitions_entered || 0}</div></div>`;
+                html += `<div class="detail-item"><div class="detail-label">Rank</div><div class="detail-value">#${agent.rank || 'N/A'}</div></div>`;
+                html += `<div class="detail-item"><div class="detail-label">Agent ID</div><div class="detail-value" style="font-size: 0.8em; word-break: break-all;">${agent.agent_id.substring(0, 12)}...</div></div>`;
+                html += `</div>`;
+                html += `</td>`;
+                html += `</tr>`;
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('table-container').innerHTML = html;
+        }
+
+        function toggleDetails(agentId) {
+            const detailsRow = document.getElementById(`details-${agentId}`);
+            detailsRow.classList.toggle('show');
+        }
+
+        function updateStats(stats) {
+            document.getElementById('stat-active').textContent = stats.active || 0;
+            document.getElementById('stat-avg-fitness').textContent = stats.avg_fitness ? stats.avg_fitness.toFixed(1) : '-';
+            document.getElementById('stat-top-fitness').textContent = stats.top_fitness ? stats.top_fitness.toFixed(1) : '-';
+            document.getElementById('stat-total-trades').textContent = stats.total_trades || 0;
+            document.getElementById('stat-avg-roi').textContent = stats.avg_roi ? stats.avg_roi.toFixed(2) + '%' : '-';
+        }
+
+        // Sort button handlers
+        document.querySelectorAll('.sort-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentSort = this.dataset.sort;
+                sortAndRender();
+            });
+        });
+
+        // Fetch on load
+        fetchAgents();
+
+        // Auto-refresh every 30 seconds
+        setInterval(fetchAgents, 30000);
+    </script>
+</body>
+</html>

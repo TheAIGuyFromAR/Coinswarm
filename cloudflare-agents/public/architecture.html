@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Architecture - Coinswarm Evolution</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        nav {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        nav a {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+
+        nav a:hover {
+            background: #5568d3;
+        }
+
+        nav a.active {
+            background: #764ba2;
+        }
+
+        .layer {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .layer-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .layer-number {
+            background: #667eea;
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .layer-title {
+            flex: 1;
+        }
+
+        .layer-title h2 {
+            color: #667eea;
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+
+        .layer-title p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .agent-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #667eea;
+        }
+
+        .agent-card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+
+        .agent-card .schedule {
+            background: rgba(255,255,255,0.7);
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+
+        .agent-card p {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .agent-card ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        .agent-card ul li {
+            color: #555;
+            margin-bottom: 5px;
+        }
+
+        .flow-diagram {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            border-radius: 10px;
+            color: white;
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .flow-diagram h2 {
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
+        .flow-steps {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .flow-step {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .flow-step h3 {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+        }
+
+        .arrow {
+            font-size: 2em;
+            color: rgba(255,255,255,0.5);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 1em;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .agents-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .flow-steps {
+                flex-direction: column;
+            }
+
+            .arrow {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧬 Multi-Agent Competitive Evolution System</h1>
+            <p class="subtitle">Three-layer architecture for self-improving trading AI</p>
+            <nav>
+                <a href="/architecture" class="active">Architecture</a>
+                <a href="/patterns">Pattern Leaderboard</a>
+                <a href="/swarm">Agent Swarm</a>
+                <a href="/agents">Agent Leaderboard</a>
+            </nav>
+        </header>
+
+        <!-- Layer 1 -->
+        <div class="layer">
+            <div class="layer-header">
+                <div class="layer-number">1</div>
+                <div class="layer-title">
+                    <h2>🔧 Pattern Discovery Layer (The Tools)</h2>
+                    <p>Build a comprehensive library of trading patterns</p>
+                </div>
+            </div>
+
+            <div class="agents-grid">
+                <div class="agent-card">
+                    <h3>🎲 Chaos Discovery Agent</h3>
+                    <span class="schedule">Every Cycle (60s)</span>
+                    <p>Generates random trades with realistic price movements and discovers statistical patterns.</p>
+                    <ul>
+                        <li>50 trades per cycle</li>
+                        <li>30-day historical simulation</li>
+                        <li>Origin: <strong>chaos</strong></li>
+                    </ul>
+                </div>
+
+                <div class="agent-card">
+                    <h3>🎓 Academic Papers Agent</h3>
+                    <span class="schedule">Every 20 Cycles (20min)</span>
+                    <p>Proven strategies from academic literature with AI-generated variations.</p>
+                    <ul>
+                        <li>10 core strategies</li>
+                        <li>5 variations per strategy</li>
+                        <li>Origin: <strong>academic</strong></li>
+                    </ul>
+                </div>
+
+                <div class="agent-card">
+                    <h3>📊 Technical Patterns Agent</h3>
+                    <span class="schedule">Every 15 Cycles (15min)</span>
+                    <p>Classic technical analysis setups and indicators.</p>
+                    <ul>
+                        <li>15 technical setups</li>
+                        <li>3 variations per pattern</li>
+                        <li>Origin: <strong>technical</strong></li>
+                    </ul>
+                </div>
+
+                <div class="agent-card">
+                    <h3>⚔️ Head-to-Head Testing</h3>
+                    <span class="schedule">Every 3 Cycles (3min)</span>
+                    <p>Patterns compete on random timeframes with weighted selection.</p>
+                    <ul>
+                        <li>Weighted random selection</li>
+                        <li>Timeframe bonuses (1.0x → 2.0x)</li>
+                        <li>Winner/loser voting</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Layer 2 -->
+        <div class="layer">
+            <div class="layer-header">
+                <div class="layer-number" style="background: #764ba2;">2</div>
+                <div class="layer-title">
+                    <h2>🧠 Reasoning Agent Layer (The Strategy)</h2>
+                    <p>Intelligent agents that combine patterns and learn from experience</p>
+                </div>
+            </div>
+
+            <div class="agents-grid">
+                <div class="agent-card" style="border-color: #764ba2;">
+                    <h3>🤖 Self-Reflective Agents</h3>
+                    <span class="schedule">Every 10 Cycles (10min)</span>
+                    <p>AI-powered agents that reason about market conditions and pattern combinations.</p>
+                    <ul>
+                        <li>10 diverse personalities</li>
+                        <li>Market condition analysis</li>
+                        <li>Pattern combination reasoning</li>
+                        <li>Post-trade self-reflection</li>
+                    </ul>
+                </div>
+
+                <div class="agent-card" style="border-color: #764ba2;">
+                    <h3>🏆 Agent Competition</h3>
+                    <span class="schedule">Every 10 Cycles (10min)</span>
+                    <p>Head-to-head battles where agents compete for survival.</p>
+                    <ul>
+                        <li>5 trades per agent</li>
+                        <li>Fitness score ranking</li>
+                        <li>Performance tracking</li>
+                    </ul>
+                </div>
+
+                <div class="agent-card" style="border-color: #764ba2;">
+                    <h3>🧬 Agent Evolution</h3>
+                    <span class="schedule">Every 50 Cycles (50min)</span>
+                    <p>Clone winners, eliminate losers, introduce mutations.</p>
+                    <ul>
+                        <li>Eliminate bottom 20%</li>
+                        <li>Clone top 20%</li>
+                        <li>Personality mutations</li>
+                        <li>Lineage tracking</li>
+                    </ul>
+                </div>
+
+                <div class="agent-card" style="border-color: #764ba2;">
+                    <h3>💾 Memory & Knowledge</h3>
+                    <span class="schedule">Continuous</span>
+                    <p>Agents build expertise through accumulated experience.</p>
+                    <ul>
+                        <li>Decision history</li>
+                        <li>Pattern preferences</li>
+                        <li>Learned rules</li>
+                        <li>Strategic insights</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Layer 3 -->
+        <div class="layer">
+            <div class="layer-header">
+                <div class="layer-number" style="background: #f093fb;">3</div>
+                <div class="layer-title">
+                    <h2>🔬 Meta-Learning Layer (The Optimization)</h2>
+                    <p>Continuously search for and test better AI models</p>
+                </div>
+            </div>
+
+            <div class="agents-grid">
+                <div class="agent-card" style="border-color: #f093fb;">
+                    <h3>🤗 HuggingFace Search</h3>
+                    <span class="schedule">Every 50 Cycles (50min)</span>
+                    <p>Search for time series and financial models.</p>
+                    <ul>
+                        <li>Time series forecasting</li>
+                        <li>Financial analysis models</li>
+                        <li>Trading strategy models</li>
+                    </ul>
+                </div>
+
+                <div class="agent-card" style="border-color: #f093fb;">
+                    <h3>📚 Academic Search</h3>
+                    <span class="schedule">Every 50 Cycles (50min)</span>
+                    <p>Latest research from arXiv and Google Scholar.</p>
+                    <ul>
+                        <li>Financial AI papers</li>
+                        <li>Time series research</li>
+                        <li>Deep learning trading</li>
+                    </ul>
+                </div>
+
+                <div class="agent-card" style="border-color: #f093fb;">
+                    <h3>🎯 Model Benchmarking</h3>
+                    <span class="schedule">Weekly</span>
+                    <p>Test models on trading reasoning tasks.</p>
+                    <ul>
+                        <li>Pattern combination tests</li>
+                        <li>Reflection quality tests</li>
+                        <li>Market analysis tests</li>
+                    </ul>
+                </div>
+
+                <div class="agent-card" style="border-color: #f093fb;">
+                    <h3>🔍 Known Model Check</h3>
+                    <span class="schedule">Every 50 Cycles (50min)</span>
+                    <p>Check for specialized financial models.</p>
+                    <ul>
+                        <li>Microsoft TimesFM</li>
+                        <li>Google Chronos</li>
+                        <li>FinGPT, BloombergGPT</li>
+                        <li>FinBERT, TFT</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Flow Diagram -->
+        <div class="flow-diagram">
+            <h2>🔄 Self-Improvement Loop</h2>
+            <div class="flow-steps">
+                <div class="flow-step">
+                    <h3>1. Discover</h3>
+                    <p>Find patterns through chaos, research, and technical analysis</p>
+                </div>
+                <div class="arrow">→</div>
+                <div class="flow-step">
+                    <h3>2. Reason</h3>
+                    <p>Agents combine patterns intelligently based on market conditions</p>
+                </div>
+                <div class="arrow">→</div>
+                <div class="flow-step">
+                    <h3>3. Execute</h3>
+                    <p>Trade using pattern combinations</p>
+                </div>
+                <div class="arrow">→</div>
+                <div class="flow-step">
+                    <h3>4. Reflect</h3>
+                    <p>Analyze outcomes and extract lessons</p>
+                </div>
+                <div class="arrow">→</div>
+                <div class="flow-step">
+                    <h3>5. Learn</h3>
+                    <p>Update knowledge and preferences</p>
+                </div>
+                <div class="arrow">→</div>
+                <div class="flow-step">
+                    <h3>6. Compete</h3>
+                    <p>Best agents survive, poor ones eliminated</p>
+                </div>
+                <div class="arrow">→</div>
+                <div class="flow-step">
+                    <h3>7. Evolve</h3>
+                    <p>Winners clone with mutations, next generation begins</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-patterns">-</div>
+                <div class="stat-label">Total Patterns</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-agents">-</div>
+                <div class="stat-label">Active Agents</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-generation">-</div>
+                <div class="stat-label">Avg Generation</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-fitness">-</div>
+                <div class="stat-label">Avg Fitness</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-cycles">-</div>
+                <div class="stat-label">Total Cycles</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Fetch system stats
+        async function fetchStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+
+                document.getElementById('stat-patterns').textContent = data.total_patterns || '-';
+                document.getElementById('stat-agents').textContent = data.active_agents || '-';
+                document.getElementById('stat-generation').textContent = data.avg_generation ? data.avg_generation.toFixed(1) : '-';
+                document.getElementById('stat-fitness').textContent = data.avg_fitness ? data.avg_fitness.toFixed(1) : '-';
+                document.getElementById('stat-cycles').textContent = data.total_cycles || '-';
+            } catch (error) {
+                console.error('Error fetching stats:', error);
+            }
+        }
+
+        // Fetch stats on load and every 30 seconds
+        fetchStats();
+        setInterval(fetchStats, 30000);
+    </script>
+</body>
+</html>

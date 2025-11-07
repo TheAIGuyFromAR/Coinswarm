@@ -1,0 +1,27 @@
+{
+  "name": "coinswarm-evolution-agent",
+  "version": "1.0.0",
+  "description": "Chaos trading evolution system using Cloudflare Agents SDK",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "d1:create": "wrangler d1 create coinswarm-evolution",
+    "d1:init": "wrangler d1 execute coinswarm-evolution --file=../cloudflare-d1-evolution-schema.sql",
+    "d1:query": "wrangler d1 execute coinswarm-evolution"
+  },
+  "dependencies": {
+    "agents": "latest",
+    "@cloudflare/ai": "^1.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "typescript": "^5.3.3",
+    "wrangler": "^3.90.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

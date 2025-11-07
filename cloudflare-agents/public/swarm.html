@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Swarm - Coinswarm Evolution</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        nav {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        nav a {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+
+        nav a:hover {
+            background: #5568d3;
+        }
+
+        nav a.active {
+            background: #764ba2;
+        }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .swarm-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .swarm-header {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .swarm-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .agent-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+            padding: 20px;
+            position: relative;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border-left: 5px solid;
+        }
+
+        .agent-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        }
+
+        .agent-card.active {
+            border-color: #51cf66;
+        }
+
+        .agent-card.eliminated {
+            border-color: #ff6b6b;
+            opacity: 0.6;
+        }
+
+        .agent-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .agent-name {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #333;
+            flex: 1;
+        }
+
+        .agent-gen {
+            background: #667eea;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .agent-personality {
+            display: inline-block;
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .agent-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .agent-stat {
+            background: rgba(255,255,255,0.6);
+            padding: 8px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .agent-stat-value {
+            font-weight: bold;
+            font-size: 1.2em;
+            color: #667eea;
+        }
+
+        .agent-stat-label {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .agent-progress {
+            margin-top: 10px;
+        }
+
+        .progress-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.6);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+        }
+
+        .agent-status {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .status-active {
+            background: #51cf66;
+            color: white;
+        }
+
+        .status-eliminated {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .status-evolved {
+            background: #ffd93d;
+            color: #333;
+        }
+
+        .lineage-info {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.5);
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .filter-btn:hover, .filter-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .swarm-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐝 Agent Swarm</h1>
+            <p class="subtitle">Live view of all trading agents and their evolution</p>
+            <nav>
+                <a href="/architecture">Architecture</a>
+                <a href="/patterns">Pattern Leaderboard</a>
+                <a href="/architecture" class="active">Agent Swarm</a>
+                <a href="/agents">Agent Leaderboard</a>
+            </nav>
+        </header>
+
+        <div class="stats-bar">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-active">-</div>
+                <div class="stat-label">Active Agents</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-eliminated">-</div>
+                <div class="stat-label">Eliminated</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-avg-gen">-</div>
+                <div class="stat-label">Avg Generation</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-max-gen">-</div>
+                <div class="stat-label">Max Generation</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-competitions">-</div>
+                <div class="stat-label">Total Competitions</div>
+            </div>
+        </div>
+
+        <div class="swarm-container">
+            <div class="swarm-header">
+                <span>🤖 Agent Population</span>
+                <div class="filter-bar">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="active">Active</button>
+                    <button class="filter-btn" data-filter="eliminated">Eliminated</button>
+                </div>
+            </div>
+
+            <div id="swarm-grid" class="swarm-grid">
+                <div class="loading">Loading agents...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let agentsData = [];
+        let currentFilter = 'all';
+
+        async function fetchAgents() {
+            try {
+                const response = await fetch('/api/agents/all');
+                const data = await response.json();
+
+                agentsData = data.agents || [];
+                renderSwarm();
+                updateStats(data.stats || {});
+            } catch (error) {
+                console.error('Error fetching agents:', error);
+                document.getElementById('swarm-grid').innerHTML = '<div class="no-data">Error loading agents</div>';
+            }
+        }
+
+        function renderSwarm() {
+            const filteredAgents = agentsData.filter(agent => {
+                if (currentFilter === 'all') return true;
+                return agent.status === currentFilter;
+            });
+
+            if (filteredAgents.length === 0) {
+                document.getElementById('swarm-grid').innerHTML = '<div class="no-data">No agents found</div>';
+                return;
+            }
+
+            let html = '';
+            filteredAgents.forEach(agent => {
+                const winRate = agent.total_trades > 0 ? ((agent.winning_trades / agent.total_trades) * 100).toFixed(1) : 0;
+                const fitness = agent.fitness_score || 0;
+                const statusClass = agent.status === 'active' ? 'active' : 'eliminated';
+                const statusBadge = agent.status === 'active' ? 'status-active' : 'status-eliminated';
+
+                html += `<div class="agent-card ${statusClass}">`;
+                html += `<div class="agent-header">`;
+                html += `<div class="agent-name">${agent.agent_name}</div>`;
+                html += `<div class="agent-gen">Gen ${agent.generation}</div>`;
+                html += `</div>`;
+                html += `<div class="agent-personality">${agent.personality.replace(/_/g, ' ').toUpperCase()}</div>`;
+
+                html += `<div class="agent-stats">`;
+                html += `<div class="agent-stat">`;
+                html += `<div class="agent-stat-value">${agent.total_trades || 0}</div>`;
+                html += `<div class="agent-stat-label">Trades</div>`;
+                html += `</div>`;
+                html += `<div class="agent-stat">`;
+                html += `<div class="agent-stat-value">${winRate}%</div>`;
+                html += `<div class="agent-stat-label">Win Rate</div>`;
+                html += `</div>`;
+                html += `<div class="agent-stat">`;
+                html += `<div class="agent-stat-value">${(agent.avg_roi_per_trade || 0).toFixed(1)}%</div>`;
+                html += `<div class="agent-stat-label">Avg ROI</div>`;
+                html += `</div>`;
+                html += `<div class="agent-stat">`;
+                html += `<div class="agent-stat-value">${agent.competitions_won || 0}</div>`;
+                html += `<div class="agent-stat-label">Wins</div>`;
+                html += `</div>`;
+                html += `</div>`;
+
+                html += `<div class="agent-progress">`;
+                html += `<div class="progress-label">Fitness Score: ${fitness.toFixed(1)}</div>`;
+                html += `<div class="progress-bar">`;
+                html += `<div class="progress-fill" style="width: ${Math.min(fitness, 100)}%"></div>`;
+                html += `</div>`;
+                html += `</div>`;
+
+                html += `<div class="agent-status ${statusBadge}">${agent.status.toUpperCase()}</div>`;
+
+                if (agent.parent_id) {
+                    html += `<div class="lineage-info">🧬 Evolved from parent agent</div>`;
+                } else {
+                    html += `<div class="lineage-info">🆕 Original population</div>`;
+                }
+
+                html += `</div>`;
+            });
+
+            document.getElementById('swarm-grid').innerHTML = html;
+        }
+
+        function updateStats(stats) {
+            document.getElementById('stat-active').textContent = stats.active || 0;
+            document.getElementById('stat-eliminated').textContent = stats.eliminated || 0;
+            document.getElementById('stat-avg-gen').textContent = stats.avg_generation ? stats.avg_generation.toFixed(1) : '-';
+            document.getElementById('stat-max-gen').textContent = stats.max_generation || '-';
+            document.getElementById('stat-competitions').textContent = stats.total_competitions || 0;
+        }
+
+        // Filter buttons
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentFilter = this.dataset.filter;
+                renderSwarm();
+            });
+        });
+
+        // Fetch on load
+        fetchAgents();
+
+        // Auto-refresh every 30 seconds
+        setInterval(fetchAgents, 30000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+name: Apply Reasoning Agent Schema Migration
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/debug-cloudflare-historical-data-011CUqugUynEoovcsiVnoaPB
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./cloudflare-agents
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Apply Reasoning Agent Schema Migration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "🔄 Applying reasoning agent schema migration..."
+          npx wrangler d1 execute coinswarm-evolution --remote \
+            --file=reasoning-agent-schema.sql
+
+          echo "✓ Reasoning agent schema migration complete"
+          echo ""
+          echo "New tables created:"
+          echo "  - trading_agents: Agent profiles"
+          echo "  - agent_memories: Decision history"
+          echo "  - agent_knowledge: Learned preferences"
+          echo "  - agent_competitions: Competition results"
+          echo "  - agent_lineage: Evolution tracking"
+          echo "  - model_test_results: Model benchmarks"
+          echo "  - research_log: Research findings"

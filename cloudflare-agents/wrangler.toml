@@ -1,0 +1,50 @@
+# Wrangler configuration for Evolution Agent
+# Uses Cloudflare Agents SDK with Durable Objects
+# Configured with account ID and updated API token
+
+name = "coinswarm-evolution-agent"
+main = "evolution-agent-simple.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Durable Objects configuration
+# The EvolutionAgent maintains persistent state across invocations
+[durable_objects]
+bindings = [
+  { name = "EVOLUTION_AGENT", class_name = "EvolutionAgent" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["EvolutionAgent"]
+
+# D1 Database binding
+# Stores chaos trades and discovered patterns
+[[d1_databases]]
+binding = "DB"
+database_name = "coinswarm-evolution"
+database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"  # Using existing database
+
+# AI binding for pattern analysis
+# Uses Cloudflare Workers AI for intelligent pattern discovery
+[ai]
+binding = "AI"
+
+# Static assets for dashboards
+# Serves HTML files from public directory
+[assets]
+directory = "public"
+binding = "ASSETS"
+
+# Observability (optional)
+[observability]
+enabled = true
+
+# Environment variables
+# Set in .dev.vars for local development or Cloudflare dashboard for production
+# OPENAI_API_KEY=xxx (if using OpenAI models)
+
+# Routes (optional - for custom domain)
+# [[routes]]
+# pattern = "evolution.yourdomain.com/*"
+# zone_name = "yourdomain.com"
