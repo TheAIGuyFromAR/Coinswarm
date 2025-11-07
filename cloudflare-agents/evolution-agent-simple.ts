@@ -1,10 +1,17 @@
 /**
- * Evolution Agent - Simplified Durable Objects Implementation
- * WITH COMPREHENSIVE ERROR HANDLING AND DEBUGGING
- * WITH AI-POWERED PATTERN ANALYSIS
+ * Evolution Agent - Multi-Agent Competitive Evolution System
+ *
+ * Agents:
+ * - Chaos Discovery Agent: Random exploration, statistical patterns
+ * - Academic Papers Agent: Proven strategies from research literature
+ * - Technical Patterns Agent: Classic technical analysis setups
+ * - Head-to-Head Testing: Weighted competition with evolutionary pressure
  */
 
 import { analyzeWithAI, validatePattern, scorePattern, generatePatternId } from './ai-pattern-analyzer';
+import { runAcademicResearch } from './academic-papers-agent';
+import { runTechnicalResearch } from './technical-patterns-agent';
+import { runHeadToHeadCompetition } from './head-to-head-testing';
 
 // Environment bindings interface
 interface Env {
@@ -361,6 +368,48 @@ export class EvolutionAgent implements DurableObject {
         } catch (error) {
           console.error('Strategy testing failed:', error);
           // Continue despite error
+        }
+      }
+
+      // Step 4: Academic research (every 20 cycles)
+      if (this.evolutionState.totalCycles % 20 === 0) {
+        this.log('Step 4: Running academic research...');
+        try {
+          const academicPatterns = await runAcademicResearch(this.env.AI, this.env.DB);
+          this.log(`✓ Academic research: ${academicPatterns} patterns generated`);
+          this.evolutionState.patternsDiscovered += academicPatterns;
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          this.log(`❌ Academic research failed: ${errorMsg}`);
+        }
+      }
+
+      // Step 5: Technical research (every 15 cycles)
+      if (this.evolutionState.totalCycles % 15 === 0) {
+        this.log('Step 5: Running technical patterns research...');
+        try {
+          const technicalPatterns = await runTechnicalResearch(this.env.AI, this.env.DB);
+          this.log(`✓ Technical research: ${technicalPatterns} patterns generated`);
+          this.evolutionState.patternsDiscovered += technicalPatterns;
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          this.log(`❌ Technical research failed: ${errorMsg}`);
+        }
+      }
+
+      // Step 6: Head-to-head competition (every 3 cycles)
+      if (this.evolutionState.totalCycles % 3 === 0 && this.evolutionState.patternsDiscovered > 1) {
+        this.log('Step 6: Running head-to-head competition...');
+        try {
+          const success = await runHeadToHeadCompetition(this.env.DB);
+          if (success) {
+            this.log('✓ Head-to-head competition complete');
+          } else {
+            this.log('⚠️  Head-to-head skipped (not enough patterns)');
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          this.log(`❌ Head-to-head competition failed: ${errorMsg}`);
         }
       }
 
