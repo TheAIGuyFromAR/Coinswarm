@@ -1,17 +1,29 @@
 /**
  * Evolution Agent - Multi-Agent Competitive Evolution System
  *
- * Agents:
- * - Chaos Discovery Agent: Random exploration, statistical patterns
- * - Academic Papers Agent: Proven strategies from research literature
- * - Technical Patterns Agent: Classic technical analysis setups
- * - Head-to-Head Testing: Weighted competition with evolutionary pressure
+ * Layer 1 - Pattern Discovery (Tools):
+ * - Chaos Discovery Agent: Random exploration, statistical patterns (every cycle)
+ * - Academic Papers Agent: Proven strategies from research literature (every 20 cycles)
+ * - Technical Patterns Agent: Classic technical analysis setups (every 15 cycles)
+ * - Head-to-Head Pattern Testing: Weighted competition (every 3 cycles)
+ *
+ * Layer 2 - Reasoning Agents (Strategy):
+ * - Self-Reflective Trading Agents: Combine patterns intelligently (every 10 cycles)
+ * - Agent Competition: Head-to-head battles with evolution
+ * - Agent Evolution: Clone winners, eliminate losers (every 50 cycles)
+ *
+ * Layer 3 - Meta-Learning:
+ * - Model Research Agent: Searches for better AI models (every 50 cycles)
+ * - Searches HuggingFace, arXiv, Papers with Code
+ * - Tests financial/time series models
  */
 
 import { analyzeWithAI, validatePattern, scorePattern, generatePatternId } from './ai-pattern-analyzer';
 import { runAcademicResearch } from './academic-papers-agent';
 import { runTechnicalResearch } from './technical-patterns-agent';
 import { runHeadToHeadCompetition } from './head-to-head-testing';
+import { runCompetitionCycle } from './agent-competition';
+import { runModelResearch } from './model-research-agent';
 
 // Environment bindings interface
 interface Env {
@@ -397,19 +409,43 @@ export class EvolutionAgent implements DurableObject {
         }
       }
 
-      // Step 6: Head-to-head competition (every 3 cycles)
+      // Step 6: Head-to-head pattern competition (every 3 cycles)
       if (this.evolutionState.totalCycles % 3 === 0 && this.evolutionState.patternsDiscovered > 1) {
-        this.log('Step 6: Running head-to-head competition...');
+        this.log('Step 6: Running head-to-head pattern competition...');
         try {
           const success = await runHeadToHeadCompetition(this.env.DB);
           if (success) {
-            this.log('✓ Head-to-head competition complete');
+            this.log('✓ Head-to-head pattern competition complete');
           } else {
             this.log('⚠️  Head-to-head skipped (not enough patterns)');
           }
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
-          this.log(`❌ Head-to-head competition failed: ${errorMsg}`);
+          this.log(`❌ Head-to-head pattern competition failed: ${errorMsg}`);
+        }
+      }
+
+      // Step 7: Reasoning agent competition (every 10 cycles)
+      if (this.evolutionState.totalCycles % 10 === 0 && this.evolutionState.patternsDiscovered >= 5) {
+        this.log('Step 7: Running reasoning agent competition...');
+        try {
+          await runCompetitionCycle(this.env.AI, this.env.DB, this.evolutionState.totalCycles);
+          this.log('✓ Reasoning agent competition complete');
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          this.log(`❌ Reasoning agent competition failed: ${errorMsg}`);
+        }
+      }
+
+      // Step 8: Model research agent (every 50 cycles)
+      if (this.evolutionState.totalCycles % 50 === 0) {
+        this.log('Step 8: Running model research...');
+        try {
+          await runModelResearch(this.env.AI, this.env.DB);
+          this.log('✓ Model research complete');
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          this.log(`❌ Model research failed: ${errorMsg}`);
         }
       }
 
