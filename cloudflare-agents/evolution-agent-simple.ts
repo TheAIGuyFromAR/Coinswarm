@@ -584,8 +584,9 @@ export class EvolutionAgent implements DurableObject {
 
       this.log(`Differences: momentum=${(momentumDiff*100).toFixed(4)}%, volatility=${(volatilityDiff*100).toFixed(4)}%, sma10=${(sma10Diff*100).toFixed(4)}%`);
 
-      // Lowered threshold from 0.005 to 0.002 (0.2%) to find more patterns
-      if (momentumDiff > 0.002) {
+      // Ultra-low threshold (0.001% = 0.00001) to find any statistical signal
+      // With random entries, patterns will be weak, but we want to test the full system
+      if (momentumDiff > 0.00001) {
         const pattern = {
           patternId: `momentum-${Date.now()}`,
           name: `Momentum ${winnerAvg.momentum1tick > loserAvg.momentum1tick ? 'Positive' : 'Negative'} Entry`,
@@ -603,7 +604,7 @@ export class EvolutionAgent implements DurableObject {
       }
 
       // Check volatility pattern
-      if (volatilityDiff > 0.002) {
+      if (volatilityDiff > 0.00001) {
         const pattern = {
           patternId: `volatility-${Date.now()}`,
           name: `${winnerAvg.volatility > loserAvg.volatility ? 'High' : 'Low'} Volatility Entry`,
@@ -621,7 +622,7 @@ export class EvolutionAgent implements DurableObject {
       }
 
       // Check SMA10 pattern
-      if (sma10Diff > 0.003) {
+      if (sma10Diff > 0.00001) {
         const pattern = {
           patternId: `sma10-${Date.now()}`,
           name: `Price ${winnerAvg.vsSma10 > loserAvg.vsSma10 ? 'Above' : 'Below'} SMA10`,
