@@ -1,0 +1,83 @@
+# Wrangler configuration for SCALED Evolution Agent
+# Optimized for Cloudflare Workers Paid Plan ($5/month)
+#
+# This configuration maximizes throughput using the paid plan limits:
+# - 10M requests/month included ($0.50 per million after)
+# - Unlimited CPU time per request
+# - 1,000 requests/second per Durable Object
+# - 10,000 AI neurons/day free ($0.011 per 1,000 after)
+
+name = "coinswarm-evolution-scaled"
+main = "evolution-agent.ts"
+compatibility_date = "2025-01-01"
+node_compat = true
+
+# Durable Objects configuration
+# We'll use MULTIPLE agent instances for parallel processing
+[durable_objects]
+bindings = [
+  { name = "EVOLUTION_AGENT", class_name = "EvolutionAgent" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["EvolutionAgent"]
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "coinswarm-evolution"
+database_id = "YOUR_DATABASE_ID_HERE"
+
+# AI binding with paid plan
+[ai]
+binding = "AI"
+
+# Observability
+[observability]
+enabled = true
+
+# Analytics Engine (for tracking performance)
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+
+# Environment variables for scaled configuration
+[vars]
+# Scaled settings
+BATCH_SIZE = "500"              # 10x larger than free tier (50 → 500)
+CYCLE_INTERVAL = "10"           # 10 seconds instead of 60
+PATTERN_ANALYSIS_INTERVAL = "2" # Every 2 cycles instead of 5
+STRATEGY_TEST_INTERVAL = "5"    # Every 5 cycles instead of 10
+PARALLEL_AGENTS = "10"          # Run 10 agent instances in parallel
+AI_ENABLED = "true"
+AI_BUDGET_PER_DAY = "50000"     # Use 50k neurons/day ($0.44/day)
+
+# Cost analysis with these settings:
+#
+# Requests:
+# - 10 agents × 6 requests/min × 1440 min/day = 86,400 requests/day
+# - 86,400 × 30 = 2,592,000 requests/month
+# - Cost: FREE (under 10M included)
+#
+# Durable Objects:
+# - Duration: ~10 seconds per cycle × 10 agents × 6 cycles/min = 600 seconds/min
+# - Cost: ~$0.12/day = $3.60/month
+#
+# AI Usage:
+# - 50,000 neurons/day (10k free + 40k paid)
+# - 40,000 neurons/day × $0.011/1000 = $0.44/day = $13.20/month
+#
+# D1 Database:
+# - Reads: ~500k/day (well under 25B free)
+# - Writes: ~500k/day (well under 50M free)
+# - Cost: FREE
+#
+# TOTAL ESTIMATED COST: $5 + $3.60 + $13.20 = $21.80/month
+#
+# To stay closer to $5, reduce AI_BUDGET_PER_DAY to 10000 (free only)
+# This would bring total to ~$8.60/month
+
+# Routes (optional)
+# [[routes]]
+# pattern = "evolution-scaled.yourdomain.com/*"
+# zone_name = "yourdomain.com"

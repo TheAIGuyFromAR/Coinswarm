@@ -1,0 +1,29 @@
+# Lightweight Docker container for continuous evolution system
+# Can run 24/7 on free tier: Railway, Render, Fly.io
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy only necessary files
+COPY chaos_trading_simulator.py .
+COPY pattern_analysis_agent.py .
+COPY strategy_testing_agent.py .
+COPY continuous_evolution.py .
+COPY src/ ./src/
+COPY data/ ./data/
+
+# Install minimal dependencies
+RUN pip install --no-cache-dir \
+    pydantic \
+    pydantic-settings \
+    pandas \
+    numpy \
+    structlog \
+    python-dotenv
+
+# Create data directories
+RUN mkdir -p data/chaos_trading data/discovered_patterns data/strategy_rankings
+
+# Run evolution system
+CMD ["python", "-u", "continuous_evolution.py"]

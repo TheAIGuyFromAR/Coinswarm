@@ -1,0 +1,22 @@
+name = "coinswarm-evolution"
+main = "cloudflare-workers/evolution-worker.js"
+compatibility_date = "2024-01-01"
+
+# Cron triggers - run evolution automatically
+[triggers]
+crons = [
+  "*/1 * * * *",   # Every 1 minute: Generate chaos trades
+  "*/5 * * * *",   # Every 5 minutes: Analyze patterns
+  "*/10 * * * *"   # Every 10 minutes: Test strategies
+]
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "coinswarm-evolution"
+database_id = "YOUR_DATABASE_ID_HERE"  # Create with: wrangler d1 create coinswarm-evolution
+
+# Routes (optional - for HTTP access)
+[routes]
+pattern = "evolution.yourdomain.com/*"
+zone_name = "yourdomain.com"

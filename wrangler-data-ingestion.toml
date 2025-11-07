@@ -1,0 +1,27 @@
+# Cloudflare Workers Configuration - Data Backfill Worker
+# Aggressive backfilling of historical data until sources exhausted
+
+name = "coinswarm-data-backfill"
+main = "cloudflare-workers/data-backfill-worker.js"
+compatibility_date = "2024-01-01"
+
+# Cron trigger: Run every minute for aggressive backfilling
+# Disable this once backfill is complete to save resources
+[triggers]
+crons = ["* * * * *"]
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"  # Available in worker as env.DB
+database_name = "coinswarm-historical-data"
+database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
+
+# Environment variables
+[vars]
+CRYPTOCOMPARE_API_KEY = "da672b9999120841fbd4427fa4550b83b5f23e017c5c03ff33bafe09064abe83"
+
+[env.production]
+name = "coinswarm-data-ingestion"
+
+[env.staging]
+name = "coinswarm-data-ingestion-staging"

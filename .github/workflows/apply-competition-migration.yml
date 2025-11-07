@@ -1,0 +1,38 @@
+name: Apply Competition Schema Migration
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/debug-cloudflare-historical-data-011CUqugUynEoovcsiVnoaPB
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Wrangler
+        run: npm install -g wrangler@4.45.4
+
+      - name: Apply Competition Schema Migration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "🗄️  Applying competition schema migration..."
+          cd cloudflare-agents
+          wrangler d1 execute coinswarm-evolution --remote --file=../cloudflare-d1-competition-migration.sql
+          echo "✅ Migration complete!"
+          echo ""
+          echo "New features added:"
+          echo "  - origin, source_detail columns for tracking agent sources"
+          echo "  - head_to_head_wins, head_to_head_losses for competition tracking"
+          echo "  - h2h_matchups table for detailed matchup history"
+          echo "  - research_agents table for agent management"
+          echo "  - data_sources table for multi-exchange support"

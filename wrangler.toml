@@ -1,0 +1,16 @@
+# Cloudflare Workers Configuration
+# This file enables GitHub-to-Cloudflare deployment
+
+name = "swarm"
+main = "cloudflare-workers/comprehensive-data-worker.js"
+compatibility_date = "2024-01-01"
+
+# Environment variables
+[vars]
+CRYPTOCOMPARE_API_KEY = "da672b9999120841fbd4427fa4550b83b5f23e017c5c03ff33bafe09064abe83"
+
+[env.production]
+name = "swarm"
+
+[env.staging]
+name = "swarm-staging"
