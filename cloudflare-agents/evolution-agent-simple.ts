@@ -290,6 +290,174 @@ export class EvolutionAgent implements DurableObject {
         }
       }
 
+      // Dashboard info endpoint
+      if (url.pathname.startsWith('/dashboard')) {
+        return new Response(JSON.stringify({
+          message: 'Dashboard HTML files available in cloudflare-agents/dashboards/',
+          note: 'Serve these HTML files via Cloudflare Pages, GitHub Pages, or local HTTP server',
+          dashboards: {
+            architecture: 'dashboards/architecture.html - System architecture visualization',
+            patterns: 'dashboards/patterns.html - Pattern leaderboard with filters',
+            swarm: 'dashboards/swarm.html - Agent swarm live view',
+            agents: 'dashboards/agents.html - Agent leaderboard rankings'
+          },
+          api_endpoints: {
+            stats: '/api/stats - System statistics',
+            patterns: '/api/patterns?origin=all&status=all&min_runs=3&limit=50',
+            agents_all: '/api/agents/all - All agents with stats',
+            agents_leaderboard: '/api/agents/leaderboard - Top 100 active agents'
+          },
+          instructions: 'To use dashboards: 1) Deploy HTML files to static host, 2) Update API URLs in HTML to point to this worker, 3) Access dashboards'
+        }, null, 2), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      // API endpoints for dashboards
+      if (url.pathname === '/api/stats') {
+        try {
+          const patterns = await this.env.DB.prepare('SELECT COUNT(*) as count FROM discovered_patterns').first();
+          const activeAgents = await this.env.DB.prepare('SELECT COUNT(*) as count FROM trading_agents WHERE status = ?').bind('active').first();
+          const avgGeneration = await this.env.DB.prepare('SELECT AVG(generation) as avg FROM trading_agents WHERE status = ?').bind('active').first();
+          const avgFitness = await this.env.DB.prepare('SELECT AVG(fitness_score) as avg FROM trading_agents WHERE status = ?').bind('active').first();
+
+          return new Response(JSON.stringify({
+            total_patterns: patterns?.count || 0,
+            active_agents: activeAgents?.count || 0,
+            avg_generation: avgGeneration?.avg || 0,
+            avg_fitness: avgFitness?.avg || 0,
+            total_cycles: this.evolutionState.totalCycles
+          }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({ error: String(error) }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      if (url.pathname === '/api/patterns') {
+        try {
+          const origin = url.searchParams.get('origin') || 'all';
+          const status = url.searchParams.get('status') || 'all';
+          const minRuns = parseInt(url.searchParams.get('min_runs') || '3');
+          const limit = parseInt(url.searchParams.get('limit') || '50');
+
+          let query = 'SELECT * FROM discovered_patterns WHERE 1=1';
+          const params: any[] = [];
+
+          if (origin !== 'all') {
+            query += ' AND origin = ?';
+            params.push(origin);
+          }
+          if (status !== 'all') {
+            query += ' AND status = ?';
+            params.push(status);
+          }
+          query += ' AND number_of_runs >= ?';
+          params.push(minRuns);
+          query += ' ORDER BY (CAST(votes AS REAL) / NULLIF(number_of_runs, 0)) DESC, head_to_head_wins DESC LIMIT ?';
+          params.push(limit);
+
+          const patterns = await this.env.DB.prepare(query).bind(...params).all();
+
+          // Get stats
+          const total = await this.env.DB.prepare('SELECT COUNT(*) as count FROM discovered_patterns').first();
+          const winning = await this.env.DB.prepare('SELECT COUNT(*) as count FROM discovered_patterns WHERE status = ?').bind('winning').first();
+          const chaos = await this.env.DB.prepare('SELECT COUNT(*) as count FROM discovered_patterns WHERE origin = ?').bind('chaos').first();
+          const academic = await this.env.DB.prepare('SELECT COUNT(*) as count FROM discovered_patterns WHERE origin = ?').bind('academic').first();
+          const technical = await this.env.DB.prepare('SELECT COUNT(*) as count FROM discovered_patterns WHERE origin = ?').bind('technical').first();
+
+          return new Response(JSON.stringify({
+            patterns: patterns.results || [],
+            stats: {
+              total: total?.count || 0,
+              winning: winning?.count || 0,
+              chaos: chaos?.count || 0,
+              academic: academic?.count || 0,
+              technical: technical?.count || 0
+            }
+          }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({ error: String(error) }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      if (url.pathname === '/api/agents/all') {
+        try {
+          const agents = await this.env.DB.prepare(`
+            SELECT * FROM trading_agents
+            ORDER BY fitness_score DESC
+          `).all();
+
+          const active = await this.env.DB.prepare('SELECT COUNT(*) as count FROM trading_agents WHERE status = ?').bind('active').first();
+          const eliminated = await this.env.DB.prepare('SELECT COUNT(*) as count FROM trading_agents WHERE status = ?').bind('eliminated').first();
+          const avgGen = await this.env.DB.prepare('SELECT AVG(generation) as avg FROM trading_agents WHERE status = ?').bind('active').first();
+          const maxGen = await this.env.DB.prepare('SELECT MAX(generation) as max FROM trading_agents WHERE status = ?').bind('active').first();
+          const competitions = await this.env.DB.prepare('SELECT COUNT(*) as count FROM agent_competitions').first();
+
+          return new Response(JSON.stringify({
+            agents: agents.results || [],
+            stats: {
+              active: active?.count || 0,
+              eliminated: eliminated?.count || 0,
+              avg_generation: avgGen?.avg || 0,
+              max_generation: maxGen?.max || 0,
+              total_competitions: competitions?.count || 0
+            }
+          }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({ error: String(error) }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      if (url.pathname === '/api/agents/leaderboard') {
+        try {
+          const agents = await this.env.DB.prepare(`
+            SELECT * FROM trading_agents
+            WHERE status = ?
+            ORDER BY fitness_score DESC
+            LIMIT 100
+          `).bind('active').all();
+
+          const active = await this.env.DB.prepare('SELECT COUNT(*) as count FROM trading_agents WHERE status = ?').bind('active').first();
+          const avgFitness = await this.env.DB.prepare('SELECT AVG(fitness_score) as avg FROM trading_agents WHERE status = ?').bind('active').first();
+          const topFitness = await this.env.DB.prepare('SELECT MAX(fitness_score) as max FROM trading_agents WHERE status = ?').bind('active').first();
+          const totalTrades = await this.env.DB.prepare('SELECT SUM(total_trades) as sum FROM trading_agents WHERE status = ?').bind('active').first();
+          const avgRoi = await this.env.DB.prepare('SELECT AVG(avg_roi_per_trade) as avg FROM trading_agents WHERE status = ?').bind('active').first();
+
+          return new Response(JSON.stringify({
+            agents: agents.results || [],
+            stats: {
+              active: active?.count || 0,
+              avg_fitness: avgFitness?.avg || 0,
+              top_fitness: topFitness?.max || 0,
+              total_trades: totalTrades?.sum || 0,
+              avg_roi: avgRoi?.avg || 0
+            }
+          }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({ error: String(error) }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // Root endpoint
       console.log('Root endpoint, returning help');
       return new Response(JSON.stringify({
@@ -298,9 +466,17 @@ export class EvolutionAgent implements DurableObject {
           '/status': 'Get agent status',
           '/trigger': 'Trigger evolution cycle',
           '/stats': 'Get database statistics',
-          '/debug': 'Get debug information'
+          '/debug': 'Get debug information',
+          '/dashboard/architecture': 'System architecture dashboard',
+          '/dashboard/patterns': 'Pattern leaderboard dashboard',
+          '/dashboard/swarm': 'Agent swarm visualization',
+          '/dashboard/agents': 'Agent leaderboard',
+          '/api/stats': 'API - System statistics',
+          '/api/patterns': 'API - Pattern data',
+          '/api/agents/all': 'API - All agents',
+          '/api/agents/leaderboard': 'API - Agent leaderboard'
         },
-        version: '1.0.0',
+        version: '2.0.0',
         timestamp: new Date().toISOString()
       }, null, 2), {
         headers: { 'Content-Type': 'application/json' }
