@@ -31,6 +31,24 @@ jobs:
           cd cloudflare-agents
           npm install
 
+      - name: Apply D1 Database Migrations
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: d1 execute coinswarm-evolution --remote --file=sentiment-data-schema.sql
+
+      - name: Apply Advanced Sentiment Migrations
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: d1 execute coinswarm-evolution --remote --file=sentiment-advanced-schema.sql
+
       - name: Deploy Evolution Agent
         uses: cloudflare/wrangler-action@v3
         with:
@@ -79,21 +97,24 @@ jobs:
       - name: Deployment Complete
         run: |
           echo "✅ All workers deployed successfully!"
+          echo "✅ D1 database migrations applied!"
           echo ""
           echo "Deployed Workers:"
-          echo "1. Evolution Agent (main orchestrator)"
-          echo "2. News & Sentiment Agent (committee weighting)"
+          echo "1. Evolution Agent (main orchestrator) - RUNNING"
+          echo "2. News & Sentiment Agent (committee weighting) - RUNNING"
           echo "3. Multi-Exchange Data Worker (Binance + Coinbase)"
           echo "4. Solana DEX Worker (Jupiter, Raydium, Orca)"
           echo "5. Sentiment Backfill Worker (historical data enrichment)"
           echo ""
+          echo "Database Migrations Applied:"
+          echo "- Sentiment columns added to chaos_trades table"
+          echo "- Sentiment time-series tables created (keywords, headlines, derivatives)"
+          echo "- Ready for sentiment-enhanced pattern discovery"
+          echo ""
           echo "Check your workers at: https://dash.cloudflare.com/8a330fc6c339f031a73905d4ca2f3e5d/workers"
           echo ""
-          echo "Next steps:"
-          echo "1. Apply D1 migrations (run locally or via dashboard):"
-          echo "   npx wrangler d1 execute coinswarm-evolution --remote --file=cloudflare-agents/sentiment-data-schema.sql"
-          echo "   npx wrangler d1 execute coinswarm-evolution --remote --file=cloudflare-agents/sentiment-advanced-schema.sql"
-          echo "2. Start backfill process:"
-          echo "   curl -X POST https://coinswarm-sentiment-backfill.bamn86.workers.dev/backfill?batch=100"
-          echo "3. Check backfill progress:"
-          echo "   curl https://coinswarm-sentiment-backfill.bamn86.workers.dev/status"
+          echo "Optional: Start historical backfill to enrich 129,200 existing trades:"
+          echo "  curl -X POST https://coinswarm-sentiment-backfill.bamn86.workers.dev/backfill?batch=100"
+          echo ""
+          echo "Check backfill progress:"
+          echo "  curl https://coinswarm-sentiment-backfill.bamn86.workers.dev/status"
