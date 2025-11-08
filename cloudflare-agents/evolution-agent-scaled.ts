@@ -16,12 +16,20 @@
 
 import { Agent } from 'agents';
 import { analyzeWithAI, validatePattern, scorePattern, generatePatternId } from './ai-pattern-analyzer';
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('EvolutionAgentScaled', LogLevel.INFO);
+
+// Cloudflare AI binding interface
+interface CloudflareAI {
+  run(model: string, inputs: Record<string, unknown>): Promise<unknown>;
+}
 
 // Environment bindings interface
 interface Env {
   DB: D1Database;
   EVOLUTION_AGENT: DurableObjectNamespace;
-  AI: any;
+  AI: CloudflareAI;
   ANALYTICS?: AnalyticsEngineDataset;
   // Configuration from wrangler.toml [vars]
   BATCH_SIZE: string;
@@ -69,10 +77,14 @@ export interface MarketState {
   volatility: number;
 }
 
+interface PatternConditions {
+  [key: string]: {target: number; threshold: number} | number | string;
+}
+
 interface Pattern {
   patternId: string;
   name: string;
-  conditions: any;
+  conditions: PatternConditions;
   winRate: number;
   sampleSize: number;
   discoveredAt: string;
@@ -99,7 +111,7 @@ export class EvolutionAgent extends Agent<Env> {
   };
 
   async onStart() {
-    console.log('SCALED EvolutionAgent starting...');
+    logger.info('SCALED EvolutionAgent starting');
 
     const storedState = await this.ctx.storage.get<EvolutionState>('evolutionState');
     if (storedState) {
@@ -110,13 +122,13 @@ export class EvolutionAgent extends Agent<Env> {
       if (this.state.aiResetDate !== today) {
         this.state.aiNeuronsUsedToday = 0;
         this.state.aiResetDate = today;
-        console.log('AI usage counter reset for new day');
+        logger.info('AI usage counter reset for new day');
       }
 
-      console.log(`Agent ${this.state.agentId} resuming from cycle ${this.state.totalCycles}`);
+      logger.info('Agent resuming', { agent_id: this.state.agentId, cycle: this.state.totalCycles });
     } else {
       this.state = this.initialState;
-      console.log('Starting fresh scaled evolution');
+      logger.info('Starting fresh scaled evolution');
     }
 
     if (!this.state.isRunning) {
@@ -144,7 +156,7 @@ export class EvolutionAgent extends Agent<Env> {
 
   async scheduleNextCycle(delaySeconds?: number) {
     const interval = delaySeconds || parseInt(this.env.CYCLE_INTERVAL || '10');
-    console.log(`Agent ${this.state.agentId}: Scheduling next cycle in ${interval}s`);
+    logger.info('Scheduling next cycle', { agent_id: this.state.agentId, interval });
     await this.schedule(interval, 'runEvolutionCycle');
   }
 
@@ -154,7 +166,7 @@ export class EvolutionAgent extends Agent<Env> {
    */
   async runEvolutionCycle() {
     const cycleStart = Date.now();
-    console.log(`\n=== Agent ${this.state.agentId} - Cycle ${this.state.totalCycles + 1} ===`);
+    logger.info('=== Evolution Cycle Start ===', { agent_id: this.state.agentId, cycle: this.state.totalCycles + 1 });
 
     this.state.isRunning = true;
     await this.saveState();
@@ -164,24 +176,24 @@ export class EvolutionAgent extends Agent<Env> {
 
       // 1. Generate chaos trades (500 per cycle = 10x larger)
       const tradesGenerated = await this.generateChaosTrades(batchSize);
-      console.log(`Agent ${this.state.agentId}: Generated ${tradesGenerated} chaos trades`);
+      logger.info('Generated chaos trades', { agent_id: this.state.agentId, count: tradesGenerated });
       this.state.totalTrades += tradesGenerated;
 
       // 2. Analyze patterns more frequently (every 2 cycles vs every 5)
       const patternInterval = parseInt(this.env.PATTERN_ANALYSIS_INTERVAL || '2');
       if (this.state.totalCycles % patternInterval === 0 && this.state.totalTrades >= 1000) {
-        console.log(`Agent ${this.state.agentId}: Analyzing patterns...`);
+        logger.info('Analyzing patterns', { agent_id: this.state.agentId });
         const patternsFound = await this.analyzePatterns();
-        console.log(`Agent ${this.state.agentId}: Discovered ${patternsFound} new patterns`);
+        logger.info('Discovered new patterns', { agent_id: this.state.agentId, count: patternsFound });
         this.state.patternsDiscovered += patternsFound;
       }
 
       // 3. Test strategies more frequently (every 5 cycles vs every 10)
       const testInterval = parseInt(this.env.STRATEGY_TEST_INTERVAL || '5');
       if (this.state.totalCycles % testInterval === 0 && this.state.patternsDiscovered > 0) {
-        console.log(`Agent ${this.state.agentId}: Testing strategies...`);
+        logger.info('Testing strategies', { agent_id: this.state.agentId });
         const winnersFound = await this.testStrategies();
-        console.log(`Agent ${this.state.agentId}: Found ${winnersFound} winning strategies`);
+        logger.info('Found winning strategies', { agent_id: this.state.agentId, count: winnersFound });
         this.state.winningStrategies += winnersFound;
       }
 
@@ -191,7 +203,7 @@ export class EvolutionAgent extends Agent<Env> {
       await this.saveState();
 
       const cycleTime = Date.now() - cycleStart;
-      console.log(`Agent ${this.state.agentId}: Cycle complete in ${cycleTime}ms. Total: ${this.state.totalTrades} trades`);
+      logger.info('Cycle complete', { agent_id: this.state.agentId, cycle_time_ms: cycleTime, total_trades: this.state.totalTrades });
 
       // Track analytics
       if (this.env.ANALYTICS) {
@@ -205,7 +217,7 @@ export class EvolutionAgent extends Agent<Env> {
       await this.scheduleNextCycle();
 
     } catch (error) {
-      console.error(`Agent ${this.state.agentId}: Error in evolution cycle:`, error);
+      logger.error('Error in evolution cycle', { agent_id: this.state.agentId, error: error instanceof Error ? error : new Error(String(error)) });
       this.state.isRunning = false;
       await this.saveState();
 
@@ -323,7 +335,7 @@ export class EvolutionAgent extends Agent<Env> {
     ).all();
 
     if (winners.results.length < 100 || losers.results.length < 100) {
-      console.log('Not enough data for pattern analysis');
+      logger.info('Not enough data for pattern analysis');
       return 0;
     }
 
@@ -360,7 +372,7 @@ export class EvolutionAgent extends Agent<Env> {
     const aiBudget = parseInt(this.env.AI_BUDGET_PER_DAY || '10000');
 
     if (aiEnabled && this.state.aiNeuronsUsedToday < aiBudget) {
-      console.log(`Agent ${this.state.agentId}: Using AI (${this.state.aiNeuronsUsedToday}/${aiBudget} neurons used today)`);
+      logger.info('Using AI for pattern discovery', { agent_id: this.state.agentId, neurons_used: this.state.aiNeuronsUsedToday, budget: aiBudget });
 
       try {
         const aiPatterns = await analyzeWithAI(
@@ -393,17 +405,17 @@ export class EvolutionAgent extends Agent<Env> {
                 tested: false,
                 votes: 0
               });
-              console.log(`✓ AI discovered: ${aiPattern.patternName}`);
+              logger.info('AI discovered pattern', { name: aiPattern.patternName });
             }
           }
         }
       } catch (error) {
-        console.error('AI pattern discovery failed:', error);
+        logger.error('AI pattern discovery failed', error instanceof Error ? error : new Error(String(error)));
       }
     } else if (!aiEnabled) {
-      console.log('AI disabled in configuration');
+      logger.info('AI disabled in configuration');
     } else {
-      console.log(`AI budget exceeded: ${this.state.aiNeuronsUsedToday}/${aiBudget}`);
+      logger.warn('AI budget exceeded', { neurons_used: this.state.aiNeuronsUsedToday, budget: aiBudget });
     }
 
     if (patternsFound.length > 0) {
@@ -478,10 +490,10 @@ export class EvolutionAgent extends Agent<Env> {
       if (patternPerformance > randomPerformance) {
         vote = 1;
         winnersFound++;
-        console.log(`✓ ${pattern.name}: ${(patternPerformance * 100).toFixed(2)}% vs random ${(randomPerformance * 100).toFixed(2)}%`);
+        logger.info('Pattern winner', { name: pattern.name, performance: (patternPerformance * 100).toFixed(2), vs_random: (randomPerformance * 100).toFixed(2) });
       } else {
         vote = -1;
-        console.log(`✗ ${pattern.name}: ${(patternPerformance * 100).toFixed(2)}% vs random ${(randomPerformance * 100).toFixed(2)}%`);
+        logger.info('Pattern loser', { name: pattern.name, performance: (patternPerformance * 100).toFixed(2), vs_random: (randomPerformance * 100).toFixed(2) });
       }
 
       await this.env.DB.prepare(`
