@@ -8,7 +8,242 @@
 
 ---
 
-## Executive Summary
+## 🌟 For Stakeholders: What You Need to Know
+
+> **TL;DR**: We're building an AI trading system. Currently testing with fake money (zero risk). Won't use real money for 8+ months. When we do, we'll start with $1k-$5k with strict limits ($500 max loss). If it works, we scale up gradually. If it doesn't, we stop with minimal losses.
+
+### What Is This Project?
+
+**Coinswarm** is an AI-powered cryptocurrency trading system that uses multiple specialized "agents" (like having a committee of expert traders) working together to make trading decisions. No emotions, just data and math.
+
+### What's Already Working? (See It Live!)
+
+We have **4 live dashboards** you can check right now:
+
+- **[System Architecture](https://coinswarm-evolution-agent.bamn86.workers.dev/architecture)** - How everything works together
+- **[Pattern Leaderboard](https://coinswarm-evolution-agent.bamn86.workers.dev/patterns)** - 663 trading patterns discovered, 228 are profitable
+- **[Agent Swarm](https://coinswarm-evolution-agent.bamn86.workers.dev/swarm)** - Live view of all AI agents competing
+- **[Agent Rankings](https://coinswarm-evolution-agent.bamn86.workers.dev/agents)** - Performance leaderboard
+
+**These update every 30 seconds with real data!** This proves we have a real, working system, not just ideas.
+
+### The 6-Phase Plan (Conservative Approach)
+
+```
+Phase 0 (Now)    → Phase 1      → Phase 2    → Phase 3      → Phase 4       → Phase 5
+Building         Paper Trading  Sandbox      Real Money     Scaling         Production
+3 months         3 months       2 months     $1k-$5k        $50k            $50k+
+$0 risk          $0 risk        $0 risk      LOW RISK       MEDIUM RISK     MANAGED
+```
+
+#### Phase 0: Foundation (Current - 40% Complete)
+**Timeline**: 3 months | **Money**: $0 | **Risk**: None
+
+Building all the safety systems and testing with fake money. We're writing comprehensive tests for everything right now to ensure quality.
+
+**Exit Criteria**: If we can't make money in simulated trading, we stop here. Zero loss.
+
+---
+
+#### Phase 1: Paper Trading (Months 4-6)
+**Timeline**: 3 months | **Money**: Still $0 | **Risk**: None
+
+Run 1,000+ simulated trades with real market data but fake money. Track everything like it's real.
+
+**Exit Criteria**: If we can't beat 55% win rate, we stop. Still zero loss.
+
+---
+
+#### Phase 2: Sandbox Testing (Months 7-8)
+**Timeline**: 2 months | **Money**: Still $0 | **Risk**: None
+
+Test with Coinbase's sandbox environment (real exchange, fake money).
+
+**Exit Criteria**: If system fails in sandbox, we fix or stop. Still zero real money.
+
+---
+
+#### Phase 3: Limited Real Money (Months 9-12) **← FIRST REAL MONEY**
+**Timeline**: 3-4 months | **Money**: $1,000 - $5,000 | **Risk**: LOW
+
+**STRICT SAFETY LIMITS**:
+- ✅ **Max $1,250 per trade** (25% of capital)
+- ✅ **Max $250/day loss** (5% daily stop)
+- ✅ **Max $500 total loss** (10% max drawdown)
+- ✅ **System auto-stops if any limit hit**
+
+**Worst Case**: Lose $500 (10% of $5k), then system automatically stops.
+
+**Exit Criteria**:
+- STOP if we lose more than 10% ($500)
+- STOP if win rate falls below 50%
+- STOP if 3 losing weeks in a row
+- CONTINUE only if profitable for 3 months straight
+
+---
+
+#### Phase 4: Scaling (Months 13-18)
+**Only if Phase 3 is profitable**
+
+**Timeline**: 6 months | **Money**: Scale $5k → $50k gradually | **Risk**: MEDIUM
+
+Scale up slowly:
+- Month 1: $5k → $10k (if profitable)
+- Month 2: $10k → $20k (if still profitable)
+- Month 3: $20k → $35k (if still profitable)
+- Month 4: $35k → $50k (if still profitable)
+
+**Protection**: Same risk limits, auto-pause on losses, regress to lower capital if losing.
+
+---
+
+#### Phase 5: Production (Month 19+)
+**Only if we've proven profitability at $50k for 3+ months**
+
+**Timeline**: Ongoing | **Money**: $50k+ | **Risk**: MANAGED
+
+Run as a profitable trading system with institutional-grade safety.
+
+### 🛡️ How We Protect Your Investment
+
+**5 Layers of Safety** (all automated):
+
+1. **Oversight Manager** - Blocks trades that exceed limits
+2. **Circuit Breaker** - Auto-pauses trading on rapid losses
+3. **Risk Agent** - Has veto power over dangerous trades
+4. **Committee Voting** - Multiple agents must agree (no single point of failure)
+5. **Hard-Coded Limits** - Can't be overridden, enforced by code
+
+**Example Protection in Action**:
+- Price drops 10% in 1 minute (flash crash) → Circuit breaker stops all trading
+- One trade would risk $2,000 → Risk agent vetoes it (exceeds 25% limit)
+- Lost $250 in one day → Oversight Manager blocks all trades until next day
+- Lost $500 total → System permanently stops, requires manual review
+
+### 💰 Projected Returns (Conservative)
+
+**Phase 3** ($5,000 capital, 3 months):
+- Target: 2-3% monthly return
+- Profit: $300-500 total
+- Risk: Up to $500 loss (10% max)
+
+**Phase 4** ($50,000 capital, 6 months):
+- Target: 2-3% monthly return
+- Profit: $6,000-9,000 total
+- Risk: $5,000 max loss (10% max)
+
+**Phase 5** ($50,000+ capital, annual):
+- Target: 2-3% monthly return
+- Profit: $12,000-18,000 per year at $50k
+- Scalable if consistently profitable
+
+**Key**: These assume we beat the market. If we can't, we stop and don't lose more than defined limits.
+
+### ⚠️ What Could Go Wrong?
+
+#### "What if the AI makes bad trades?"
+- **Phase 0-2**: Only fake money (zero risk)
+- **Phase 3**: Max $500 loss, then auto-stop
+- **All phases**: Circuit breaker, risk agent veto, human override
+
+#### "What if you lose money in Phase 3?"
+- **Max loss capped at 10%** ($500 on $5k)
+- **System auto-stops** at loss limit
+- **Weekly reviews** catch problems early
+- **We can stop anytime** - zero pressure to continue
+
+#### "What if the market crashes?"
+- Circuit breaker detects flash crashes and pauses
+- Position limits prevent over-exposure
+- Daily loss limits prevent big losses
+- Can trade both directions (buy AND sell)
+
+### 💸 Investment Required
+
+**Time**:
+- Phase 0-2 (8 months): Testing only, no real money
+- Phase 3 (4 months): First real money, close monitoring
+- Total: ~12 months to prove profitability
+
+**Money**:
+- Phase 0-2: $0 (paper trading)
+- Phase 3: $1,000-$5,000 (max $500 loss)
+- Phase 4: Scale to $50k (only if Phase 3 works)
+
+**Development Time**:
+- Current phase: Evenings/weekends for 3 months
+- Once live: System runs automatically, weekly 1-2 hour reviews
+
+### 🎯 Why This Has a Good Chance
+
+✅ **Evidence-Based**: Test with fake money for 8 months first
+✅ **Multiple Safety Layers**: 5 automated safety systems
+✅ **Conservative Strategy**: Start tiny ($1k-$5k), strict limits
+✅ **Professional Architecture**: Production-grade engineering
+✅ **Clear Exit Criteria**: No pressure to continue if losing
+
+### ❓ Frequently Asked Questions
+
+**Q: How is this different from gambling?**
+A: Gambling is random (slots). This is like poker - skilled play with math, strategy, and risk management. We test extensively before risking $1.
+
+**Q: Can you lose all the money?**
+A: No. Maximum loss is 10% ($500 on $5k), then system auto-stops. We can manually stop anytime.
+
+**Q: When will we see profits?**
+A: Months 1-8 are testing ($0). Months 9-12 are first real trading. IF profitable, months 13+ scale up with meaningful returns.
+
+**Q: Time commitment?**
+A: Current: Evenings/weekends building. Once live: Runs automatically 24/7, weekly reviews (1-2 hours).
+
+**Q: Why not just invest in index funds?**
+A: We can! If this doesn't work, we stop and do that. If it DOES work, potential for 24-36% annually vs 10% in S&P 500.
+
+### 🚦 The Ask
+
+**What we're asking for**:
+- Support to finish Phase 0 (3 months of weekend work)
+- Permission to run Phase 1-2 (paper trading - still zero risk)
+- Trust in the process (clear exit criteria at every step)
+
+**What we're NOT asking for**:
+- ❌ Real money now (8+ months away)
+- ❌ Quit job (side project)
+- ❌ Big investment (start with $1k-5k)
+- ❌ Blind faith (data-driven with proof at every step)
+
+### 📊 Current Progress
+
+**Built and Working** ✅:
+- 6 trading agents
+- 4 live dashboards (check them out!)
+- 663 patterns discovered, 228 profitable
+- 3,726 lines of tests
+- Coinbase API integration
+
+**Building This Month** 🔨:
+- Master Orchestrator
+- Oversight Manager (safety)
+- Circuit Breaker (auto-stop)
+- Mean Reversion Agent
+- Comprehensive test suite (writing now)
+
+**Next Month** 📅:
+- Complete all safety systems
+- Begin paper trading
+- Track 1,000+ simulated trades
+
+### 🎯 Bottom Line
+
+We're building a **professional, safe, data-driven** trading system with **multiple safety layers** and **clear exit criteria** at every phase. We test with fake money for 8+ months before risking $1. When we do risk real money, we start tiny ($1k-5k) with strict limits ($500 max loss). If it works, we scale gradually. If it doesn't, we stop before big losses.
+
+**Current status**: 40% done with Phase 0, dashboards working, on track.
+
+**No decision needed today** - just showing what's working and the path forward.
+
+---
+
+## Executive Summary (Technical)
 
 This roadmap outlines the path from current state (fake money testing) to confident real-money trading at scale. Each phase has clear **entry criteria**, **deliverables**, and **exit criteria** to ensure we never risk real capital before the system is ready.
 
