@@ -9,6 +9,14 @@
 
 import { generatePatternId } from './ai-pattern-analyzer';
 import { TradingAgent, agentDecision, executeAgentTrade, agentReflection } from './reasoning-agent';
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('AgentCompetition', LogLevel.INFO);
+
+// AI interface
+interface CloudflareAI {
+  run(model: string, inputs: Record<string, unknown>): Promise<{ response?: string; [key: string]: unknown }>;
+}
 
 interface CompetitionResult {
   competition_id: string;
@@ -24,11 +32,19 @@ interface CompetitionResult {
   }[];
 }
 
+interface RankingResult {
+  agent_id: string;
+  agent_name: string;
+  roi: number;
+  trades: number;
+  rank: number;
+}
+
 /**
  * Initialize agent population with diverse personalities
  */
 export async function initializeAgentPopulation(
-  db: any,
+  db: D1Database,
   populationSize: number = 10
 ): Promise<TradingAgent[]> {
   const personalities = [
@@ -76,14 +92,17 @@ export async function initializeAgentPopulation(
     agents.push(agent);
   }
 
-  console.log(`\n🧬 Initialized ${agents.length} agents with diverse personalities`);
+  logger.info('Initialized agent population', {
+    count: agents.length,
+    personalities: personalities.slice(0, populationSize),
+  });
   return agents;
 }
 
 /**
  * Get all active agents
  */
-export async function getActiveAgents(db: any): Promise<TradingAgent[]> {
+export async function getActiveAgents(db: D1Database): Promise<TradingAgent[]> {
   const result = await db.prepare(`
     SELECT
       agent_id,
@@ -136,7 +155,7 @@ export function calculateFitnessScore(agent: TradingAgent): number {
 /**
  * Update agent fitness scores
  */
-export async function updateAgentFitness(db: any): Promise<void> {
+export async function updateAgentFitness(db: D1Database): Promise<void> {
   const agents = await getActiveAgents(db);
 
   for (const agent of agents) {
@@ -155,8 +174,8 @@ export async function updateAgentFitness(db: any): Promise<void> {
  * Each agent trades for a period, then results are compared
  */
 export async function runAgentCompetition(
-  ai: any,
-  db: any,
+  ai: CloudflareAI,
+  db: D1Database,
   cycleNumber: number,
   tradesPerAgent: number = 5
 ): Promise<CompetitionResult> {
@@ -172,10 +191,14 @@ export async function runAgentCompetition(
   console.log(`   ${agents.length} agents competing...`);
 
   // Each agent makes multiple trades
-  const competitionResults: any[] = [];
+  const competitionResults: RankingResult[] = [];
 
   for (const agent of agents) {
-    console.log(`\n   🤖 ${agent.agent_name} (Gen ${agent.generation})`);
+    logger.debug('Agent competing', {
+      agent_name: agent.agent_name,
+      agent_id: agent.agent_id,
+      generation: agent.generation,
+    });
 
     let totalRoi = 0;
     let wins = 0;
@@ -220,7 +243,13 @@ export async function runAgentCompetition(
       trades
     });
 
-    console.log(`      Final: ${avgRoi.toFixed(2)}% avg ROI, ${(winRate * 100).toFixed(0)}% win rate`);
+    logger.info('Agent competition finished', {
+      agent_id: agent.agent_id,
+      agent_name: agent.agent_name,
+      avg_roi: avgRoi.toFixed(2),
+      win_rate: (winRate * 100).toFixed(0),
+      total_trades: trades,
+    });
   }
 
   // Sort by total ROI
@@ -270,9 +299,9 @@ export async function runAgentCompetition(
   `).bind(
     competitionId,
     `${tradesPerAgent} trades per agent`,
-    JSON.stringify(competitionResults.map((r: any) => r.agent_id)),
+    JSON.stringify(competitionResults.map((r) => r.agent_id)),
     competitionResults[0].agent_id,
-    JSON.stringify(competitionResults.map((r: any) => ({ agent_id: r.agent_id, rank: r.rank }))),
+    JSON.stringify(competitionResults.map((r) => ({ agent_id: r.agent_id, rank: r.rank }))),
     JSON.stringify(competitionResults)
   ).run();
 
@@ -281,7 +310,7 @@ export async function runAgentCompetition(
     winner_id: competitionResults[0].agent_id,
     eliminated_ids: [],
     cloned_ids: [],
-    rankings: competitionResults.map((r: any) => ({
+    rankings: competitionResults.map((r) => ({
       agent_id: r.agent_id,
       agent_name: r.agent_name,
       roi: r.total_roi,
@@ -297,8 +326,8 @@ export async function runAgentCompetition(
  * - Clone top 20% with mutations
  */
 export async function evolveAgentPopulation(
-  ai: any,
-  db: any,
+  ai: CloudflareAI,
+  db: D1Database,
   competition: CompetitionResult
 ): Promise<{ eliminated: number; cloned: number }> {
   const agents = await getActiveAgents(db);
@@ -414,8 +443,8 @@ export async function evolveAgentPopulation(
  * Run full competition cycle with evolution
  */
 export async function runCompetitionCycle(
-  ai: any,
-  db: any,
+  ai: CloudflareAI,
+  db: D1Database,
   cycleNumber: number
 ): Promise<void> {
   // 1. Check if population exists
@@ -441,8 +470,8 @@ export async function runCompetitionCycle(
 
   // 4. Show current population stats
   const updatedAgents = await getActiveAgents(db);
-  const avgFitness = updatedAgents.reduce((sum: number, a: any) => sum + a.fitness_score, 0) / updatedAgents.length;
-  const avgGeneration = updatedAgents.reduce((sum: number, a: any) => sum + a.generation, 0) / updatedAgents.length;
+  const avgFitness = updatedAgents.reduce((sum: number, a: TradingAgent) => sum + a.fitness_score, 0) / updatedAgents.length;
+  const avgGeneration = updatedAgents.reduce((sum: number, a: TradingAgent) => sum + a.generation, 0) / updatedAgents.length;
 
   console.log(`\n   📊 Population Stats:`);
   console.log(`      Active agents: ${updatedAgents.length}`);
