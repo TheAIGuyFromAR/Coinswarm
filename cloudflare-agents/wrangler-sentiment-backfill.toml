@@ -1,0 +1,21 @@
+# Wrangler configuration for Sentiment Backfill Worker
+# Enriches historical chaos trades with sentiment data
+
+name = "coinswarm-sentiment-backfill"
+main = "sentiment-backfill-worker.ts"
+compatibility_date = "2024-11-01"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "coinswarm-evolution"
+database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
+
+# Environment variables (set via wrangler secret or dashboard)
+# [vars]
+# CRYPTOCOMPARE_API_KEY will be read from secrets
+# FRED_API_KEY will be read from secrets
+
+# Usage:
+# curl -X POST https://coinswarm-sentiment-backfill.bamn86.workers.dev/backfill?batch=100
+# curl https://coinswarm-sentiment-backfill.bamn86.workers.dev/status
