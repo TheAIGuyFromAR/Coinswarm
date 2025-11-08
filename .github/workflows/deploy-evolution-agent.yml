@@ -10,6 +10,7 @@ on:
     paths:
       - 'cloudflare-agents/**'
       - '.github/workflows/deploy-evolution-agent.yml'
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
   deploy:
