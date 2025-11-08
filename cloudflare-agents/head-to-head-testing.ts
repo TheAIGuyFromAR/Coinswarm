@@ -7,6 +7,10 @@
  * - Tracks wins/losses for evolutionary pressure
  */
 
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('HeadToHeadTesting', LogLevel.INFO);
+
 interface Pattern {
   pattern_id: string;
   name: string;
@@ -52,7 +56,7 @@ function calculateSelectionWeight(pattern: Pattern): number {
  * Weighted random selection of patterns
  * Returns array of [patternA, patternB]
  */
-export async function selectPatternsForCompetition(db: any): Promise<[Pattern, Pattern] | null> {
+export async function selectPatternsForCompetition(db: D1Database): Promise<[Pattern, Pattern] | null> {
   try {
     // Get all patterns
     const result = await db.prepare(`
@@ -66,7 +70,7 @@ export async function selectPatternsForCompetition(db: any): Promise<[Pattern, P
     const patterns: Pattern[] = result.results;
 
     if (patterns.length < 2) {
-      console.log('⚠️  Not enough patterns for head-to-head (need at least 2)');
+      logger.info('Not enough patterns for head-to-head competition', { minimum_required: 2 });
       return null;
     }
 
@@ -103,14 +107,24 @@ export async function selectPatternsForCompetition(db: any): Promise<[Pattern, P
     const patternA = patterns[indexA];
     const patternB = remainingPatterns[indexB];
 
-    console.log(`🎲 Selected for competition:`);
-    console.log(`  A: ${patternA.name} (runs: ${patternA.number_of_runs}, votes: ${patternA.votes}, weight: ${weights[indexA].toFixed(1)})`);
-    console.log(`  B: ${patternB.name} (runs: ${remainingPatterns[indexB] ? 'unknown' : patternB.number_of_runs}, votes: ${patternB.votes})`);
+    logger.info('Selected patterns for competition', {
+      pattern_a: {
+        name: patternA.name,
+        runs: patternA.number_of_runs,
+        votes: patternA.votes,
+        weight: weights[indexA].toFixed(1)
+      },
+      pattern_b: {
+        name: patternB.name,
+        runs: patternB.number_of_runs,
+        votes: patternB.votes
+      }
+    });
 
     return [patternA, patternB];
 
   } catch (error) {
-    console.error('Failed to select patterns:', error);
+    logger.error('Failed to select patterns', error instanceof Error ? error : new Error(String(error)));
     return null;
   }
 }
@@ -138,7 +152,7 @@ function selectRandomTimeframe(): typeof TIMEFRAMES[0] {
  * Test a strategy on historical data
  * Returns simulated performance
  */
-async function testStrategy(pattern: Pattern, timeframe: typeof TIMEFRAMES[0], db: any): Promise<TestResult> {
+async function testStrategy(pattern: Pattern, timeframe: typeof TIMEFRAMES[0], db: D1Database): Promise<TestResult> {
   try {
     // Get random historical trades for testing
     const tradesResult = await db.prepare(`
@@ -201,7 +215,10 @@ async function testStrategy(pattern: Pattern, timeframe: typeof TIMEFRAMES[0], d
     };
 
   } catch (error) {
-    console.error(`Failed to test strategy ${pattern.name}:`, error);
+    logger.error('Failed to test strategy', {
+      pattern_name: pattern.name,
+      error: error instanceof Error ? error.message : String(error)
+    });
     return {
       patternId: pattern.pattern_id,
       roi: 0,
@@ -214,8 +231,8 @@ async function testStrategy(pattern: Pattern, timeframe: typeof TIMEFRAMES[0], d
 /**
  * Run head-to-head competition between two patterns
  */
-export async function runHeadToHeadCompetition(db: any): Promise<boolean> {
-  console.log('⚔️  Starting head-to-head competition...');
+export async function runHeadToHeadCompetition(db: D1Database): Promise<boolean> {
+  logger.info('Starting head-to-head competition');
 
   try {
     // Select two patterns
@@ -228,13 +245,16 @@ export async function runHeadToHeadCompetition(db: any): Promise<boolean> {
 
     // Select random timeframe
     const timeframe = selectRandomTimeframe();
-    console.log(`⏱️  Timeframe: ${timeframe.name} (bonus: ${timeframe.bonus}x)`);
+    logger.info('Selected timeframe', {
+      name: timeframe.name,
+      bonus: timeframe.bonus
+    });
 
     // Test both strategies
-    console.log('🧪 Testing pattern A...');
+    logger.info('Testing pattern A');
     const resultA = await testStrategy(patternA, timeframe, db);
 
-    console.log('🧪 Testing pattern B...');
+    logger.info('Testing pattern B');
     const resultB = await testStrategy(patternB, timeframe, db);
 
     // Apply timeframe bonus
@@ -244,11 +264,21 @@ export async function runHeadToHeadCompetition(db: any): Promise<boolean> {
     // Determine winner
     const winnerId = scoreA > scoreB ? patternA.pattern_id : patternB.pattern_id;
     const loserId = scoreA > scoreB ? patternB.pattern_id : patternA.pattern_id;
+    const winnerName = scoreA > scoreB ? patternA.name : patternB.name;
 
-    console.log(`📊 Results:`);
-    console.log(`  ${patternA.name}: ${resultA.annualizedRoi.toFixed(2)}% × ${timeframe.bonus} = ${scoreA.toFixed(2)}%`);
-    console.log(`  ${patternB.name}: ${resultB.annualizedRoi.toFixed(2)}% × ${timeframe.bonus} = ${scoreB.toFixed(2)}%`);
-    console.log(`  🏆 Winner: ${scoreA > scoreB ? patternA.name : patternB.name}`);
+    logger.info('Competition results', {
+      pattern_a: {
+        name: patternA.name,
+        annualized_roi: resultA.annualizedRoi.toFixed(2),
+        final_score: scoreA.toFixed(2)
+      },
+      pattern_b: {
+        name: patternB.name,
+        annualized_roi: resultB.annualizedRoi.toFixed(2),
+        final_score: scoreB.toFixed(2)
+      },
+      winner: winnerName
+    });
 
     // Update database
     // Winner: +1 vote, +1 h2h_win
@@ -285,11 +315,11 @@ export async function runHeadToHeadCompetition(db: any): Promise<boolean> {
       winnerId
     ).run();
 
-    console.log('✅ Competition complete, results recorded');
+    logger.info('Competition complete, results recorded');
     return true;
 
   } catch (error) {
-    console.error('❌ Head-to-head competition failed:', error);
+    logger.error('Head-to-head competition failed', error instanceof Error ? error : new Error(String(error)));
     return false;
   }
 }
