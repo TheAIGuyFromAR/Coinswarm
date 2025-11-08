@@ -11,6 +11,29 @@
  */
 
 import { generatePatternId } from './ai-pattern-analyzer';
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('ReasoningAgent', LogLevel.INFO);
+
+// Database and AI type definitions
+interface CloudflareAI {
+  run(model: string, inputs: Record<string, unknown>): Promise<AIResponse>;
+}
+
+interface AIResponse {
+  response?: string;
+  [key: string]: unknown;
+}
+
+interface D1Result<T = Record<string, unknown>> {
+  results: T[];
+  success: boolean;
+  meta?: {
+    duration: number;
+    rows_read: number;
+    rows_written: number;
+  };
+}
 
 interface TradingAgent {
   agent_id: string;
@@ -67,10 +90,49 @@ interface MarketConditions {
   momentum: number;
 }
 
+// Trade result interface
+interface TradeResult {
+  price: number;
+  timestamp: string;
+  volume?: number;
+}
+
+interface Pattern {
+  pattern_id: string;
+  pattern_name?: string;
+  origin?: string;
+  votes?: number;
+  number_of_runs?: number;
+  head_to_head_wins?: number;
+  head_to_head_losses?: number;
+}
+
+interface TradingDecision {
+  patterns_selected: string[];
+  reasoning: string;
+  confidence: number;
+  expected_outcome?: string;
+}
+
+interface ReflectionResult {
+  outcome_analysis?: string;
+  what_worked?: string;
+  what_failed?: string;
+  lessons_learned?: string;
+  strategy_adjustment?: string;
+  confidence_adjustment?: number;
+}
+
+interface MemoryRecord {
+  patterns_selected?: string;
+  roi?: number;
+  lessons_learned?: string;
+}
+
 /**
  * Analyze current market conditions from recent price data
  */
-export async function analyzeMarketConditions(db: any): Promise<MarketConditions> {
+export async function analyzeMarketConditions(db: D1Database): Promise<MarketConditions> {
   // Get recent price data from chaos_trades
   const recentTrades = await db.prepare(`
     SELECT price, timestamp, volume
@@ -88,8 +150,8 @@ export async function analyzeMarketConditions(db: any): Promise<MarketConditions
     };
   }
 
-  const prices = recentTrades.results.map((t: any) => t.price);
-  const volumes = recentTrades.results.map((t: any) => t.volume || 1000);
+  const prices = (recentTrades.results as TradeResult[]).map((t) => t.price);
+  const volumes = (recentTrades.results as TradeResult[]).map((t) => t.volume || 1000);
 
   // Calculate volatility (standard deviation)
   const mean = prices.reduce((sum: number, p: number) => sum + p, 0) / prices.length;
@@ -120,7 +182,7 @@ export async function analyzeMarketConditions(db: any): Promise<MarketConditions
 /**
  * Get top patterns from library based on recent performance
  */
-export async function getTopPatterns(db: any, limit: number = 20): Promise<any[]> {
+export async function getTopPatterns(db: D1Database, limit: number = 20): Promise<Record<string, unknown>[]> {
   const patterns = await db.prepare(`
     SELECT
       pattern_id,
@@ -146,7 +208,7 @@ export async function getTopPatterns(db: any, limit: number = 20): Promise<any[]
 /**
  * Get agent's learned knowledge
  */
-export async function getAgentKnowledge(db: any, agentId: string): Promise<AgentKnowledge[]> {
+export async function getAgentKnowledge(db: D1Database, agentId: string): Promise<AgentKnowledge[]> {
   const knowledge = await db.prepare(`
     SELECT *
     FROM agent_knowledge
@@ -162,8 +224,8 @@ export async function getAgentKnowledge(db: any, agentId: string): Promise<Agent
  * Agent makes a trading decision using AI reasoning
  */
 export async function agentDecision(
-  ai: any,
-  db: any,
+  ai: CloudflareAI,
+  db: D1Database,
   agent: TradingAgent,
   cycleNumber: number
 ): Promise<AgentMemory> {
@@ -205,17 +267,17 @@ YOUR PERFORMANCE:
 - Total Trades: ${agent.total_trades}
 
 AVAILABLE PATTERNS (Top 20 from library):
-${topPatterns.slice(0, 10).map((p: any, i: number) =>
+${(topPatterns as Pattern[]).slice(0, 10).map((p, i: number) =>
   `${i+1}. ${p.pattern_id}: ${p.pattern_name} (Origin: ${p.origin}, Votes: ${p.votes}, Runs: ${p.number_of_runs}, H2H: ${p.head_to_head_wins}W-${p.head_to_head_losses}L)`
 ).join('\n')}
 
 YOUR LEARNED KNOWLEDGE:
-${knowledge.slice(0, 5).map((k: any) =>
+${knowledge.slice(0, 5).map((k) =>
   `- ${k.knowledge_type}: ${k.condition || ''} → ${k.recommended_action || 'Prefer pattern ' + k.pattern_id} (Confidence: ${(k.confidence * 100).toFixed(0)}%)`
 ).join('\n')}
 
 RECENT SUCCESSFUL STRATEGIES:
-${(recentMemories.results || []).slice(0, 3).map((m: any) =>
+${(recentMemories.results as MemoryRecord[] || []).slice(0, 3).map((m) =>
   `- Patterns: ${m.patterns_selected} → ROI: ${m.roi?.toFixed(2)}% | Lesson: ${m.lessons_learned}`
 ).join('\n')}
 
@@ -247,16 +309,16 @@ Remember: You are ${agent.personality}, so select patterns that match your perso
     max_tokens: 1000
   });
 
-  let decision: any;
+  let decision: TradingDecision;
   try {
     const text = response.response || '{}';
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    decision = JSON.parse(jsonMatch ? jsonMatch[0] : '{}');
+    decision = JSON.parse(jsonMatch ? jsonMatch[0] : '{}') as TradingDecision;
   } catch (e) {
     // Fallback to random selection
-    const randomPatterns = topPatterns.sort(() => Math.random() - 0.5).slice(0, 2);
+    const randomPatterns = (topPatterns as Pattern[]).sort(() => Math.random() - 0.5).slice(0, 2);
     decision = {
-      patterns_selected: randomPatterns.map((p: any) => p.pattern_id),
+      patterns_selected: randomPatterns.map((p) => p.pattern_id),
       reasoning: 'Using top-rated patterns from library',
       confidence: 0.5,
       expected_outcome: 'Unknown'
@@ -272,7 +334,7 @@ Remember: You are ${agent.personality}, so select patterns that match your perso
     market_volatility: market.volatility,
     market_trend: market.trend,
     market_volume: market.volume,
-    patterns_considered: topPatterns.map((p: any) => p.pattern_id),
+    patterns_considered: (topPatterns as Pattern[]).map((p) => p.pattern_id),
     patterns_selected: decision.patterns_selected || [],
     combination_reasoning: decision.reasoning || '',
     confidence_level: decision.confidence || 0.5
@@ -315,7 +377,7 @@ Remember: You are ${agent.personality}, so select patterns that match your perso
  * Returns simulated outcome
  */
 export async function executeAgentTrade(
-  db: any,
+  db: D1Database,
   memory: AgentMemory
 ): Promise<{ outcome: string; roi: number; roiAnnualized: number }> {
   // For now, simulate by testing the combined patterns
@@ -363,8 +425,8 @@ export async function executeAgentTrade(
  * Agent reflects on decision outcome and learns
  */
 export async function agentReflection(
-  ai: any,
-  db: any,
+  ai: CloudflareAI,
+  db: D1Database,
   agent: TradingAgent,
   memory: AgentMemory,
   outcome: { outcome: string; roi: number; roiAnnualized: number }
@@ -423,14 +485,14 @@ Respond in JSON format:
     max_tokens: 800
   });
 
-  let reflection: any;
+  let reflection: ReflectionResult;
   try {
     const text = response.response || '{}';
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    reflection = JSON.parse(jsonMatch ? jsonMatch[0] : '{}');
+    reflection = JSON.parse(jsonMatch ? jsonMatch[0] : '{}') as ReflectionResult;
   } catch (e) {
     reflection = {
-      reflection: 'Analysis pending',
+      outcome_analysis: 'Analysis pending',
       lessons_learned: 'Continue testing',
       strategy_adjustment: 'Monitor performance'
     };
@@ -529,25 +591,36 @@ Respond in JSON format:
  * Run one full agent decision cycle
  */
 export async function runAgentCycle(
-  ai: any,
-  db: any,
+  ai: CloudflareAI,
+  db: D1Database,
   agent: TradingAgent,
   cycleNumber: number
 ): Promise<void> {
-  console.log(`\n🤖 Agent ${agent.agent_name} making decision (Cycle ${cycleNumber})...`);
+  logger.info('Agent making decision', {
+    agent_name: agent.agent_name,
+    agent_id: agent.agent_id,
+    cycle: cycleNumber,
+  });
 
   // 1. Make decision
   const memory = await agentDecision(ai, db, agent, cycleNumber);
-  console.log(`   └─ Selected patterns: ${memory.patterns_selected.join(', ')}`);
-  console.log(`   └─ Reasoning: ${memory.combination_reasoning.substring(0, 100)}...`);
+  logger.info('Patterns selected', {
+    agent_id: agent.agent_id,
+    patterns: memory.patterns_selected.join(', '),
+    reasoning_preview: memory.combination_reasoning.substring(0, 100),
+  });
 
   // 2. Execute trade
   const outcome = await executeAgentTrade(db, memory);
-  console.log(`   └─ Outcome: ${outcome.outcome.toUpperCase()} | ROI: ${outcome.roi.toFixed(2)}%`);
+  logger.info('Trade executed', {
+    agent_id: agent.agent_id,
+    outcome: outcome.outcome.toUpperCase(),
+    roi: outcome.roi.toFixed(2),
+  });
 
   // 3. Reflect and learn
   await agentReflection(ai, db, agent, memory, outcome);
-  console.log(`   └─ Reflection complete, knowledge updated`);
+  logger.info('Reflection complete, knowledge updated', { agent_id: agent.agent_id });
 }
 
 export { TradingAgent, AgentMemory, AgentKnowledge, MarketConditions };
