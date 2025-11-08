@@ -3,6 +3,7 @@ name: Deploy Data Backfill Worker
 on:
   push:
     branches:
+      - claude/incomplete-description-011CUutLehm75rEefmt5WYQj
       - claude/debug-cloudflare-historical-data-011CUqugUynEoovcsiVnoaPB
       - main
       - master
@@ -19,6 +20,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
