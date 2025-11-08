@@ -921,9 +921,7 @@ export class EvolutionAgent implements DurableObject {
           entry_is_weekend, entry_is_monday, entry_is_tuesday, entry_is_wednesday,
           entry_is_thursday, entry_is_friday, entry_is_market_hours,
           entry_near_recent_high, entry_near_recent_low, entry_at_resistance, entry_at_support,
-          buy_rationalization, sell_rationalization,
-          sentiment_fear_greed, sentiment_overall, sentiment_regime, sentiment_classification, sentiment_news_score,
-          macro_fed_rate, macro_cpi, macro_unemployment, macro_10y_yield
+          buy_rationalization, sell_rationalization
         ) VALUES (
           ?, ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?, ?, ?, ?,
@@ -942,10 +940,9 @@ export class EvolutionAgent implements DurableObject {
           ?, ?, ?,
           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?,
-          ?, ?,
-          ?, ?, ?, ?, ?,
-          ?, ?, ?, ?
+          ?, ?
         )
+        -- Note: Sentiment columns will be added back after migrations are verified
       `);
 
       const batch = trades.map(t => {
@@ -1036,18 +1033,8 @@ export class EvolutionAgent implements DurableObject {
           ind.at_support ? 1 : 0,
           // Rationalization
           JSON.stringify(t.buyRationalization),
-          JSON.stringify(t.sellRationalization),
-          // Sentiment Data
-          t.sentimentFearGreed ?? null,
-          t.sentimentOverall ?? null,
-          t.sentimentRegime ?? null,
-          t.sentimentClassification ?? null,
-          t.sentimentNewsScore ?? null,
-          // Macro Indicators
-          t.macroFedRate ?? null,
-          t.macroCPI ?? null,
-          t.macroUnemployment ?? null,
-          t.macro10yYield ?? null
+          JSON.stringify(t.sellRationalization)
+          // Note: Sentiment data binding will be added back after migrations are verified
         );
       });
 
