@@ -26,12 +26,20 @@ import { runCompetitionCycle } from './agent-competition';
 import { runModelResearch } from './model-research-agent';
 import { runCrossAgentLearning } from './cross-agent-learning';
 import { calculateAllIndicators, generateTradeRationalization, type TechnicalIndicators } from './technical-indicators';
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('EvolutionAgent', LogLevel.INFO);
+
+// Cloudflare AI binding interface
+interface CloudflareAI {
+  run(model: string, inputs: Record<string, unknown>): Promise<unknown>;
+}
 
 // Environment bindings interface
 interface Env {
   DB: D1Database;
   EVOLUTION_AGENT: DurableObjectNamespace;
-  AI?: any;
+  AI?: CloudflareAI;
   SENTIMENT_AGENT_URL?: string; // Optional: news-sentiment-agent worker URL
 }
 
@@ -73,6 +81,16 @@ interface ChaosTrade {
   macro10yYield?: number;
 }
 
+// Candle data structure
+interface Candle {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 // Market state at decision time
 export interface MarketState {
   price: number;
@@ -83,11 +101,19 @@ export interface MarketState {
   volatility: number;
 }
 
+// Pattern condition interface
+interface PatternCondition {
+  indicator: string;
+  operator: '>' | '<' | '>=' | '<=' | '==' | '!=';
+  value: number;
+  weight?: number;
+}
+
 // Discovered pattern structure
 interface Pattern {
   patternId: string;
   name: string;
-  conditions: any;
+  conditions: PatternCondition[] | Record<string, unknown>;
   winRate: number;
   sampleSize: number;
   discoveredAt: string;
@@ -99,17 +125,25 @@ interface Pattern {
 /**
  * Helper function to create error responses
  */
-function errorResponse(message: string, error: any, status: number = 500): Response {
-  console.error(`ERROR: ${message}`, error);
-  return new Response(JSON.stringify({
-    error: message,
-    details: error?.message || String(error),
-    stack: error?.stack,
-    timestamp: new Date().toISOString()
-  }, null, 2), {
-    status,
-    headers: { 'Content-Type': 'application/json' }
-  });
+function errorResponse(message: string, error: Error | unknown, status: number = 500): Response {
+  const err = error as Error;
+  logger.error(message, err);
+  return new Response(
+    JSON.stringify(
+      {
+        error: message,
+        details: err?.message || String(error),
+        stack: err?.stack,
+        timestamp: new Date().toISOString(),
+      },
+      null,
+      2
+    ),
+    {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
 }
 
 /**
@@ -122,7 +156,7 @@ export class EvolutionAgent implements DurableObject {
   private logs: string[] = [];
 
   constructor(state: DurableObjectState, env: Env) {
-    console.log('EvolutionAgent constructor called');
+    logger.info('EvolutionAgent constructor called');
     this.state = state;
     this.env = env;
     this.evolutionState = {
@@ -133,20 +167,20 @@ export class EvolutionAgent implements DurableObject {
       lastCycleAt: 'never',
       isRunning: false
     };
-    console.log('EvolutionAgent constructor completed');
+    logger.info('EvolutionAgent constructor completed');
   }
 
   async fetch(request: Request): Promise<Response> {
-    console.log(`Fetch called: ${request.url}`);
+    logger.info('Fetch called', { url: request.url });
 
     try {
       const url = new URL(request.url);
-      console.log(`Pathname: ${url.pathname}`);
+      logger.debug('Processing request', { pathname: url.pathname });
 
       // Load state from D1 database only on first access (when lastCycleAt is 'never')
       // After that, rely on in-memory state which is maintained by the Durable Object
       if (this.evolutionState.lastCycleAt === 'never') {
-        console.log('First access - loading stored state from D1...');
+        logger.info('First access - loading stored state from D1');
         try {
           const result = await this.env.DB.prepare(`
             SELECT value FROM system_state WHERE key = 'evolutionState'
@@ -154,19 +188,22 @@ export class EvolutionAgent implements DurableObject {
 
           if (result && result.value) {
             this.evolutionState = JSON.parse(result.value);
-            console.log('State loaded from D1:', JSON.stringify(this.evolutionState));
+            logger.info('State loaded from D1', {
+              totalCycles: this.evolutionState.totalCycles,
+              totalTrades: this.evolutionState.totalTrades,
+            });
           } else {
-            console.log('No stored state found in D1, using defaults');
+            logger.info('No stored state found in D1, using defaults');
           }
         } catch (error) {
-          console.error('Error loading state from D1:', error);
+          logger.error('Error loading state from D1', error as Error);
           this.evolutionState.lastError = `Failed to load state: ${error}`;
         }
       }
 
       // Debug endpoint
       if (url.pathname === '/debug') {
-        console.log('Debug endpoint called');
+        logger.debug('Debug endpoint called');
         return new Response(JSON.stringify({
           message: 'Debug information',
           state: this.evolutionState,
@@ -197,7 +234,7 @@ export class EvolutionAgent implements DurableObject {
 
       // Status endpoint
       if (url.pathname === '/status') {
-        console.log('Status endpoint called');
+        logger.debug('Status endpoint called');
         return new Response(JSON.stringify({
           status: 'running',
           ...this.evolutionState,
@@ -239,10 +276,10 @@ export class EvolutionAgent implements DurableObject {
 
       // Trigger endpoint
       if (url.pathname === '/trigger') {
-        console.log('Trigger endpoint called');
+        logger.info('Trigger endpoint called');
 
         if (this.evolutionState.isRunning) {
-          console.log('Cycle already running');
+          logger.warn('Cycle already running');
           return new Response(JSON.stringify({
             error: 'Cycle already running',
             state: this.evolutionState
@@ -253,9 +290,9 @@ export class EvolutionAgent implements DurableObject {
         }
 
         // Start evolution in background
-        console.log('Starting evolution cycle...');
-        this.runEvolutionCycle().catch(error => {
-          console.error('Evolution cycle failed:', error);
+        logger.info('Starting evolution cycle');
+        this.runEvolutionCycle().catch((error) => {
+          logger.error('Evolution cycle failed', error as Error);
           this.evolutionState.lastError = String(error);
         });
 
@@ -340,7 +377,7 @@ export class EvolutionAgent implements DurableObject {
 
           // Simple query that works with old schema
           let query = 'SELECT * FROM discovered_patterns WHERE number_of_runs >= ? ORDER BY votes DESC LIMIT ?';
-          const params: any[] = [minRuns, limit];
+          const params: (number | string)[] = [minRuns, limit];
 
           const patterns = await this.env.DB.prepare(query).bind(...params).all();
 
@@ -828,7 +865,7 @@ export class EvolutionAgent implements DurableObject {
   /**
    * Calculate real market indicators from historical candle data
    */
-  private calculateMarketState(candles: any[], index: number): MarketState {
+  private calculateMarketState(candles: Candle[], index: number): MarketState {
     const current = candles[index];
 
     // Calculate momentum (1 tick = 5 minutes)
