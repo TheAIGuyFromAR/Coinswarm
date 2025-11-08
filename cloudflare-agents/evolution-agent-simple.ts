@@ -957,6 +957,12 @@ export class EvolutionAgent implements DurableObject {
   async storeTrades(trades: ChaosTrade[]): Promise<void> {
     logger.info('Storing trades with indicators in D1', { count: trades.length });
 
+    // Skip if no trades to store
+    if (!trades || trades.length === 0) {
+      logger.warn('No trades to store, skipping batch insert');
+      return;
+    }
+
     try {
       if (!this.env.DB) {
         throw new Error('D1 database binding not found');
@@ -1162,7 +1168,8 @@ export class EvolutionAgent implements DurableObject {
           sampleSize: winners.results.length + losers.results.length,
           discoveredAt: new Date().toISOString(),
           tested: false,
-          votes: 0
+          votes: 0,
+          origin: 'CHAOS'
         };
         patternsFound.push(pattern);
         this.log(`✓ Found momentum pattern: ${pattern.name} (${(momentumDiff*100).toFixed(3)}% diff)`);
@@ -1180,7 +1187,8 @@ export class EvolutionAgent implements DurableObject {
           sampleSize: winners.results.length + losers.results.length,
           discoveredAt: new Date().toISOString(),
           tested: false,
-          votes: 0
+          votes: 0,
+          origin: 'CHAOS'
         };
         patternsFound.push(pattern);
         this.log(`✓ Found volatility pattern: ${pattern.name} (${(volatilityDiff*100).toFixed(3)}% diff)`);
@@ -1198,7 +1206,8 @@ export class EvolutionAgent implements DurableObject {
           sampleSize: winners.results.length + losers.results.length,
           discoveredAt: new Date().toISOString(),
           tested: false,
-          votes: 0
+          votes: 0,
+          origin: 'CHAOS'
         };
         patternsFound.push(pattern);
         this.log(`✓ Found SMA10 pattern: ${pattern.name} (${(sma10Diff*100).toFixed(3)}% diff)`);
@@ -1237,7 +1246,8 @@ export class EvolutionAgent implements DurableObject {
                   sampleSize: winners.results.length + losers.results.length,
                   discoveredAt: new Date().toISOString(),
                   tested: false,
-                  votes: 0
+                  votes: 0,
+                  origin: 'CHAOS'
                 };
                 patternsFound.push(pattern);
                 logger.info('AI discovered pattern', {
@@ -1303,13 +1313,22 @@ export class EvolutionAgent implements DurableObject {
       const stmt = this.env.DB.prepare(`
         INSERT OR IGNORE INTO discovered_patterns (
           pattern_id, name, conditions, win_rate, sample_size,
-          discovered_at, tested, votes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          discovered_at, tested, votes, origin
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       const batch = patterns.map(p =>
-        stmt.bind(p.patternId, p.name, JSON.stringify(p.conditions),
-                  p.winRate, p.sampleSize, p.discoveredAt, p.tested ? 1 : 0, p.votes)
+        stmt.bind(
+          p.patternId,
+          p.name,
+          JSON.stringify(p.conditions),
+          p.winRate,
+          p.sampleSize,
+          p.discoveredAt,
+          p.tested ? 1 : 0,
+          p.votes,
+          p.origin || 'CHAOS'  // Default to CHAOS if not specified
+        )
       );
 
       await this.env.DB.batch(batch);
