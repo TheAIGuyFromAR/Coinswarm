@@ -19,7 +19,13 @@
  * - "Volume spike + extreme greed = 45% win rate (avoid)"
  */
 
-import { Env } from './types';
+// Environment bindings interface
+interface Env {
+  DB: D1Database;
+  SENTIMENT_CACHE?: KVNamespace;
+  CRYPTOCOMPARE_API_KEY?: string;
+  FRED_API_KEY?: string;
+}
 
 // ============================================================================
 // Data Structures

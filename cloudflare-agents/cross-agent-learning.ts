@@ -19,7 +19,7 @@
  * - Original insight now helps entire population
  */
 
-import { Env } from './types';
+// No imports needed - D1Database is globally available in Cloudflare Workers
 
 interface KnowledgeItem {
   knowledge_id: string;
