@@ -40,6 +40,11 @@ binding = "ASSETS"
 [observability]
 enabled = true
 
+# Cron triggers for evolution cycles
+# Run evolution cycle every minute to keep data fresh
+[triggers]
+crons = ["* * * * *"]  # Every minute
+
 # Environment variables
 # Set in .dev.vars for local development or Cloudflare dashboard for production
 # OPENAI_API_KEY=xxx (if using OpenAI models)

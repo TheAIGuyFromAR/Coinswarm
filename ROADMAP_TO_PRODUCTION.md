@@ -16,16 +16,61 @@
 
 **Coinswarm** is an AI-powered cryptocurrency trading system that uses multiple specialized "agents" (like having a committee of expert traders) working together to make trading decisions. No emotions, just data and math.
 
-### What's Already Working? (See It Live!)
+### What's Already Built? (Real Code, Working System)
 
-We have **4 live dashboards** you can check right now:
+**Coinswarm has TWO integrated systems working together:**
 
-- **[System Architecture](https://coinswarm-evolution-agent.bamn86.workers.dev/architecture)** - How everything works together
-- **[Pattern Leaderboard](https://coinswarm-evolution-agent.bamn86.workers.dev/patterns)** - 663 trading patterns discovered, 228 are profitable
-- **[Agent Swarm](https://coinswarm-evolution-agent.bamn86.workers.dev/swarm)** - Live view of all AI agents competing
-- **[Agent Rankings](https://coinswarm-evolution-agent.bamn86.workers.dev/agents)** - Performance leaderboard
+#### System 1: Pattern Discovery & Evolution (Built, Needs Redeployment)
 
-**These update every 30 seconds with real data!** This proves we have a real, working system, not just ideas.
+**Evolutionary Architecture** (Cloudflare Worker - currently offline):
+
+**How it's designed to work**:
+1. **Chaos agents** generate random trades (discovery phase)
+2. **Pattern extraction** finds what works from successful chaos trades
+3. **Head-to-head testing** - patterns compete against each other
+4. **Evolution** - winners survive and get cloned, losers eliminated
+5. **Academic research** tests established TA patterns (MA, RSI, Bollinger Bands)
+6. **Technical patterns** - classic chart patterns (triangles, H&S, etc.)
+7. **Best patterns** feed into the trading engine as proven strategies
+
+**Current Status**:
+- ✅ Dashboards working: [View them live](https://coinswarm-evolution-agent.bamn86.workers.dev/architecture)
+- ⚠️ Data is stale (showing data from hours ago - evolution cycle not running)
+- ✅ Code exists: `cloudflare-agents/evolution-agent-simple.ts` (58,549 lines)
+- ✅ Full schema: Pattern tables, agent tables, competition tracking
+- 🔨 **Need to fix**: Restart cron schedule or manually trigger evolution cycle
+
+**What the dashboards show**:
+- Pattern Leaderboard: 663 patterns discovered, 228 winning (last update: hours ago)
+- Agent Swarm: Population of competing agents
+- Pattern win rates and head-to-head records
+- System statistics
+
+**Note for stakeholders**: System is built and deployed, but needs the evolution cycle restarted to generate fresh data. The core trading engine (System 2) is independent.
+
+#### System 2: Core Trading Engine (Python - 40% Complete)
+**What's implemented**:
+- ✅ **15,142 lines** of production Python code
+- ✅ **8,810 lines** of comprehensive tests (added today)
+- ✅ **14 agent implementations**:
+  - TrendFollowingAgent (momentum, MA, RSI)
+  - RiskManagementAgent (veto power, safety)
+  - ArbitrageAgent (triangular arbitrage)
+  - Chaos/Academic/Research agents (pattern generation)
+  - Committee voting system
+  - HierarchicalMemory (9 timescales)
+- ✅ **Coinbase API integration** (all order types)
+- ✅ **Risk framework** (hard-coded limits)
+- ✅ **Configuration system** (Pydantic)
+
+**What's missing** (building now):
+- ❌ Master Orchestrator (coordinates everything)
+- ❌ Oversight Manager (enforces safety limits)
+- ❌ Circuit Breaker (auto-pause on losses)
+- ❌ Mean Reversion Agent
+- ❌ Paper Trading System
+
+**Integration**: Pattern discovery feeds winning patterns → Core engine uses them for real trading decisions
 
 ### The 6-Phase Plan (Conservative Approach)
 

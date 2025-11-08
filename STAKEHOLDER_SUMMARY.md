@@ -16,27 +16,44 @@
 
 ---
 
-## 📊 What's Already Working - Live Dashboards
+## 📊 What's Already Built - TWO Working Systems
 
-We have **4 live dashboards** showing real-time data from the evolution system:
+### System 1: Pattern Discovery & Evolution (Deployed on Cloudflare)
+
+**4 Live Dashboards** (showing data from earlier - evolution cycle needs restart):
 
 ### [🏗️ System Architecture Dashboard](https://coinswarm-evolution-agent.bamn86.workers.dev/architecture)
-**What it shows**: Visual diagram of how all the AI agents work together in a 3-layer system
-- **Why it matters**: Demonstrates we have a real, working system (not just ideas)
+**What it shows**: 3-layer evolutionary system architecture
+- **Why it matters**: Shows the chaos → pattern → evolution flow
 
 ### [📈 Pattern Leaderboard Dashboard](https://coinswarm-evolution-agent.bamn86.workers.dev/patterns)
-**What it shows**: 663 trading patterns discovered, 228 are profitable
-- **Why it matters**: The AI is already finding patterns that work in backtests
+**What it shows**: 663 patterns discovered, 228 profitable
+- **Why it matters**: AI is finding patterns that work
 
 ### [🐝 Agent Swarm Dashboard](https://coinswarm-evolution-agent.bamn86.workers.dev/swarm)
-**What it shows**: Live view of all AI trading agents competing
-- **Why it matters**: Shows the "evolution" part - agents compete, winners survive, losers are eliminated
+**What it shows**: Population of competing agents
+- **Why it matters**: Evolution in action - winners survive, losers eliminated
 
 ### [🏆 Agent Leaderboard Dashboard](https://coinswarm-evolution-agent.bamn86.workers.dev/agents)
-**What it shows**: Rankings of agents by performance
-- **Why it matters**: Proves we can measure and track what's working
+**What it shows**: Agent performance rankings
+- **Why it matters**: Measurable, trackable results
 
-**These dashboards update every 30 seconds with real data!**
+**How it works**: Chaos agents make random trades → Extract patterns from winners → Patterns compete → Best patterns become strategies
+
+**Current status**: Deployed (58,549 lines of TypeScript code), but data is stale - needs evolution cycle restarted
+
+### System 2: Core Trading Engine (Python - 40% Complete)
+
+**Production-quality code**:
+- ✅ 15,142 lines of Python
+- ✅ 8,810 lines of tests (added today)
+- ✅ 14 agent implementations
+- ✅ Committee voting system
+- ✅ Coinbase API integration
+- ✅ Risk management framework
+- ✅ Hierarchical memory system
+
+**This is the engine that will execute real trades** using patterns discovered by System 1
 
 ---
 

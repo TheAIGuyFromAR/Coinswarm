@@ -1515,6 +1515,35 @@ export default {
     } catch (error) {
       return errorResponse('Worker fetch failed', error);
     }
+  },
+
+  // Scheduled handler for cron triggers
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    logger.info('Cron triggered evolution cycle');
+
+    try {
+      // Validate environment
+      if (!env.EVOLUTION_AGENT || !env.DB) {
+        logger.error('Missing required bindings in scheduled handler');
+        return;
+      }
+
+      // Get Durable Object instance
+      const id = env.EVOLUTION_AGENT.idFromName('main-evolution-agent');
+      const agent = env.EVOLUTION_AGENT.get(id);
+
+      // Trigger evolution cycle via fetch to /trigger endpoint
+      const triggerRequest = new Request('http://internal/trigger', {
+        method: 'POST'
+      });
+
+      // Use waitUntil to allow the operation to complete
+      ctx.waitUntil(agent.fetch(triggerRequest));
+
+      logger.info('Evolution cycle triggered via cron');
+    } catch (error) {
+      logger.error('Cron trigger failed', { error });
+    }
   }
 };
 
