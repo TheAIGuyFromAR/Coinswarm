@@ -7,6 +7,35 @@
  */
 
 import { generatePatternId } from './ai-pattern-analyzer';
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('ModelResearchAgent', LogLevel.INFO);
+
+// Paper interface
+interface ResearchPaper {
+  title: string;
+  summary: string;
+  published: string;
+  link: string;
+}
+
+// HuggingFace Model interface
+interface HFModel {
+  modelId?: string;
+  downloads?: number;
+  likes?: number;
+  tags?: string[];
+  id?: string;
+}
+
+// Finding interface
+interface ResearchFinding {
+  source: string;
+  title: string;
+  description: string;
+  relevance: string;
+  link?: string;
+}
 
 interface AIModel {
   model_id: string;
@@ -41,21 +70,21 @@ interface ModelTestResult {
 /**
  * Search arXiv for recent AI model papers
  */
-export async function searchArXiv(query: string = 'large language model trading'): Promise<any[]> {
+export async function searchArXiv(query: string = 'large language model trading'): Promise<ResearchPaper[]> {
   try {
     const response = await fetch(
       `http://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=20&sortBy=submittedDate&sortOrder=descending`
     );
 
     if (!response.ok) {
-      console.error('arXiv API error:', response.status);
+      logger.error('arXiv API error', { status: response.status });
       return [];
     }
 
     const xml = await response.text();
 
     // Parse XML to extract papers (basic parsing)
-    const papers: any[] = [];
+    const papers: ResearchPaper[] = [];
     const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
     let match;
 
@@ -78,7 +107,7 @@ export async function searchArXiv(query: string = 'large language model trading'
 
     return papers;
   } catch (error) {
-    console.error('Error searching arXiv:', error);
+    logger.error('Error searching arXiv', error instanceof Error ? error : new Error(String(error)));
     return [];
   }
 }
@@ -100,7 +129,7 @@ export async function searchGoogleScholar(query: string = 'AI trading models'): 
       note: 'Manual review recommended - visit URL to see latest papers'
     }];
   } catch (error) {
-    console.error('Error searching Google Scholar:', error);
+    logger.error('Error searching Google Scholar', error instanceof Error ? error : new Error(String(error)));
     return [];
   }
 }
@@ -120,7 +149,7 @@ export async function searchPapersWithCode(task: string = 'reasoning'): Promise<
       note: 'Check for latest SOTA models in reasoning tasks'
     }];
   } catch (error) {
-    console.error('Error searching Papers with Code:', error);
+    logger.error('Error searching Papers with Code', error instanceof Error ? error : new Error(String(error)));
     return [];
   }
 }
@@ -141,14 +170,14 @@ export async function searchHuggingFaceModels(query: string = 'trading reasoning
     );
 
     if (!response.ok) {
-      console.error('HuggingFace API error:', response.status);
+      logger.error('HuggingFace API error', { status: response.status });
       return [];
     }
 
     const models = await response.json();
 
     // Filter for promising models
-    const promising = models.filter((m: any) => {
+    const promising = (models as HFModel[]).filter((m) => {
       const name = m.id.toLowerCase();
       return (
         // Look for reasoning, chat, or instruction-tuned models
@@ -162,7 +191,7 @@ export async function searchHuggingFaceModels(query: string = 'trading reasoning
 
     return promising.slice(0, 20);
   } catch (error) {
-    console.error('Error searching HuggingFace:', error);
+    logger.error('Error searching HuggingFace', error instanceof Error ? error : new Error(String(error)));
     return [];
   }
 }
@@ -184,7 +213,7 @@ export async function searchFinancialModels(): Promise<any[]> {
     'llm financial analysis'
   ];
 
-  const allFindings: any[] = [];
+  const allFindings: ResearchFinding[] = [];
 
   for (const query of searches) {
     const hfResults = await searchHuggingFaceModels(query);
@@ -252,10 +281,10 @@ export async function checkKnownFinancialModels(): Promise<any[]> {
     }
   ];
 
-  const findings: any[] = [];
+  const findings: ResearchFinding[] = [];
 
   for (const model of knownModels) {
-    console.log(`   🔍 Checking for ${model.name}...`);
+    logger.info('Checking for known model', { model_name: model.name });
 
     // Search HuggingFace for this specific model
     for (const term of model.search_terms) {
@@ -317,9 +346,9 @@ export async function getCloudflareModels(): Promise<string[]> {
  * Test a model's reasoning ability with trading scenarios
  */
 export async function testModelReasoning(
-  ai: any,
+  ai: { run(model: string, inputs: Record<string, unknown>): Promise<{ response?: string }> },
   modelName: string,
-  db: any
+  db: D1Database
 ): Promise<ModelTestResult> {
   const testPrompts = [
     {
@@ -360,7 +389,7 @@ What's happening and what should a conservative trader do? JSON:
 
   let totalScore = 0;
   let totalTime = 0;
-  const results: any[] = [];
+  const results: { prompt: string; response: string; quality: number }[] = [];
 
   for (const test of testPrompts) {
     const startTime = Date.now();
@@ -421,7 +450,11 @@ What's happening and what should a conservative trader do? JSON:
       });
 
     } catch (error) {
-      console.error(`Model ${modelName} failed test ${test.type}:`, error);
+      logger.error('Model test failed', {
+        model: modelName,
+        test_type: test.type,
+        error: error instanceof Error ? error.message : String(error)
+      });
       results.push({
         test_type: test.type,
         score: 0,
@@ -471,14 +504,14 @@ What's happening and what should a conservative trader do? JSON:
 /**
  * Test all Cloudflare models and find the best one
  */
-export async function benchmarkAllModels(ai: any, db: any): Promise<any[]> {
+export async function benchmarkAllModels(ai: { run(model: string, inputs: Record<string, unknown>): Promise<{ response?: string }> }, db: D1Database): Promise<ModelTestResult[]> {
   const models = await getCloudflareModels();
-  const results: any[] = [];
+  const results: ModelTestResult[] = [];
 
-  console.log(`\n🔬 Benchmarking ${models.length} models for trading reasoning...`);
+  logger.info('Starting model benchmark', { model_count: models.length });
 
   for (const modelName of models) {
-    console.log(`   Testing ${modelName}...`);
+    logger.info('Testing model', { model: modelName });
 
     try {
       const result = await testModelReasoning(ai, modelName, db);
@@ -488,13 +521,20 @@ export async function benchmarkAllModels(ai: any, db: any): Promise<any[]> {
         speed: result.response_time_ms
       });
 
-      console.log(`   └─ Score: ${result.reasoning_quality.toFixed(1)}/100 | Speed: ${result.response_time_ms}ms`);
+      logger.info('Model test complete', {
+        model: modelName,
+        score: result.reasoning_quality.toFixed(1),
+        speed_ms: result.response_time_ms
+      });
 
       // Wait between tests to avoid rate limits
       await new Promise(resolve => setTimeout(resolve, 2000));
 
     } catch (error) {
-      console.error(`   └─ Error testing ${modelName}:`, error);
+      logger.error('Error testing model', {
+        model: modelName,
+        error: error instanceof Error ? error.message : String(error)
+      });
       results.push({
         model: modelName,
         score: 0,
@@ -506,9 +546,13 @@ export async function benchmarkAllModels(ai: any, db: any): Promise<any[]> {
   // Sort by score
   results.sort((a, b) => b.score - a.score);
 
-  console.log('\n📊 Benchmark Results:');
-  results.slice(0, 5).forEach((r, i) => {
-    console.log(`   ${i + 1}. ${r.model}: ${r.score.toFixed(1)}/100 (${r.speed}ms)`);
+  logger.info('Benchmark results', {
+    top_5: results.slice(0, 5).map((r, i) => ({
+      rank: i + 1,
+      model: r.model,
+      score: r.score.toFixed(1),
+      speed_ms: r.speed
+    }))
   });
 
   return results;
@@ -517,7 +561,7 @@ export async function benchmarkAllModels(ai: any, db: any): Promise<any[]> {
 /**
  * Get current best model
  */
-export async function getBestModel(db: any): Promise<string> {
+export async function getBestModel(db: D1Database): Promise<string> {
   const result = await db.prepare(`
     SELECT model_id, reasoning_quality
     FROM model_test_results
@@ -532,20 +576,24 @@ export async function getBestModel(db: any): Promise<string> {
 /**
  * Run model research cycle - searches for new models and tests them
  */
-export async function runModelResearch(ai: any, db: any): Promise<void> {
-  console.log('\n🔬 MODEL RESEARCH AGENT ACTIVATED');
+export async function runModelResearch(
+  ai: { run(model: string, inputs: Record<string, unknown>): Promise<{ response?: string }> },
+  db: D1Database
+): Promise<void> {
+  logger.info('Model research agent activated');
 
   // 1. Check for known financial/time series models
-  console.log('💰 Checking for known financial & time series models...');
+  logger.info('Checking for known financial & time series models');
   const financialModels = await checkKnownFinancialModels();
 
   if (financialModels.length > 0) {
-    console.log(`\n   Found ${financialModels.length} financial models:`);
-    financialModels.forEach((m: any) => {
-      console.log(`   ✓ ${m.model_name}: ${m.description}`);
-      if (m.results && m.results.length > 0) {
-        console.log(`     └─ Available: ${m.results[0].id}`);
-      }
+    logger.info('Found financial models', {
+      count: financialModels.length,
+      models: (financialModels as HFModel[]).map((m) => ({
+        name: m.model_name,
+        description: m.description,
+        available: m.results && m.results.length > 0 ? m.results[0].id : null
+      }))
     });
 
     // Store findings
@@ -560,14 +608,17 @@ export async function runModelResearch(ai: any, db: any): Promise<void> {
   }
 
   // 2. Search arXiv for recent financial AI papers
-  console.log('\n📚 Searching arXiv for recent financial AI research...');
+  logger.info('Searching arXiv for recent financial AI research');
   const arxivPapers = await searchArXiv('deep learning time series forecasting');
 
   if (arxivPapers.length > 0) {
-    console.log(`   Found ${arxivPapers.length} recent papers:`);
-    arxivPapers.slice(0, 3).forEach((p: any) => {
-      console.log(`   - ${p.title}`);
-      console.log(`     Published: ${p.published.substring(0, 10)} | ${p.link}`);
+    logger.info('Found arXiv papers', {
+      count: arxivPapers.length,
+      top_papers: (arxivPapers as ResearchPaper[]).slice(0, 3).map((p) => ({
+        title: p.title,
+        published: p.published.substring(0, 10),
+        link: p.link
+      }))
     });
 
     // Store findings
@@ -585,14 +636,16 @@ export async function runModelResearch(ai: any, db: any): Promise<void> {
   }
 
   // 3. Search HuggingFace for new models
-  console.log('\n🤗 Searching HuggingFace for trading models...');
+  logger.info('Searching HuggingFace for trading models');
   const hfModels = await searchHuggingFaceModels('time series forecasting');
-  console.log(`   Found ${hfModels.length} potential models`);
+  logger.info('HuggingFace search complete', { count: hfModels.length });
 
   if (hfModels.length > 0) {
-    console.log('\n   Top findings:');
-    hfModels.slice(0, 5).forEach((m: any) => {
-      console.log(`   - ${m.id} (${m.downloads} downloads)`);
+    logger.info('Top HuggingFace models', {
+      models: (hfModels as HFModel[]).slice(0, 5).map((m) => ({
+        id: m.id,
+        downloads: m.downloads
+      }))
     });
 
     // Store findings
@@ -606,7 +659,7 @@ export async function runModelResearch(ai: any, db: any): Promise<void> {
         source: 'huggingface',
         query: 'time series forecasting',
         results_count: hfModels.length,
-        top_models: hfModels.slice(0, 5).map((m: any) => ({
+        top_models: (hfModels as HFModel[]).slice(0, 5).map((m) => ({
           id: m.id,
           downloads: m.downloads
         }))
@@ -625,23 +678,25 @@ export async function runModelResearch(ai: any, db: any): Promise<void> {
     999;
 
   if (daysSinceLastBenchmark > 7) {
-    console.log('\n🧪 Running full model benchmark (last run: ' +
-      (daysSinceLastBenchmark < 999 ? `${daysSinceLastBenchmark.toFixed(0)} days ago` : 'never') + ')');
+    logger.info('Running full model benchmark', {
+      last_run_days_ago: daysSinceLastBenchmark < 999 ? daysSinceLastBenchmark.toFixed(0) : 'never'
+    });
 
     await benchmarkAllModels(ai, db);
   } else {
-    console.log(`\n✓ Skipping benchmark (last run ${daysSinceLastBenchmark.toFixed(0)} days ago)`);
+    logger.info('Skipping benchmark', { last_run_days_ago: daysSinceLastBenchmark.toFixed(0) });
   }
 
   // 5. Get current best model
   const bestModel = await getBestModel(db);
-  console.log(`\n🏆 Current best model for trading: ${bestModel}`);
+  logger.info('Current best model for trading', { model: bestModel });
 
   // 6. Provide research summary
-  console.log('\n📊 Research Recommendations:');
-  console.log('   - For time series: Consider Chronos, TimesFM, or TFT models');
-  console.log('   - For financial reasoning: Check FinGPT, BloombergGPT papers');
-  console.log('   - For general reasoning: Continue with Llama 3.1-8B or test Mistral variants');
+  logger.info('Research recommendations', {
+    time_series: 'Consider Chronos, TimesFM, or TFT models',
+    financial_reasoning: 'Check FinGPT, BloombergGPT papers',
+    general_reasoning: 'Continue with Llama 3.1-8B or test Mistral variants'
+  });
 
   // 7. Store research completion
   await db.prepare(`
@@ -657,7 +712,11 @@ export async function runModelResearch(ai: any, db: any): Promise<void> {
     })
   ).run();
 
-  console.log('✓ Model research cycle complete\n');
+  logger.info('Model research cycle complete', {
+    best_model: bestModel,
+    financial_models_found: financialModels.length,
+    papers_reviewed: arxivPapers.length
+  });
 }
 
 export { AIModel, ModelTestResult };
