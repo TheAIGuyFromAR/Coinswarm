@@ -6,6 +6,7 @@ on:
       - claude/debug-cloudflare-historical-data-011CUqugUynEoovcsiVnoaPB
       - claude/review-codebase-docs-workers-011CUu5WhXjGVdghJyJh81Dh
       - claude/incomplete-description-011CUutLehm75rEefmt5WYQj
+      - claude/full-code-review-011CUvqUcjpgrh9x49XzAs2v
       - main
       - master
     paths:
