@@ -43,6 +43,19 @@ interface Env {
   SENTIMENT_AGENT_URL?: string; // Optional: news-sentiment-agent worker URL
 }
 
+// Sentiment data structure from news-sentiment-agent
+interface SentimentData {
+  fear_greed_classification: string;
+  fear_greed_index: number;
+  market_regime: string;
+  overall_sentiment: number;
+  news_sentiment: number;
+  macro_indicators?: Array<{
+    indicator_code: string;
+    value: number;
+  }>;
+}
+
 // Agent state interface
 interface EvolutionState {
   totalCycles: number;
@@ -577,26 +590,34 @@ export class EvolutionAgent implements DurableObject {
       // Step 4: Academic research (every 20 cycles)
       if (this.evolutionState.totalCycles % 20 === 0) {
         this.log('Step 4: Running academic research...');
-        try {
-          const academicPatterns = await runAcademicResearch(this.env.AI, this.env.DB);
-          this.log(`✓ Academic research: ${academicPatterns} patterns generated`);
-          this.evolutionState.patternsDiscovered += academicPatterns;
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          this.log(`❌ Academic research failed: ${errorMsg}`);
+        if (!this.env.AI) {
+          this.log('⚠️  AI not available, skipping academic research');
+        } else {
+          try {
+            const academicPatterns = await runAcademicResearch(this.env.AI, this.env.DB);
+            this.log(`✓ Academic research: ${academicPatterns} patterns generated`);
+            this.evolutionState.patternsDiscovered += academicPatterns;
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            this.log(`❌ Academic research failed: ${errorMsg}`);
+          }
         }
       }
 
       // Step 5: Technical research (every 15 cycles)
       if (this.evolutionState.totalCycles % 15 === 0) {
         this.log('Step 5: Running technical patterns research...');
-        try {
-          const technicalPatterns = await runTechnicalResearch(this.env.AI, this.env.DB);
-          this.log(`✓ Technical research: ${technicalPatterns} patterns generated`);
-          this.evolutionState.patternsDiscovered += technicalPatterns;
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          this.log(`❌ Technical research failed: ${errorMsg}`);
+        if (!this.env.AI) {
+          this.log('⚠️  AI not available, skipping technical research');
+        } else {
+          try {
+            const technicalPatterns = await runTechnicalResearch(this.env.AI, this.env.DB);
+            this.log(`✓ Technical research: ${technicalPatterns} patterns generated`);
+            this.evolutionState.patternsDiscovered += technicalPatterns;
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            this.log(`❌ Technical research failed: ${errorMsg}`);
+          }
         }
       }
 
@@ -619,12 +640,16 @@ export class EvolutionAgent implements DurableObject {
       // Step 7: Reasoning agent competition (every 10 cycles)
       if (this.evolutionState.totalCycles % 10 === 0 && this.evolutionState.patternsDiscovered >= 5) {
         this.log('Step 7: Running reasoning agent competition...');
-        try {
-          await runCompetitionCycle(this.env.AI, this.env.DB, this.evolutionState.totalCycles);
-          this.log('✓ Reasoning agent competition complete');
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          this.log(`❌ Reasoning agent competition failed: ${errorMsg}`);
+        if (!this.env.AI) {
+          this.log('⚠️  AI not available, skipping agent competition');
+        } else {
+          try {
+            await runCompetitionCycle(this.env.AI, this.env.DB, this.evolutionState.totalCycles);
+            this.log('✓ Reasoning agent competition complete');
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            this.log(`❌ Reasoning agent competition failed: ${errorMsg}`);
+          }
         }
       }
 
@@ -643,12 +668,16 @@ export class EvolutionAgent implements DurableObject {
       // Step 8: Model research agent (every 50 cycles)
       if (this.evolutionState.totalCycles % 50 === 0) {
         this.log('Step 8: Running model research...');
-        try {
-          await runModelResearch(this.env.AI, this.env.DB);
-          this.log('✓ Model research complete');
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          this.log(`❌ Model research failed: ${errorMsg}`);
+        if (!this.env.AI) {
+          this.log('⚠️  AI not available, skipping model research');
+        } else {
+          try {
+            await runModelResearch(this.env.AI, this.env.DB);
+            this.log('✓ Model research complete');
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            this.log(`❌ Model research failed: ${errorMsg}`);
+          }
         }
       }
 
@@ -687,7 +716,7 @@ export class EvolutionAgent implements DurableObject {
    * Fetch current sentiment data from news-sentiment-agent
    * Returns null if sentiment agent is not configured or fails
    */
-  private async fetchSentimentData(): Promise<any | null> {
+  private async fetchSentimentData(): Promise<SentimentData | null> {
     if (!this.env.SENTIMENT_AGENT_URL) {
       this.log('Sentiment agent URL not configured, skipping sentiment data');
       return null;
@@ -706,7 +735,7 @@ export class EvolutionAgent implements DurableObject {
         return null;
       }
 
-      const data = await response.json();
+      const data = await response.json() as SentimentData;
       this.log(`✓ Fetched sentiment: ${data.fear_greed_classification} (${data.fear_greed_index}), Regime: ${data.market_regime}`);
       return data;
     } catch (error) {

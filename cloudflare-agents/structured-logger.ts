@@ -19,7 +19,7 @@ export interface LogContext {
   cycle?: number;
   pair?: string;
   request_id?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface LogEntry {
@@ -187,7 +187,7 @@ export function createLegacyLogger(workerName: string) {
   const logger = createLogger(workerName);
 
   return {
-    log: (message: string, ...args: any[]) => {
+    log: (message: string, ...args: unknown[]) => {
       if (args.length > 0) {
         logger.info(message, { args });
       } else {
@@ -201,10 +201,10 @@ export function createLegacyLogger(workerName: string) {
         logger.error(message);
       }
     },
-    warn: (message: string, context?: any) => {
+    warn: (message: string, context?: LogContext) => {
       logger.warn(message, context);
     },
-    info: (message: string, context?: any) => {
+    info: (message: string, context?: LogContext) => {
       logger.info(message, context);
     },
   };

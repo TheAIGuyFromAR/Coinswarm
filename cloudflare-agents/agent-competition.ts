@@ -35,9 +35,21 @@ interface CompetitionResult {
 interface RankingResult {
   agent_id: string;
   agent_name: string;
+  personality: string;
+  generation: number;
   roi: number;
+  total_roi: number;
+  win_rate: number;
   trades: number;
-  rank: number;
+  rank?: number;
+}
+
+interface RankedAgent {
+  agent_id: string;
+  agent_name: string;
+  fitness_score: number;
+  personality: string;
+  generation: number;
 }
 
 /**
@@ -124,7 +136,7 @@ export async function getActiveAgents(db: D1Database): Promise<TradingAgent[]> {
     ORDER BY fitness_score DESC
   `).all();
 
-  return result.results || [];
+  return (result.results || []) as unknown as TradingAgent[];
 }
 
 /**
@@ -331,7 +343,7 @@ export async function runAgentCompetition(
       agent_name: r.agent_name,
       roi: r.total_roi,
       trades: r.trades,
-      rank: r.rank
+      rank: r.rank || 0
     }))
   };
 }
@@ -364,12 +376,13 @@ export async function evolveAgentPopulation(
     ORDER BY fitness_score DESC
   `).all();
 
-  const totalAgents = rankedAgents.results.length;
+  const rankedList = (rankedAgents.results || []) as unknown as RankedAgent[];
+  const totalAgents = rankedList.length;
   const eliminateCount = Math.max(1, Math.floor(totalAgents * 0.2));
   const cloneCount = eliminateCount; // Keep population constant
 
   // Eliminate bottom performers
-  const toEliminate = rankedAgents.results.slice(-eliminateCount);
+  const toEliminate = rankedList.slice(-eliminateCount);
   const eliminatedIds: string[] = [];
 
   logger.info('Eliminating bottom agents', {
@@ -392,7 +405,7 @@ export async function evolveAgentPopulation(
   }
 
   // Clone top performers with mutations
-  const toClone = rankedAgents.results.slice(0, cloneCount);
+  const toClone = rankedList.slice(0, cloneCount);
   const clonedIds: string[] = [];
 
   logger.info('Cloning top agents with mutations', { count: cloneCount });
@@ -514,4 +527,4 @@ export async function runCompetitionCycle(
   });
 }
 
-export { CompetitionResult };
+export type { CompetitionResult };
