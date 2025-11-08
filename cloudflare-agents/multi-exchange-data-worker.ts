@@ -20,6 +20,10 @@
  * - GET /compare - Compare prices across exchanges
  */
 
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('MultiExchangeDataWorker', LogLevel.INFO);
+
 interface Env {
   HISTORICAL_PRICES: KVNamespace;
 }
@@ -41,6 +45,43 @@ interface HistoricalDataset {
   endTime: number;
   candles: OHLCVCandle[];
   fetchedAt: string;
+}
+
+interface CoinbaseCandle {
+  0: number; // timestamp
+  1: number; // low
+  2: number; // high
+  3: number; // open
+  4: number; // close
+  5: number; // volume
+}
+
+interface BinanceKline {
+  0: number; // open time
+  1: string; // open
+  2: string; // high
+  3: string; // low
+  4: string; // close
+  5: string; // volume
+  6: number; // close time
+}
+
+interface DatasetIndex {
+  startTime: number;
+  endTime: number;
+  candleCount: number;
+}
+
+interface FetchRequestBody {
+  interval?: string;
+}
+
+interface FetchResult {
+  exchange: string;
+  pair: string;
+  success: boolean;
+  candleCount?: number;
+  error?: string;
 }
 
 /**
@@ -74,7 +115,7 @@ class CoinbaseClient {
       throw new Error(`Coinbase API error: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json() as any[];
+    const data = await response.json() as CoinbaseCandle[];
 
     // Coinbase format: [timestamp, low, high, open, close, volume]
     return data.map(c => ({
@@ -121,7 +162,12 @@ class CoinbaseClient {
         await this.sleep(100);
 
       } catch (error) {
-        console.error(`Error fetching ${productId} ${currentStart}-${batchEnd}:`, error);
+        logger.error('Error fetching Coinbase batch', {
+          product_id: productId,
+          start: currentStart,
+          end: batchEnd,
+          error: error instanceof Error ? error.message : String(error)
+        });
         // Continue with next batch
       }
 
@@ -164,7 +210,7 @@ class BinanceClient {
           throw new Error(`Binance API error: ${response.status}`);
         }
 
-        const data = await response.json() as any[];
+        const data = await response.json() as BinanceKline[];
         const candles = data.map(k => ({
           timestamp: k[0],
           open: parseFloat(k[1]),
@@ -182,7 +228,12 @@ class BinanceClient {
         await this.sleep(200);  // Rate limiting
 
       } catch (error) {
-        console.error(`Error fetching ${symbol} ${currentStart}-${batchEnd}:`, error);
+        logger.error('Error fetching Binance batch', {
+          symbol,
+          start: currentStart,
+          end: batchEnd,
+          error: error instanceof Error ? error.message : String(error)
+        });
         break;
       }
     }
@@ -232,7 +283,7 @@ class MultiExchangeDataManager {
     if (!index || index.length === 0) return null;
 
     const minDuration = minDays * 24 * 60 * 60 * 1000;
-    const validDatasets = index.filter((ds: any) => (ds.endTime - ds.startTime) >= minDuration);
+    const validDatasets = index.filter((ds: DatasetIndex) => (ds.endTime - ds.startTime) >= minDuration);
 
     if (validDatasets.length === 0) return null;
 
@@ -244,7 +295,7 @@ class MultiExchangeDataManager {
 
   private async addToIndex(dataset: HistoricalDataset): Promise<void> {
     const indexKey = `index:${dataset.exchange}:${dataset.pair}:${dataset.interval}`;
-    const existing = await this.kv.get(indexKey, 'json') as any[] || [];
+    const existing = await this.kv.get(indexKey, 'json') as DatasetIndex[] | null || [];
 
     existing.push({
       startTime: dataset.startTime,
@@ -255,10 +306,10 @@ class MultiExchangeDataManager {
     await this.kv.put(indexKey, JSON.stringify(existing));
   }
 
-  private async getIndex(exchange: string, pair: string, interval: string): Promise<any[]> {
+  private async getIndex(exchange: string, pair: string, interval: string): Promise<DatasetIndex[]> {
     const indexKey = `index:${exchange}:${pair}:${interval}`;
     const data = await this.kv.get(indexKey, 'json');
-    return (data as any[]) || [];
+    return (data as DatasetIndex[] | null) || [];
   }
 }
 
@@ -287,14 +338,14 @@ export default {
 
       // Route: Fetch 2 years of data for all pairs
       if (path === '/fetch-2-years' && request.method === 'POST') {
-        const body = await request.json() as any;
+        const body = await request.json() as FetchRequestBody;
         const interval = body.interval || '5m';  // 1m or 5m
         const durationDays = 730;  // 2 years
 
         const endTime = Date.now();
         const startTime = endTime - (durationDays * 24 * 60 * 60 * 1000);
 
-        const results: any[] = [];
+        const results: FetchResult[] = [];
 
         // Binance pairs
         const binancePairs = [
@@ -305,7 +356,7 @@ export default {
 
         for (const { symbol, pair } of binancePairs) {
           try {
-            console.log(`Fetching Binance ${pair} ${interval} for 2 years...`);
+            logger.info('Fetching Binance data', { pair, interval, duration: '2 years' });
             const candles = await binanceClient.fetchLargeDataset(symbol, interval, startTime, endTime);
 
             const dataset: HistoricalDataset = {
@@ -327,12 +378,12 @@ export default {
               candleCount: candles.length
             });
 
-          } catch (error: any) {
+          } catch (error) {
             results.push({
               exchange: 'binance',
               pair,
               success: false,
-              error: error.message
+              error: error instanceof Error ? error.message : String(error)
             });
           }
         }
@@ -348,7 +399,7 @@ export default {
 
         for (const { productId, pair } of coinbasePairs) {
           try {
-            console.log(`Fetching Coinbase ${pair} ${interval} for 2 years...`);
+            logger.info('Fetching Coinbase data', { pair, interval, duration: '2 years' });
             const candles = await coinbaseClient.fetchLargeDataset(productId, granularity, startTime, endTime);
 
             const dataset: HistoricalDataset = {
@@ -370,12 +421,12 @@ export default {
               candleCount: candles.length
             });
 
-          } catch (error: any) {
+          } catch (error) {
             results.push({
               exchange: 'coinbase',
               pair,
               success: false,
-              error: error.message
+              error: error instanceof Error ? error.message : String(error)
             });
           }
         }
@@ -484,11 +535,11 @@ export default {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
 
-    } catch (error: any) {
+    } catch (error) {
       return new Response(JSON.stringify({
         success: false,
-        error: error.message,
-        stack: error.stack
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

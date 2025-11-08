@@ -14,6 +14,9 @@
  */
 
 import { calculateSentimentDerivatives, extractKeywords, calculateNewsContext } from './sentiment-timeseries-calculator';
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('SentimentBackfillWorker', LogLevel.INFO);
 
 interface Env {
   DB: D1Database;
@@ -29,6 +32,31 @@ interface ChaosTrade {
   exit_price: number;
   pnl_pct: number;
   profitable: number;
+}
+
+// API Response Interfaces
+interface FearGreedAPIResponse {
+  data: Array<{
+    value: string;
+    value_classification: string;
+    timestamp: string;
+  }>;
+}
+
+interface CryptoCompareAPIResponse {
+  Data?: Array<{
+    title: string;
+    body?: string;
+    source?: string;
+    source_info?: {name: string};
+    published_on: number;
+  }>;
+}
+
+interface FREDAPIResponse {
+  observations?: Array<{
+    value: string;
+  }>;
 }
 
 // ============================================================================
@@ -47,11 +75,11 @@ class FearGreedHistoricalClient {
       if (daysSinceToday <= 90) {
         // Can fetch from API
         const response = await fetch(`https://api.alternative.me/fng/?limit=90`);
-        const data = await response.json() as any;
+        const data = await response.json() as FearGreedAPIResponse;
 
         // Find closest date
         const targetTimestamp = Math.floor(date.getTime() / 1000);
-        const closest = data.data.find((item: any) => {
+        const closest = data.data.find((item) => {
           const itemTimestamp = parseInt(item.timestamp);
           return Math.abs(itemTimestamp - targetTimestamp) < 24 * 60 * 60; // Within 1 day
         });
@@ -71,7 +99,7 @@ class FearGreedHistoricalClient {
       return null;
 
     } catch (error) {
-      console.error('Failed to fetch historical Fear & Greed:', error);
+      logger.error('Failed to fetch historical Fear & Greed', error instanceof Error ? error : new Error(String(error)));
       return null;
     }
   }
@@ -98,7 +126,7 @@ class CryptoCompareHistoricalClient {
   ): Promise<Array<{title: string; body: string; source: string; published_on: number; sentiment?: number}>> {
 
     if (!this.apiKey) {
-      console.log('CryptoCompare API key not set, skipping historical news');
+      logger.info('CryptoCompare API key not set, skipping historical news');
       return [];
     }
 
@@ -117,16 +145,16 @@ class CryptoCompareHistoricalClient {
         }
       );
 
-      const data = await response.json() as any;
+      const data = await response.json() as CryptoCompareAPIResponse;
 
       if (!data.Data) return [];
 
       // Filter to time range
-      const articles = data.Data.filter((item: any) => {
+      const articles = data.Data.filter((item) => {
         return item.published_on >= startTime && item.published_on <= endTime;
       });
 
-      return articles.map((item: any) => ({
+      return articles.map((item) => ({
         title: item.title,
         body: item.body || '',
         source: item.source_info?.name || item.source,
@@ -135,7 +163,7 @@ class CryptoCompareHistoricalClient {
       }));
 
     } catch (error) {
-      console.error('Failed to fetch historical news:', error);
+      logger.error('Failed to fetch historical news', error instanceof Error ? error : new Error(String(error)));
       return [];
     }
   }
@@ -180,7 +208,7 @@ class FREDHistoricalClient {
   }> {
 
     if (!this.apiKey) {
-      console.log('FRED API key not set, skipping macro data');
+      logger.info('FRED API key not set, skipping macro data');
       return {};
     }
 
@@ -202,7 +230,7 @@ class FREDHistoricalClient {
       };
 
     } catch (error) {
-      console.error('Failed to fetch FRED data:', error);
+      logger.error('Failed to fetch FRED data', error instanceof Error ? error : new Error(String(error)));
       return {};
     }
   }
@@ -213,7 +241,7 @@ class FREDHistoricalClient {
         `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${this.apiKey}&file_type=json&observation_start=${date}&observation_end=${date}`
       );
 
-      const data = await response.json() as any;
+      const data = await response.json() as FREDAPIResponse;
 
       if (data.observations && data.observations.length > 0) {
         const value = parseFloat(data.observations[0].value);
@@ -223,7 +251,7 @@ class FREDHistoricalClient {
       return undefined;
 
     } catch (error) {
-      console.error(`Failed to fetch ${seriesId}:`, error);
+      logger.error(`Failed to fetch ${seriesId}`, error instanceof Error ? error : new Error(String(error)));
       return undefined;
     }
   }
@@ -252,7 +280,7 @@ export default {
           WHERE sentiment_fear_greed IS NULL
           ORDER BY entry_time DESC
           LIMIT ?
-        `).bind(batchSize).all() as any;
+        `).bind(batchSize).all() as D1Result<ChaosTrade>;
 
         if (!trades.results || trades.results.length === 0) {
           return new Response(JSON.stringify({
@@ -355,7 +383,10 @@ export default {
             enriched++;
 
           } catch (tradeError) {
-            console.error(`Failed to enrich trade ${trade.id}:`, tradeError);
+            logger.error('Failed to enrich trade', {
+              trade_id: trade.id,
+              error: tradeError instanceof Error ? tradeError.message : String(tradeError)
+            });
           }
 
           processed++;
@@ -371,7 +402,7 @@ export default {
           SELECT COUNT(*) as count
           FROM chaos_trades
           WHERE sentiment_fear_greed IS NULL
-        `).first() as any;
+        `).first() as {count: number} | null;
 
         return new Response(JSON.stringify({
           message: 'Backfill completed',
@@ -395,11 +426,11 @@ export default {
       try {
         const total = await env.DB.prepare(`
           SELECT COUNT(*) as count FROM chaos_trades
-        `).first() as any;
+        `).first() as {count: number} | null;
 
         const withSentiment = await env.DB.prepare(`
           SELECT COUNT(*) as count FROM chaos_trades WHERE sentiment_fear_greed IS NOT NULL
-        `).first() as any;
+        `).first() as {count: number} | null;
 
         const remaining = (total?.count || 0) - (withSentiment?.count || 0);
         const progress = total?.count > 0 ? (withSentiment?.count || 0) / total.count * 100 : 0;

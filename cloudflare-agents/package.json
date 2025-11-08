@@ -13,12 +13,12 @@
     "d1:query": "wrangler d1 execute coinswarm-evolution"
   },
   "dependencies": {
-    "agents": "latest",
-    "@cloudflare/ai": "^1.0.0"
+    "@cloudflare/ai": "^1.0.0",
+    "agents": "latest"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250101.0",
-    "typescript": "^5.3.3",
+    "@cloudflare/workers-types": "^4.20251107.0",
+    "typescript": "^5.9.3",
     "wrangler": "^3.90.0"
   },
   "engines": {

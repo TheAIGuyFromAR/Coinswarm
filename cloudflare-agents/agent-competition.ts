@@ -9,6 +9,14 @@
 
 import { generatePatternId } from './ai-pattern-analyzer';
 import { TradingAgent, agentDecision, executeAgentTrade, agentReflection } from './reasoning-agent';
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('AgentCompetition', LogLevel.INFO);
+
+// AI interface
+interface CloudflareAI {
+  run(model: string, inputs: Record<string, unknown>): Promise<{ response?: string; [key: string]: unknown }>;
+}
 
 interface CompetitionResult {
   competition_id: string;
@@ -24,11 +32,31 @@ interface CompetitionResult {
   }[];
 }
 
+interface RankingResult {
+  agent_id: string;
+  agent_name: string;
+  personality: string;
+  generation: number;
+  roi: number;
+  total_roi: number;
+  win_rate: number;
+  trades: number;
+  rank?: number;
+}
+
+interface RankedAgent {
+  agent_id: string;
+  agent_name: string;
+  fitness_score: number;
+  personality: string;
+  generation: number;
+}
+
 /**
  * Initialize agent population with diverse personalities
  */
 export async function initializeAgentPopulation(
-  db: any,
+  db: D1Database,
   populationSize: number = 10
 ): Promise<TradingAgent[]> {
   const personalities = [
@@ -47,8 +75,8 @@ export async function initializeAgentPopulation(
   const agents: TradingAgent[] = [];
 
   for (let i = 0; i < populationSize; i++) {
-    const agentId = generatePatternId();
     const personality = personalities[i % personalities.length];
+    const agentId = generatePatternId(`agent-${personality}-${i}`);
 
     const agent: TradingAgent = {
       agent_id: agentId,
@@ -76,14 +104,17 @@ export async function initializeAgentPopulation(
     agents.push(agent);
   }
 
-  console.log(`\n🧬 Initialized ${agents.length} agents with diverse personalities`);
+  logger.info('Initialized agent population', {
+    count: agents.length,
+    personalities: personalities.slice(0, populationSize),
+  });
   return agents;
 }
 
 /**
  * Get all active agents
  */
-export async function getActiveAgents(db: any): Promise<TradingAgent[]> {
+export async function getActiveAgents(db: D1Database): Promise<TradingAgent[]> {
   const result = await db.prepare(`
     SELECT
       agent_id,
@@ -105,7 +136,7 @@ export async function getActiveAgents(db: any): Promise<TradingAgent[]> {
     ORDER BY fitness_score DESC
   `).all();
 
-  return result.results || [];
+  return (result.results || []) as unknown as TradingAgent[];
 }
 
 /**
@@ -136,7 +167,7 @@ export function calculateFitnessScore(agent: TradingAgent): number {
 /**
  * Update agent fitness scores
  */
-export async function updateAgentFitness(db: any): Promise<void> {
+export async function updateAgentFitness(db: D1Database): Promise<void> {
   const agents = await getActiveAgents(db);
 
   for (const agent of agents) {
@@ -155,12 +186,15 @@ export async function updateAgentFitness(db: any): Promise<void> {
  * Each agent trades for a period, then results are compared
  */
 export async function runAgentCompetition(
-  ai: any,
-  db: any,
+  ai: CloudflareAI,
+  db: D1Database,
   cycleNumber: number,
   tradesPerAgent: number = 5
 ): Promise<CompetitionResult> {
-  console.log(`\n🏆 AGENT COMPETITION - Cycle ${cycleNumber}`);
+  logger.info('Agent competition cycle started', {
+    cycle: cycleNumber,
+    trades_per_agent: tradesPerAgent,
+  });
 
   // Get all active agents
   const agents = await getActiveAgents(db);
@@ -169,13 +203,17 @@ export async function runAgentCompetition(
     throw new Error('No active agents found. Initialize population first.');
   }
 
-  console.log(`   ${agents.length} agents competing...`);
+  logger.info('Agents competing', { count: agents.length });
 
   // Each agent makes multiple trades
-  const competitionResults: any[] = [];
+  const competitionResults: RankingResult[] = [];
 
   for (const agent of agents) {
-    console.log(`\n   🤖 ${agent.agent_name} (Gen ${agent.generation})`);
+    logger.debug('Agent competing', {
+      agent_name: agent.agent_name,
+      agent_id: agent.agent_id,
+      generation: agent.generation,
+    });
 
     let totalRoi = 0;
     let wins = 0;
@@ -196,10 +234,19 @@ export async function runAgentCompetition(
         if (outcome.outcome === 'win') wins++;
         trades++;
 
-        console.log(`      Trade ${i + 1}: ${outcome.outcome} (${outcome.roi.toFixed(2)}%)`);
+        logger.debug('Trade completed', {
+          agent_id: agent.agent_id,
+          trade_num: i + 1,
+          outcome: outcome.outcome,
+          roi: outcome.roi.toFixed(2),
+        });
 
       } catch (error) {
-        console.error(`      Error on trade ${i + 1}:`, error);
+        logger.error('Trade failed', {
+          agent_id: agent.agent_id,
+          trade_num: i + 1,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
 
       // Small delay between trades
@@ -220,7 +267,13 @@ export async function runAgentCompetition(
       trades
     });
 
-    console.log(`      Final: ${avgRoi.toFixed(2)}% avg ROI, ${(winRate * 100).toFixed(0)}% win rate`);
+    logger.info('Agent competition finished', {
+      agent_id: agent.agent_id,
+      agent_name: agent.agent_name,
+      avg_roi: avgRoi.toFixed(2),
+      win_rate: (winRate * 100).toFixed(0),
+      total_trades: trades,
+    });
   }
 
   // Sort by total ROI
@@ -231,9 +284,13 @@ export async function runAgentCompetition(
     r.rank = i + 1;
   });
 
-  console.log('\n   📊 Competition Results:');
-  competitionResults.slice(0, 3).forEach((r, i) => {
-    console.log(`      ${i + 1}. ${r.agent_name}: ${r.total_roi.toFixed(2)}% (${(r.win_rate * 100).toFixed(0)}% WR)`);
+  logger.info('Competition results', {
+    top_3: competitionResults.slice(0, 3).map((r, i) => ({
+      rank: i + 1,
+      name: r.agent_name,
+      roi: r.total_roi.toFixed(2),
+      win_rate: (r.win_rate * 100).toFixed(0),
+    })),
   });
 
   // Update agent fitness scores
@@ -257,7 +314,7 @@ export async function runAgentCompetition(
   }
 
   // Store competition record
-  const competitionId = generatePatternId();
+  const competitionId = generatePatternId(`competition-${Date.now()}`);
   await db.prepare(`
     INSERT INTO agent_competitions (
       competition_id,
@@ -270,9 +327,9 @@ export async function runAgentCompetition(
   `).bind(
     competitionId,
     `${tradesPerAgent} trades per agent`,
-    JSON.stringify(competitionResults.map((r: any) => r.agent_id)),
+    JSON.stringify(competitionResults.map((r) => r.agent_id)),
     competitionResults[0].agent_id,
-    JSON.stringify(competitionResults.map((r: any) => ({ agent_id: r.agent_id, rank: r.rank }))),
+    JSON.stringify(competitionResults.map((r) => ({ agent_id: r.agent_id, rank: r.rank }))),
     JSON.stringify(competitionResults)
   ).run();
 
@@ -281,12 +338,12 @@ export async function runAgentCompetition(
     winner_id: competitionResults[0].agent_id,
     eliminated_ids: [],
     cloned_ids: [],
-    rankings: competitionResults.map((r: any) => ({
+    rankings: competitionResults.map((r) => ({
       agent_id: r.agent_id,
       agent_name: r.agent_name,
       roi: r.total_roi,
       trades: r.trades,
-      rank: r.rank
+      rank: r.rank || 0
     }))
   };
 }
@@ -297,14 +354,14 @@ export async function runAgentCompetition(
  * - Clone top 20% with mutations
  */
 export async function evolveAgentPopulation(
-  ai: any,
-  db: any,
+  ai: CloudflareAI,
+  db: D1Database,
   competition: CompetitionResult
 ): Promise<{ eliminated: number; cloned: number }> {
   const agents = await getActiveAgents(db);
 
   if (agents.length < 5) {
-    console.log('   ⚠️  Population too small for evolution, skipping');
+    logger.warn('Population too small for evolution, skipping', { agent_count: agents.length });
     return { eliminated: 0, cloned: 0 };
   }
 
@@ -319,17 +376,23 @@ export async function evolveAgentPopulation(
     ORDER BY fitness_score DESC
   `).all();
 
-  const totalAgents = rankedAgents.results.length;
+  const rankedList = (rankedAgents.results || []) as unknown as RankedAgent[];
+  const totalAgents = rankedList.length;
   const eliminateCount = Math.max(1, Math.floor(totalAgents * 0.2));
   const cloneCount = eliminateCount; // Keep population constant
 
   // Eliminate bottom performers
-  const toEliminate = rankedAgents.results.slice(-eliminateCount);
+  const toEliminate = rankedList.slice(-eliminateCount);
   const eliminatedIds: string[] = [];
 
-  console.log(`\n   ☠️  Eliminating bottom ${eliminateCount} agents:`);
+  logger.info('Eliminating bottom agents', {
+    count: eliminateCount,
+  });
   for (const agent of toEliminate) {
-    console.log(`      - ${agent.agent_name} (Fitness: ${agent.fitness_score.toFixed(1)})`);
+    logger.debug('Eliminating agent', {
+      name: agent.agent_name,
+      fitness: agent.fitness_score.toFixed(1),
+    });
 
     await db.prepare(`
       UPDATE trading_agents
@@ -342,10 +405,10 @@ export async function evolveAgentPopulation(
   }
 
   // Clone top performers with mutations
-  const toClone = rankedAgents.results.slice(0, cloneCount);
+  const toClone = rankedList.slice(0, cloneCount);
   const clonedIds: string[] = [];
 
-  console.log(`\n   🧬 Cloning top ${cloneCount} agents with mutations:`);
+  logger.info('Cloning top agents with mutations', { count: cloneCount });
   for (const parent of toClone) {
     const mutationType = Math.random();
     let newPersonality = parent.personality;
@@ -361,7 +424,7 @@ export async function evolveAgentPopulation(
       mutationDesc = `personality: ${parent.personality} → ${newPersonality}`;
     }
 
-    const cloneId = generatePatternId();
+    const cloneId = generatePatternId(`clone-${newPersonality}-gen${parent.generation + 1}`);
     const cloneName = `${newPersonality.toUpperCase()}-GEN${parent.generation + 1}-${Math.floor(Math.random() * 1000)}`;
 
     await db.prepare(`
@@ -382,7 +445,7 @@ export async function evolveAgentPopulation(
         lineage_id, ancestor_id, descendant_id, generation_gap, mutation_type, mutation_details
       ) VALUES (?, ?, ?, 1, 'evolution', ?)
     `).bind(
-      generatePatternId(),
+      generatePatternId(`lineage-${parent.agent_id}-${cloneId}`),
       parent.agent_id,
       cloneId,
       JSON.stringify({ mutation: mutationDesc })
@@ -390,7 +453,11 @@ export async function evolveAgentPopulation(
 
     clonedIds.push(cloneId);
 
-    console.log(`      + ${cloneName} (from ${parent.agent_name}) - ${mutationDesc}`);
+    logger.info('Clone created', {
+      clone_name: cloneName,
+      parent_name: parent.agent_name,
+      mutation: mutationDesc,
+    });
   }
 
   // Update competition record with evolution outcomes
@@ -405,7 +472,10 @@ export async function evolveAgentPopulation(
     competition.competition_id
   ).run();
 
-  console.log(`\n   ✓ Evolution complete: ${eliminatedIds.length} eliminated, ${clonedIds.length} cloned`);
+  logger.info('Evolution cycle complete', {
+    eliminated_count: eliminatedIds.length,
+    cloned_count: clonedIds.length,
+  });
 
   return { eliminated: eliminatedIds.length, cloned: clonedIds.length };
 }
@@ -414,40 +484,47 @@ export async function evolveAgentPopulation(
  * Run full competition cycle with evolution
  */
 export async function runCompetitionCycle(
-  ai: any,
-  db: any,
+  ai: CloudflareAI,
+  db: D1Database,
   cycleNumber: number
 ): Promise<void> {
   // 1. Check if population exists
   const agents = await getActiveAgents(db);
 
   if (agents.length === 0) {
-    console.log('   No agents found, initializing population...');
+    logger.warn('No agents found, initializing population');
     await initializeAgentPopulation(db, 10);
   }
 
   // 2. Run competition
   const competition = await runAgentCompetition(ai, db, cycleNumber, 5);
 
-  console.log(`\n   🏆 Winner: ${competition.rankings[0].agent_name} (${competition.rankings[0].roi.toFixed(2)}%)`);
+  logger.info('Competition winner', {
+    winner: competition.rankings[0].agent_name,
+    roi: competition.rankings[0].roi.toFixed(2),
+  });
 
   // 3. Evolve population (every 5 competitions)
   if (cycleNumber % 5 === 0) {
     const evolution = await evolveAgentPopulation(ai, db, competition);
-    console.log(`   🧬 Population evolved: -${evolution.eliminated} +${evolution.cloned}`);
+    logger.info('Population evolved', {
+      eliminated: evolution.eliminated,
+      cloned: evolution.cloned,
+    });
   } else {
-    console.log('   ⏭️  Skipping evolution this round');
+    logger.info('Evolution skipped this round');
   }
 
   // 4. Show current population stats
   const updatedAgents = await getActiveAgents(db);
-  const avgFitness = updatedAgents.reduce((sum: number, a: any) => sum + a.fitness_score, 0) / updatedAgents.length;
-  const avgGeneration = updatedAgents.reduce((sum: number, a: any) => sum + a.generation, 0) / updatedAgents.length;
+  const avgFitness = updatedAgents.reduce((sum: number, a: TradingAgent) => sum + a.fitness_score, 0) / updatedAgents.length;
+  const avgGeneration = updatedAgents.reduce((sum: number, a: TradingAgent) => sum + a.generation, 0) / updatedAgents.length;
 
-  console.log(`\n   📊 Population Stats:`);
-  console.log(`      Active agents: ${updatedAgents.length}`);
-  console.log(`      Avg fitness: ${avgFitness.toFixed(1)}`);
-  console.log(`      Avg generation: ${avgGeneration.toFixed(1)}`);
+  logger.info('Population stats', {
+    active_agents: updatedAgents.length,
+    avg_fitness: avgFitness.toFixed(1),
+    avg_generation: avgGeneration.toFixed(1),
+  });
 }
 
-export { CompetitionResult };
+export type { CompetitionResult };

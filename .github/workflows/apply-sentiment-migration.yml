@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -27,7 +29,7 @@ jobs:
         run: |
           cd cloudflare-agents
           echo "Applying sentiment data schema migration..."
-          wrangler d1 execute coinswarm-evolution-db --remote --file=sentiment-data-schema.sql
+          wrangler d1 execute coinswarm-evolution --remote --file=sentiment-data-schema.sql
           echo "✅ Sentiment data schema applied successfully!"
           echo ""
           echo "New tables created:"

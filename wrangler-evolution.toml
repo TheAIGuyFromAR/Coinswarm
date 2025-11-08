@@ -14,7 +14,7 @@ crons = [
 [[d1_databases]]
 binding = "DB"
 database_name = "coinswarm-evolution"
-database_id = "YOUR_DATABASE_ID_HERE"  # Create with: wrangler d1 create coinswarm-evolution
+database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
 
 # Routes (optional - for HTTP access)
 [routes]

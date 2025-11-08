@@ -92,7 +92,7 @@ class BinanceClient {
       throw new Error(`Binance API error: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json() as any[];
+    const data = await response.json() as Array<[number, string, string, string, string, string, number, string, number, string, string]>;
 
     // Parse Binance kline format
     return data.map(k => ({
@@ -366,11 +366,12 @@ export default {
               success: true,
               candleCount: candles.length
             });
-          } catch (error: any) {
+          } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
             results.push({
               pair,
               success: false,
-              error: error.message
+              error: err.message
             });
           }
 
@@ -476,11 +477,12 @@ export default {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
 
-    } catch (error: any) {
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
       return new Response(JSON.stringify({
         success: false,
-        error: error.message,
-        stack: error.stack
+        error: err.message,
+        stack: err.stack
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

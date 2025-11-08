@@ -17,6 +17,9 @@ import {
   type SentimentDerivatives,
   type NewsContext
 } from './sentiment-timeseries-calculator';
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('SentimentEnhancedRoutes', LogLevel.INFO);
 
 /**
  * Route: Get sentiment with derivatives for a specific timestamp
@@ -41,7 +44,7 @@ export async function getSentimentWithDerivatives(
         AND symbol = 'MARKET'
       ORDER BY timestamp DESC
       LIMIT 1
-    `).bind(targetTime.toISOString()).first() as any;
+    `).bind(targetTime.toISOString()).first() as {sentiment_value: number; fear_greed_value: number; timestamp: string} | null;
 
     if (!current) {
       return null;
@@ -54,7 +57,7 @@ export async function getSentimentWithDerivatives(
       WHERE timestamp BETWEEN ? AND ?
         AND symbol = 'MARKET'
       ORDER BY timestamp DESC
-    `).bind(time_1hr_ago.toISOString(), targetTime.toISOString()).all() as any;
+    `).bind(time_1hr_ago.toISOString(), targetTime.toISOString()).all() as D1Result<SentimentSnapshot>;
 
     const snapshots_4hr = await db.prepare(`
       SELECT sentiment_value as sentiment, fear_greed_value as fear_greed, timestamp
@@ -62,7 +65,7 @@ export async function getSentimentWithDerivatives(
       WHERE timestamp BETWEEN ? AND ?
         AND symbol = 'MARKET'
       ORDER BY timestamp DESC
-    `).bind(time_4hr_ago.toISOString(), time_1hr_ago.toISOString()).all() as any;
+    `).bind(time_4hr_ago.toISOString(), time_1hr_ago.toISOString()).all() as D1Result<SentimentSnapshot>;
 
     const snapshots_24hr = await db.prepare(`
       SELECT sentiment_value as sentiment, fear_greed_value as fear_greed, timestamp
@@ -70,7 +73,7 @@ export async function getSentimentWithDerivatives(
       WHERE timestamp BETWEEN ? AND ?
         AND symbol = 'MARKET'
       ORDER BY timestamp DESC
-    `).bind(time_24hr_ago.toISOString(), time_4hr_ago.toISOString()).all() as any;
+    `).bind(time_24hr_ago.toISOString(), time_4hr_ago.toISOString()).all() as D1Result<SentimentSnapshot>;
 
     const currentSnapshot: SentimentSnapshot = {
       timestamp: current.timestamp,
@@ -88,7 +91,7 @@ export async function getSentimentWithDerivatives(
     return derivatives;
 
   } catch (error) {
-    console.error('Failed to calculate sentiment derivatives:', error);
+    logger.error('Failed to calculate sentiment derivatives', error instanceof Error ? error : new Error(String(error)));
     return null;
   }
 }
@@ -117,7 +120,7 @@ export async function getNewsContext(
     `).bind(
       Math.floor(time_1hr_ago.getTime() / 1000),
       Math.floor(targetTime.getTime() / 1000)
-    ).all() as any;
+    ).all() as D1Result<{title: string; body: string; sentiment: number; published_on: number}>;
 
     // Get articles from last 24 hours
     const articles_24hr_result = await db.prepare(`
@@ -129,7 +132,7 @@ export async function getNewsContext(
     `).bind(
       Math.floor(time_24hr_ago.getTime() / 1000),
       Math.floor(targetTime.getTime() / 1000)
-    ).all() as any;
+    ).all() as D1Result<{title: string; body: string; sentiment: number; published_on: number}>;
 
     const articles_1hr = articles_1hr_result.results || [];
     const articles_24hr = articles_24hr_result.results || [];
@@ -139,7 +142,7 @@ export async function getNewsContext(
     return context;
 
   } catch (error) {
-    console.error('Failed to get news context:', error);
+    logger.error('Failed to get news context', error instanceof Error ? error : new Error(String(error)));
     return null;
   }
 }
@@ -198,7 +201,7 @@ export async function storeSentimentSnapshot(
     return true;
 
   } catch (error) {
-    console.error('Failed to store sentiment snapshot:', error);
+    logger.error('Failed to store sentiment snapshot', error instanceof Error ? error : new Error(String(error)));
     return false;
   }
 }
@@ -237,12 +240,16 @@ export async function getTrendingKeywords(
       GROUP BY keyword
       ORDER BY total_frequency DESC
       LIMIT 50
-    `).bind(cutoffTime).all() as any;
+    `).bind(cutoffTime).all() as D1Result<{keyword: string; total_frequency: number; avg_sentiment: number}>;
 
-    return results.results || [];
+    return (results.results || []).map(r => ({
+      keyword: r.keyword,
+      frequency: r.total_frequency,
+      sentiment: r.avg_sentiment
+    }));
 
   } catch (error) {
-    console.error('Failed to get trending keywords:', error);
+    logger.error('Failed to get trending keywords', error instanceof Error ? error : new Error(String(error)));
     return [];
   }
 }
@@ -302,7 +309,7 @@ export async function storeNewsArticle(
     return true;
 
   } catch (error) {
-    console.error('Failed to store news article:', error);
+    logger.error('Failed to store news article', error instanceof Error ? error : new Error(String(error)));
     return false;
   }
 }

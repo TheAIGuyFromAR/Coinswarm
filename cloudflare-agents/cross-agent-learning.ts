@@ -19,7 +19,9 @@
  * - Original insight now helps entire population
  */
 
-// No imports needed - D1Database is globally available in Cloudflare Workers
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('CrossAgentLearning', LogLevel.INFO);
 
 interface KnowledgeItem {
   knowledge_id: string;
@@ -68,7 +70,7 @@ export class CrossAgentLearning {
    * - Schedule validation
    */
   async runKnowledgeSharingCycle(): Promise<KnowledgeSharingResult> {
-    console.log('🧠 Running Cross-Agent Learning cycle...');
+    logger.info('Running Cross-Agent Learning cycle');
 
     try {
       // Step 1: Get active agents sorted by fitness
@@ -81,7 +83,7 @@ export class CrossAgentLearning {
       `).all();
 
       if (!agents.results || agents.results.length < 5) {
-        console.log('Not enough active agents for knowledge sharing (need at least 5)');
+        logger.info('Not enough active agents for knowledge sharing', { minimum_required: 5 });
         return { sharingsCreated: 0, teachersCount: 0, studentsCount: 0, knowledgeItemsShared: 0 };
       }
 
@@ -95,7 +97,10 @@ export class CrossAgentLearning {
       const teachers = allAgents.slice(0, teacherCount);
       const students = allAgents.slice(-studentCount);
 
-      console.log(`Teachers: ${teachers.length} (top 20%), Students: ${students.length} (bottom 50%)`);
+      logger.info('Identified teachers and students', {
+        teachers_count: teachers.length,
+        students_count: students.length
+      });
 
       // Step 3: For each teacher, extract valuable knowledge
       let sharingsCreated = 0;
@@ -117,12 +122,15 @@ export class CrossAgentLearning {
         `).bind(teacher.agent_id).all();
 
         if (!teacherKnowledge.results || teacherKnowledge.results.length === 0) {
-          console.log(`Teacher ${teacher.agent_name} has no validated knowledge to share yet`);
+          logger.info('Teacher has no validated knowledge to share', { teacher_name: teacher.agent_name });
           continue;
         }
 
         const knowledgeItems = teacherKnowledge.results as unknown as KnowledgeItem[];
-        console.log(`Teacher ${teacher.agent_name} has ${knowledgeItems.length} knowledge items to share`);
+        logger.info('Teacher has knowledge to share', {
+          teacher_name: teacher.agent_name,
+          knowledge_items: knowledgeItems.length
+        });
 
         // Step 4: Share with students
         for (const student of students) {
@@ -136,7 +144,7 @@ export class CrossAgentLearning {
           );
 
           if (studentHasKnowledge) {
-            console.log(`Student ${student.agent_name} already has similar knowledge, skipping`);
+            logger.debug('Student already has similar knowledge', { student_name: student.agent_name });
             continue;
           }
 
@@ -184,7 +192,7 @@ export class CrossAgentLearning {
         }
       }
 
-      console.log(`✓ Created ${sharingsCreated} knowledge sharings`);
+      logger.info('Created knowledge sharings', { count: sharingsCreated });
 
       // Step 5: Update network metrics
       await this.updateNetworkMetrics(allAgents.length, teachers.length, sharingsCreated);
@@ -197,7 +205,7 @@ export class CrossAgentLearning {
       };
 
     } catch (error) {
-      console.error('Failed to run knowledge sharing cycle:', error);
+      logger.error('Failed to run knowledge sharing cycle', error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -256,7 +264,10 @@ export class CrossAgentLearning {
       new Date().toISOString()
     ).run();
 
-    console.log(`✓ Student ${studentId} adopted knowledge ${knowledge.knowledge_id}`);
+    logger.info('Student adopted knowledge', {
+      student_id: studentId,
+      knowledge_id: knowledge.knowledge_id
+    });
   }
 
   /**
@@ -264,7 +275,7 @@ export class CrossAgentLearning {
    * - Called after agents have had time to test adopted knowledge
    */
   async validateKnowledgeSharings(): Promise<number> {
-    console.log('🔍 Validating knowledge sharings...');
+    logger.info('Validating knowledge sharings');
 
     try {
       // Get pending validations (sharings from at least 50 cycles ago)
@@ -285,11 +296,11 @@ export class CrossAgentLearning {
       `).all();
 
       if (!pendingSharings.results || pendingSharings.results.length === 0) {
-        console.log('No pending knowledge validations');
+        logger.info('No pending knowledge validations');
         return 0;
       }
 
-      console.log(`Validating ${pendingSharings.results.length} knowledge sharings...`);
+      logger.info('Validating knowledge sharings', { count: pendingSharings.results.length });
 
       let validatedCount = 0;
 
@@ -324,11 +335,11 @@ export class CrossAgentLearning {
         validatedCount++;
       }
 
-      console.log(`✓ Validated ${validatedCount} knowledge sharings`);
+      logger.info('Validated knowledge sharings', { count: validatedCount });
       return validatedCount;
 
     } catch (error) {
-      console.error('Failed to validate knowledge sharings:', error);
+      logger.error('Failed to validate knowledge sharings', error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -399,10 +410,10 @@ export class CrossAgentLearning {
         stats?.top_fitness || 0
       ).run();
 
-      console.log(`✓ Updated network learning metrics`);
+      logger.info('Updated network learning metrics');
 
     } catch (error) {
-      console.error('Failed to update network metrics:', error);
+      logger.error('Failed to update network metrics', error instanceof Error ? error : new Error(String(error)));
       // Don't throw - this is not critical
     }
   }
@@ -413,9 +424,7 @@ export class CrossAgentLearning {
  * Called every 25 cycles (between pattern discovery and agent evolution)
  */
 export async function runCrossAgentLearning(db: D1Database): Promise<void> {
-  console.log('='.repeat(60));
-  console.log('🧠 CROSS-AGENT LEARNING CYCLE');
-  console.log('='.repeat(60));
+  logger.info('=== CROSS-AGENT LEARNING CYCLE START ===');
 
   try {
     const learning = new CrossAgentLearning(db);
@@ -423,21 +432,21 @@ export async function runCrossAgentLearning(db: D1Database): Promise<void> {
     // Share knowledge from high performers to learners
     const result = await learning.runKnowledgeSharingCycle();
 
-    console.log('\nKnowledge Sharing Results:');
-    console.log(`  Teachers (top 20%): ${result.teachersCount}`);
-    console.log(`  Students (bottom 50%): ${result.studentsCount}`);
-    console.log(`  Knowledge items shared: ${result.knowledgeItemsShared}`);
-    console.log(`  Total sharings created: ${result.sharingsCreated}`);
+    logger.info('Knowledge Sharing Results', {
+      teachers: result.teachersCount,
+      students: result.studentsCount,
+      knowledge_items_shared: result.knowledgeItemsShared,
+      total_sharings_created: result.sharingsCreated
+    });
 
     // Validate previous sharings
     const validated = await learning.validateKnowledgeSharings();
-    console.log(`\nValidated ${validated} previous knowledge sharings`);
+    logger.info('Validated previous knowledge sharings', { count: validated });
 
-    console.log('\n✓ Cross-agent learning cycle complete');
-    console.log('='.repeat(60));
+    logger.info('=== Cross-agent learning cycle complete ===');
 
   } catch (error) {
-    console.error('Cross-agent learning failed:', error);
+    logger.error('Cross-agent learning failed', error instanceof Error ? error : new Error(String(error)));
     throw error;
   }
 }

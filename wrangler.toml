@@ -6,8 +6,10 @@ main = "cloudflare-workers/comprehensive-data-worker.js"
 compatibility_date = "2024-01-01"
 
 # Environment variables
+# API keys should be added as secrets, not environment variables
+# Use: wrangler secret put CRYPTOCOMPARE_API_KEY
 [vars]
-CRYPTOCOMPARE_API_KEY = "da672b9999120841fbd4427fa4550b83b5f23e017c5c03ff33bafe09064abe83"
+# CRYPTOCOMPARE_API_KEY removed for security - add via secrets
 
 [env.production]
 name = "swarm"

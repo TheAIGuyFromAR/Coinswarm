@@ -5,6 +5,7 @@ on:
     branches:
       - claude/debug-cloudflare-historical-data-011CUqugUynEoovcsiVnoaPB
       - claude/review-codebase-docs-workers-011CUu5WhXjGVdghJyJh81Dh
+      - claude/incomplete-description-011CUutLehm75rEefmt5WYQj
       - main
       - master
     paths:
@@ -20,6 +21,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -113,7 +116,7 @@ jobs:
           echo "- Sentiment time-series tables created (keywords, headlines, derivatives)"
           echo "- Ready for sentiment-enhanced pattern discovery"
           echo ""
-          echo "Check your workers at: https://dash.cloudflare.com/8a330fc6c339f031a73905d4ca2f3e5d/workers"
+          echo "Check your workers at: https://dash.cloudflare.com (login required)"
           echo ""
           echo "Optional: Start historical backfill to enrich 129,200 existing trades:"
           echo "  curl -X POST https://coinswarm-sentiment-backfill.bamn86.workers.dev/backfill?batch=100"

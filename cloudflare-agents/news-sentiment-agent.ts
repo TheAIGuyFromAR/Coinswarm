@@ -19,12 +19,41 @@
  * - "Volume spike + extreme greed = 45% win rate (avoid)"
  */
 
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('NewsSentimentAgent', LogLevel.INFO);
+
 // Environment bindings interface
 interface Env {
   DB: D1Database;
   SENTIMENT_CACHE?: KVNamespace;
   CRYPTOCOMPARE_API_KEY?: string;
   FRED_API_KEY?: string;
+}
+
+// API Response interfaces
+interface FearGreedAPIResponse {
+  data: Array<{
+    value: string;
+    value_classification: string;
+    timestamp: string;
+    time_until_update?: string;
+  }>;
+}
+
+interface NewsAPIItem {
+  title: string;
+  body: string;
+  url: string;
+  source: string;
+  source_info?: { name: string };
+  published_on: number;
+  imageurl?: string;
+  tags?: string;
+}
+
+interface NewsAPIResponse {
+  Data: NewsAPIItem[];
 }
 
 // ============================================================================
@@ -92,11 +121,11 @@ class FearGreedClient {
       });
 
       if (!response.ok) {
-        console.error(`Fear & Greed API error: ${response.status}`);
+        logger.error('Fear & Greed API error', { status: response.status });
         return null;
       }
 
-      const data = await response.json() as any;
+      const data = await response.json() as FearGreedAPIResponse;
 
       if (data.data && data.data.length > 0) {
         const latest = data.data[0];
@@ -110,7 +139,7 @@ class FearGreedClient {
 
       return null;
     } catch (error) {
-      console.error('Fear & Greed fetch error:', error);
+      logger.error('Fear & Greed fetch error', error instanceof Error ? error : new Error(String(error)));
       return null;
     }
   }
@@ -124,14 +153,14 @@ class FearGreedClient {
       });
 
       if (!response.ok) {
-        console.error(`Fear & Greed API error: ${response.status}`);
+        logger.error('Fear & Greed API error', { status: response.status });
         return [];
       }
 
-      const data = await response.json() as any;
+      const data = await response.json() as FearGreedAPIResponse;
 
       if (data.data) {
-        return data.data.map((item: any) => ({
+        return data.data.map((item) => ({
           value: parseInt(item.value),
           value_classification: item.value_classification,
           timestamp: parseInt(item.timestamp)
@@ -140,7 +169,7 @@ class FearGreedClient {
 
       return [];
     } catch (error) {
-      console.error('Fear & Greed historical fetch error:', error);
+      logger.error('Fear & Greed historical fetch error', error instanceof Error ? error : new Error(String(error)));
       return [];
     }
   }
@@ -160,7 +189,7 @@ class CryptoCompareClient {
 
   async getLatestNews(categories: string[] = ['BTC', 'ETH', 'SOL'], limit: number = 50): Promise<NewsArticle[]> {
     if (!this.apiKey) {
-      console.log('CryptoCompare API key not set, skipping news fetch');
+      logger.info('CryptoCompare API key not set, skipping news fetch');
       return [];
     }
 
@@ -179,14 +208,14 @@ class CryptoCompareClient {
       });
 
       if (!response.ok) {
-        console.error(`CryptoCompare API error: ${response.status}`);
+        logger.error('CryptoCompare API error', { status: response.status });
         return [];
       }
 
-      const data = await response.json() as any;
+      const data = await response.json() as NewsAPIResponse;
 
       if (data.Data) {
-        return data.Data.map((item: any) => ({
+        return data.Data.map((item) => ({
           title: item.title,
           body: item.body,
           url: item.url,
@@ -199,7 +228,7 @@ class CryptoCompareClient {
 
       return [];
     } catch (error) {
-      console.error('CryptoCompare news fetch error:', error);
+      logger.error('CryptoCompare news fetch error', error instanceof Error ? error : new Error(String(error)));
       return [];
     }
   }
@@ -219,7 +248,7 @@ class FREDClient {
 
   async getIndicator(seriesId: string, limit: number = 1): Promise<MacroIndicator | null> {
     if (!this.apiKey) {
-      console.log('FRED API key not set, skipping macro data fetch');
+      logger.info('FRED API key not set, skipping macro data fetch');
       return null;
     }
 
@@ -239,7 +268,7 @@ class FREDClient {
       });
 
       if (!response.ok) {
-        console.error(`FRED API error for ${seriesId}: ${response.status}`);
+        logger.error('FRED API error', { series_id: seriesId, status: response.status });
         return null;
       }
 
@@ -258,7 +287,10 @@ class FREDClient {
 
       return null;
     } catch (error) {
-      console.error(`FRED fetch error for ${seriesId}:`, error);
+      logger.error('FRED fetch error', {
+        series_id: seriesId,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return null;
     }
   }
@@ -512,7 +544,9 @@ export default {
               macroIndicators.length > 0 ? JSON.stringify(macroIndicators) : null
             ).run();
           } catch (dbError) {
-            console.error('Failed to store sentiment snapshot:', dbError);
+            logger.error('Failed to store sentiment snapshot', {
+              error: dbError instanceof Error ? dbError.message : String(dbError)
+            });
             // Continue anyway - not critical
           }
         }
@@ -521,7 +555,7 @@ export default {
           headers: { 'Content-Type': 'application/json' }
         });
       } catch (error) {
-        console.error('Error fetching current sentiment:', error);
+        logger.error('Error fetching current sentiment', error instanceof Error ? error : new Error(String(error)));
         return new Response(JSON.stringify({
           error: 'Failed to fetch current sentiment',
           details: error instanceof Error ? error.message : 'Unknown error'
@@ -583,7 +617,7 @@ export default {
           headers: { 'Content-Type': 'application/json' }
         });
       } catch (error) {
-        console.error('Error generating committee weighting:', error);
+        logger.error('Error generating committee weighting', error instanceof Error ? error : new Error(String(error)));
         return new Response(JSON.stringify({
           error: 'Failed to generate committee weighting',
           details: error instanceof Error ? error.message : 'Unknown error'
@@ -608,7 +642,7 @@ export default {
           headers: { 'Content-Type': 'application/json' }
         });
       } catch (error) {
-        console.error('Error fetching historical sentiment:', error);
+        logger.error('Error fetching historical sentiment', error instanceof Error ? error : new Error(String(error)));
         return new Response(JSON.stringify({
           error: 'Failed to fetch historical sentiment',
           details: error instanceof Error ? error.message : 'Unknown error'
@@ -635,7 +669,7 @@ export default {
           headers: { 'Content-Type': 'application/json' }
         });
       } catch (error) {
-        console.error('Error fetching news:', error);
+        logger.error('Error fetching news', error instanceof Error ? error : new Error(String(error)));
         return new Response(JSON.stringify({
           error: 'Failed to fetch news',
           details: error instanceof Error ? error.message : 'Unknown error'
@@ -657,7 +691,7 @@ export default {
           headers: { 'Content-Type': 'application/json' }
         });
       } catch (error) {
-        console.error('Error fetching macro indicators:', error);
+        logger.error('Error fetching macro indicators', error instanceof Error ? error : new Error(String(error)));
         return new Response(JSON.stringify({
           error: 'Failed to fetch macro indicators',
           details: error instanceof Error ? error.message : 'Unknown error'
@@ -665,7 +699,26 @@ export default {
       }
     }
 
-    return new Response('News & Sentiment Agent\n\nRoutes:\n- GET / or /current - Current sentiment snapshot\n- GET /committee-weighting - Committee weighting recommendation\n- GET /historical?limit=30 - Historical Fear & Greed data\n- GET /news?limit=50 - Latest news articles with sentiment\n- GET /macro - Current macro indicators', {
+    // ========================================================================
+    // Route: Version Information
+    // ========================================================================
+    if (path === '/version') {
+      return new Response(JSON.stringify({
+        worker: 'news-sentiment-agent',
+        version: '2.1.0',
+        branch: 'claude/incomplete-description-011CUutLehm75rEefmt5WYQj',
+        deployed_at: '2025-11-08T11:52:00Z',
+        phase: 'Phase 3 - Code Quality Improvements',
+        changes: [
+          'Added version endpoint for deployment tracking',
+          'Ready for structured logging migration'
+        ]
+      }, null, 2), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    return new Response('News & Sentiment Agent\n\nRoutes:\n- GET / or /current - Current sentiment snapshot\n- GET /committee-weighting - Committee weighting recommendation\n- GET /historical?limit=30 - Historical Fear & Greed data\n- GET /news?limit=50 - Latest news articles with sentiment\n- GET /macro - Current macro indicators\n- GET /version - Version and deployment info', {
       headers: { 'Content-Type': 'text/plain' }
     });
   }

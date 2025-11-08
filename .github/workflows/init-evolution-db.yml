@@ -3,6 +3,7 @@ name: Initialize Evolution Database
 on:
   push:
     branches:
+      - claude/incomplete-description-011CUutLehm75rEefmt5WYQj
       - claude/debug-cloudflare-historical-data-011CUqugUynEoovcsiVnoaPB
     paths:
       - 'cloudflare-d1-evolution-schema.sql'
@@ -14,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v3

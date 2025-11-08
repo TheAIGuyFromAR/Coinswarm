@@ -14,12 +14,20 @@
 
 import { Agent } from 'agents';
 import { analyzeWithAI, validatePattern, scorePattern, generatePatternId } from './ai-pattern-analyzer';
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('EvolutionAgent', LogLevel.INFO);
+
+// Cloudflare AI binding interface
+interface CloudflareAI {
+  run(model: string, inputs: Record<string, unknown>): Promise<unknown>;
+}
 
 // Environment bindings interface
 interface Env {
   DB: D1Database;  // D1 database for storing trades and patterns
   EVOLUTION_AGENT: DurableObjectNamespace;  // Durable Object binding
-  AI: any;  // Cloudflare Workers AI for intelligent pattern analysis
+  AI: CloudflareAI;  // Cloudflare Workers AI for intelligent pattern analysis
 }
 
 // Agent state interface
@@ -56,11 +64,16 @@ export interface MarketState {
   volatility: number;
 }
 
+// Pattern conditions structure
+interface PatternConditions {
+  [key: string]: {target: number; threshold: number} | number | string;
+}
+
 // Discovered pattern structure
 interface Pattern {
   patternId: string;
   name: string;
-  conditions: any;
+  conditions: PatternConditions;
   winRate: number;
   sampleSize: number;
   discoveredAt: string;
@@ -92,16 +105,16 @@ export class EvolutionAgent extends Agent<Env> {
    * Initializes state and schedules first evolution cycle
    */
   async onStart() {
-    console.log('EvolutionAgent starting...');
+    logger.info('EvolutionAgent starting');
 
     // Load state from storage if exists
     const storedState = await this.ctx.storage.get<EvolutionState>('evolutionState');
     if (storedState) {
       this.state = storedState;
-      console.log(`Resuming from cycle ${this.state.totalCycles}`);
+      logger.info('Resuming from cycle', { cycle: this.state.totalCycles });
     } else {
       this.state = this.initialState;
-      console.log('Starting fresh evolution');
+      logger.info('Starting fresh evolution');
     }
 
     // If not already running, schedule first cycle
@@ -135,7 +148,7 @@ export class EvolutionAgent extends Agent<Env> {
    * Can be called immediately or with a delay
    */
   async scheduleNextCycle(delaySeconds: number = 60) {
-    console.log(`Scheduling next cycle in ${delaySeconds} seconds`);
+    logger.info('Scheduling next cycle', { delay_seconds: delaySeconds });
     await this.schedule(delaySeconds, 'runEvolutionCycle');
   }
 
@@ -148,7 +161,7 @@ export class EvolutionAgent extends Agent<Env> {
    * 4. Schedule next cycle
    */
   async runEvolutionCycle() {
-    console.log(`\n=== Evolution Cycle ${this.state.totalCycles + 1} ===`);
+    logger.info('=== Evolution Cycle Start ===', { cycle: this.state.totalCycles + 1 });
 
     this.state.isRunning = true;
     await this.saveState();
@@ -156,23 +169,23 @@ export class EvolutionAgent extends Agent<Env> {
     try {
       // 1. Generate 50 chaos trades
       const tradesGenerated = await this.generateChaosTrades(50);
-      console.log(`Generated ${tradesGenerated} chaos trades`);
+      logger.info('Generated chaos trades', { count: tradesGenerated });
 
       this.state.totalTrades += tradesGenerated;
 
       // 2. Analyze patterns every 5 cycles
       if (this.state.totalCycles % 5 === 0 && this.state.totalTrades >= 100) {
-        console.log('Analyzing patterns...');
+        logger.info('Analyzing patterns');
         const patternsFound = await this.analyzePatterns();
-        console.log(`Discovered ${patternsFound} new patterns`);
+        logger.info('Discovered new patterns', { count: patternsFound });
         this.state.patternsDiscovered += patternsFound;
       }
 
       // 3. Test strategies every 10 cycles
       if (this.state.totalCycles % 10 === 0 && this.state.patternsDiscovered > 0) {
-        console.log('Testing strategies...');
+        logger.info('Testing strategies');
         const winnersFound = await this.testStrategies();
-        console.log(`Found ${winnersFound} winning strategies`);
+        logger.info('Found winning strategies', { count: winnersFound });
         this.state.winningStrategies += winnersFound;
       }
 
@@ -182,13 +195,13 @@ export class EvolutionAgent extends Agent<Env> {
       this.state.isRunning = false;
       await this.saveState();
 
-      console.log(`Cycle complete. Total: ${this.state.totalTrades} trades, ${this.state.patternsDiscovered} patterns`);
+      logger.info('Cycle complete', { total_trades: this.state.totalTrades, patterns_discovered: this.state.patternsDiscovered });
 
       // Schedule next cycle in 1 minute
       await this.scheduleNextCycle(60);
 
     } catch (error) {
-      console.error('Error in evolution cycle:', error);
+      logger.error('Error in evolution cycle', error instanceof Error ? error : new Error(String(error)));
       this.state.isRunning = false;
       await this.saveState();
 
@@ -342,7 +355,7 @@ export class EvolutionAgent extends Agent<Env> {
     ).all();
 
     if (winners.results.length < 10 || losers.results.length < 10) {
-      console.log('Not enough data for pattern analysis');
+      logger.info('Not enough data for pattern analysis');
       return 0;
     }
 
@@ -417,7 +430,7 @@ export class EvolutionAgent extends Agent<Env> {
     }
 
     // Use AI to discover additional patterns
-    console.log('Using Cloudflare AI for pattern discovery...');
+    logger.info('Using Cloudflare AI for pattern discovery');
     try {
       const aiPatterns = await analyzeWithAI(
         this.env.AI,
@@ -448,12 +461,12 @@ export class EvolutionAgent extends Agent<Env> {
               tested: false,
               votes: 0
             });
-            console.log(`✓ AI discovered: ${aiPattern.patternName} (confidence: ${(aiPattern.confidence * 100).toFixed(0)}%)`);
+            logger.info('AI discovered pattern', { name: aiPattern.patternName, confidence: aiPattern.confidence });
           }
         }
       }
     } catch (error) {
-      console.error('AI pattern discovery failed:', error);
+      logger.error('AI pattern discovery failed', error instanceof Error ? error : new Error(String(error)));
     }
 
     // Store patterns in D1
@@ -540,7 +553,7 @@ export class EvolutionAgent extends Agent<Env> {
     ).all();
 
     if (patterns.results.length === 0) {
-      console.log('No untested patterns');
+      logger.info('No untested patterns');
       return 0;
     }
 
@@ -567,10 +580,10 @@ export class EvolutionAgent extends Agent<Env> {
       if (patternPerformance > randomPerformance) {
         vote = 1; // Upvote
         winnersFound++;
-        console.log(`✓ ${pattern.name}: ${(patternPerformance * 100).toFixed(2)}% vs random ${(randomPerformance * 100).toFixed(2)}%`);
+        logger.info('Pattern winner', { name: pattern.name, performance: (patternPerformance * 100).toFixed(2), vs_random: (randomPerformance * 100).toFixed(2) });
       } else {
         vote = -1; // Downvote
-        console.log(`✗ ${pattern.name}: ${(patternPerformance * 100).toFixed(2)}% vs random ${(randomPerformance * 100).toFixed(2)}%`);
+        logger.info('Pattern loser', { name: pattern.name, performance: (patternPerformance * 100).toFixed(2), vs_random: (randomPerformance * 100).toFixed(2) });
       }
 
       // Update pattern with vote

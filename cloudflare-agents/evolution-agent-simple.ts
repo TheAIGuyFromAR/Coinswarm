@@ -26,13 +26,34 @@ import { runCompetitionCycle } from './agent-competition';
 import { runModelResearch } from './model-research-agent';
 import { runCrossAgentLearning } from './cross-agent-learning';
 import { calculateAllIndicators, generateTradeRationalization, type TechnicalIndicators } from './technical-indicators';
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('EvolutionAgent', LogLevel.INFO);
+
+// Cloudflare AI binding interface
+interface CloudflareAI {
+  run(model: string, inputs: Record<string, unknown>): Promise<unknown>;
+}
 
 // Environment bindings interface
 interface Env {
   DB: D1Database;
   EVOLUTION_AGENT: DurableObjectNamespace;
-  AI?: any;
+  AI?: CloudflareAI;
   SENTIMENT_AGENT_URL?: string; // Optional: news-sentiment-agent worker URL
+}
+
+// Sentiment data structure from news-sentiment-agent
+interface SentimentData {
+  fear_greed_classification: string;
+  fear_greed_index: number;
+  market_regime: string;
+  overall_sentiment: number;
+  news_sentiment: number;
+  macro_indicators?: Array<{
+    indicator_code: string;
+    value: number;
+  }>;
 }
 
 // Agent state interface
@@ -73,6 +94,16 @@ interface ChaosTrade {
   macro10yYield?: number;
 }
 
+// Candle data structure
+interface Candle {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 // Market state at decision time
 export interface MarketState {
   price: number;
@@ -83,11 +114,19 @@ export interface MarketState {
   volatility: number;
 }
 
+// Pattern condition interface
+interface PatternCondition {
+  indicator: string;
+  operator: '>' | '<' | '>=' | '<=' | '==' | '!=';
+  value: number;
+  weight?: number;
+}
+
 // Discovered pattern structure
 interface Pattern {
   patternId: string;
   name: string;
-  conditions: any;
+  conditions: PatternCondition[] | Record<string, unknown>;
   winRate: number;
   sampleSize: number;
   discoveredAt: string;
@@ -99,17 +138,25 @@ interface Pattern {
 /**
  * Helper function to create error responses
  */
-function errorResponse(message: string, error: any, status: number = 500): Response {
-  console.error(`ERROR: ${message}`, error);
-  return new Response(JSON.stringify({
-    error: message,
-    details: error?.message || String(error),
-    stack: error?.stack,
-    timestamp: new Date().toISOString()
-  }, null, 2), {
-    status,
-    headers: { 'Content-Type': 'application/json' }
-  });
+function errorResponse(message: string, error: Error | unknown, status: number = 500): Response {
+  const err = error as Error;
+  logger.error(message, err);
+  return new Response(
+    JSON.stringify(
+      {
+        error: message,
+        details: err?.message || String(error),
+        stack: err?.stack,
+        timestamp: new Date().toISOString(),
+      },
+      null,
+      2
+    ),
+    {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
 }
 
 /**
@@ -122,7 +169,7 @@ export class EvolutionAgent implements DurableObject {
   private logs: string[] = [];
 
   constructor(state: DurableObjectState, env: Env) {
-    console.log('EvolutionAgent constructor called');
+    logger.info('EvolutionAgent constructor called');
     this.state = state;
     this.env = env;
     this.evolutionState = {
@@ -133,20 +180,20 @@ export class EvolutionAgent implements DurableObject {
       lastCycleAt: 'never',
       isRunning: false
     };
-    console.log('EvolutionAgent constructor completed');
+    logger.info('EvolutionAgent constructor completed');
   }
 
   async fetch(request: Request): Promise<Response> {
-    console.log(`Fetch called: ${request.url}`);
+    logger.info('Fetch called', { url: request.url });
 
     try {
       const url = new URL(request.url);
-      console.log(`Pathname: ${url.pathname}`);
+      logger.debug('Processing request', { pathname: url.pathname });
 
       // Load state from D1 database only on first access (when lastCycleAt is 'never')
       // After that, rely on in-memory state which is maintained by the Durable Object
       if (this.evolutionState.lastCycleAt === 'never') {
-        console.log('First access - loading stored state from D1...');
+        logger.info('First access - loading stored state from D1');
         try {
           const result = await this.env.DB.prepare(`
             SELECT value FROM system_state WHERE key = 'evolutionState'
@@ -154,19 +201,22 @@ export class EvolutionAgent implements DurableObject {
 
           if (result && result.value) {
             this.evolutionState = JSON.parse(result.value);
-            console.log('State loaded from D1:', JSON.stringify(this.evolutionState));
+            logger.info('State loaded from D1', {
+              totalCycles: this.evolutionState.totalCycles,
+              totalTrades: this.evolutionState.totalTrades,
+            });
           } else {
-            console.log('No stored state found in D1, using defaults');
+            logger.info('No stored state found in D1, using defaults');
           }
         } catch (error) {
-          console.error('Error loading state from D1:', error);
+          logger.error('Error loading state from D1', error as Error);
           this.evolutionState.lastError = `Failed to load state: ${error}`;
         }
       }
 
       // Debug endpoint
       if (url.pathname === '/debug') {
-        console.log('Debug endpoint called');
+        logger.debug('Debug endpoint called');
         return new Response(JSON.stringify({
           message: 'Debug information',
           state: this.evolutionState,
@@ -197,7 +247,7 @@ export class EvolutionAgent implements DurableObject {
 
       // Status endpoint
       if (url.pathname === '/status') {
-        console.log('Status endpoint called');
+        logger.debug('Status endpoint called');
         return new Response(JSON.stringify({
           status: 'running',
           ...this.evolutionState,
@@ -239,10 +289,10 @@ export class EvolutionAgent implements DurableObject {
 
       // Trigger endpoint
       if (url.pathname === '/trigger') {
-        console.log('Trigger endpoint called');
+        logger.info('Trigger endpoint called');
 
         if (this.evolutionState.isRunning) {
-          console.log('Cycle already running');
+          logger.warn('Cycle already running');
           return new Response(JSON.stringify({
             error: 'Cycle already running',
             state: this.evolutionState
@@ -253,9 +303,9 @@ export class EvolutionAgent implements DurableObject {
         }
 
         // Start evolution in background
-        console.log('Starting evolution cycle...');
-        this.runEvolutionCycle().catch(error => {
-          console.error('Evolution cycle failed:', error);
+        logger.info('Starting evolution cycle');
+        this.runEvolutionCycle().catch((error) => {
+          logger.error('Evolution cycle failed', error as Error);
           this.evolutionState.lastError = String(error);
         });
 
@@ -270,7 +320,7 @@ export class EvolutionAgent implements DurableObject {
 
       // Stats endpoint
       if (url.pathname === '/stats') {
-        console.log('Stats endpoint called');
+        logger.info('Stats endpoint called');
 
         try {
           const tradesCount = await this.env.DB.prepare(
@@ -340,7 +390,7 @@ export class EvolutionAgent implements DurableObject {
 
           // Simple query that works with old schema
           let query = 'SELECT * FROM discovered_patterns WHERE number_of_runs >= ? ORDER BY votes DESC LIMIT ?';
-          const params: any[] = [minRuns, limit];
+          const params: (number | string)[] = [minRuns, limit];
 
           const patterns = await this.env.DB.prepare(query).bind(...params).all();
 
@@ -437,7 +487,7 @@ export class EvolutionAgent implements DurableObject {
       }
 
       // Root endpoint
-      console.log('Root endpoint, returning help');
+      logger.info('Root endpoint, returning help');
       return new Response(JSON.stringify({
         message: 'Evolution Agent - Chaos Trading Evolution System',
         endpoints: {
@@ -466,7 +516,7 @@ export class EvolutionAgent implements DurableObject {
   }
 
   async alarm(): Promise<void> {
-    console.log('Alarm triggered');
+    logger.info('Alarm triggered');
 
     // Load state from D1 if this is first access after DO restart
     if (this.evolutionState.lastCycleAt === 'never') {
@@ -490,7 +540,7 @@ export class EvolutionAgent implements DurableObject {
     try {
       await this.runEvolutionCycle();
     } catch (error) {
-      console.error('Alarm handler failed:', error);
+      logger.error('Alarm handler failed', error instanceof Error ? error : new Error(String(error)));
       this.evolutionState.lastError = `Alarm failed: ${error}`;
       await this.saveState();
     }
@@ -526,13 +576,13 @@ export class EvolutionAgent implements DurableObject {
 
       // Step 3: Test strategies (every 10 cycles)
       if (this.evolutionState.totalCycles % 10 === 0 && this.evolutionState.patternsDiscovered > 0) {
-        console.log('Step 3: Testing strategies...');
+        logger.info('Step 3: Testing strategies');
         try {
           const winnersFound = await this.testStrategies();
-          console.log(`✓ Found ${winnersFound} winning strategies`);
+          logger.info('Strategy testing complete', { winners_found: winnersFound });
           this.evolutionState.winningStrategies += winnersFound;
         } catch (error) {
-          console.error('Strategy testing failed:', error);
+          logger.error('Strategy testing failed', error instanceof Error ? error : new Error(String(error)));
           // Continue despite error
         }
       }
@@ -540,26 +590,34 @@ export class EvolutionAgent implements DurableObject {
       // Step 4: Academic research (every 20 cycles)
       if (this.evolutionState.totalCycles % 20 === 0) {
         this.log('Step 4: Running academic research...');
-        try {
-          const academicPatterns = await runAcademicResearch(this.env.AI, this.env.DB);
-          this.log(`✓ Academic research: ${academicPatterns} patterns generated`);
-          this.evolutionState.patternsDiscovered += academicPatterns;
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          this.log(`❌ Academic research failed: ${errorMsg}`);
+        if (!this.env.AI) {
+          this.log('⚠️  AI not available, skipping academic research');
+        } else {
+          try {
+            const academicPatterns = await runAcademicResearch(this.env.AI, this.env.DB);
+            this.log(`✓ Academic research: ${academicPatterns} patterns generated`);
+            this.evolutionState.patternsDiscovered += academicPatterns;
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            this.log(`❌ Academic research failed: ${errorMsg}`);
+          }
         }
       }
 
       // Step 5: Technical research (every 15 cycles)
       if (this.evolutionState.totalCycles % 15 === 0) {
         this.log('Step 5: Running technical patterns research...');
-        try {
-          const technicalPatterns = await runTechnicalResearch(this.env.AI, this.env.DB);
-          this.log(`✓ Technical research: ${technicalPatterns} patterns generated`);
-          this.evolutionState.patternsDiscovered += technicalPatterns;
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          this.log(`❌ Technical research failed: ${errorMsg}`);
+        if (!this.env.AI) {
+          this.log('⚠️  AI not available, skipping technical research');
+        } else {
+          try {
+            const technicalPatterns = await runTechnicalResearch(this.env.AI, this.env.DB);
+            this.log(`✓ Technical research: ${technicalPatterns} patterns generated`);
+            this.evolutionState.patternsDiscovered += technicalPatterns;
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            this.log(`❌ Technical research failed: ${errorMsg}`);
+          }
         }
       }
 
@@ -582,12 +640,16 @@ export class EvolutionAgent implements DurableObject {
       // Step 7: Reasoning agent competition (every 10 cycles)
       if (this.evolutionState.totalCycles % 10 === 0 && this.evolutionState.patternsDiscovered >= 5) {
         this.log('Step 7: Running reasoning agent competition...');
-        try {
-          await runCompetitionCycle(this.env.AI, this.env.DB, this.evolutionState.totalCycles);
-          this.log('✓ Reasoning agent competition complete');
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          this.log(`❌ Reasoning agent competition failed: ${errorMsg}`);
+        if (!this.env.AI) {
+          this.log('⚠️  AI not available, skipping agent competition');
+        } else {
+          try {
+            await runCompetitionCycle(this.env.AI, this.env.DB, this.evolutionState.totalCycles);
+            this.log('✓ Reasoning agent competition complete');
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            this.log(`❌ Reasoning agent competition failed: ${errorMsg}`);
+          }
         }
       }
 
@@ -606,12 +668,16 @@ export class EvolutionAgent implements DurableObject {
       // Step 8: Model research agent (every 50 cycles)
       if (this.evolutionState.totalCycles % 50 === 0) {
         this.log('Step 8: Running model research...');
-        try {
-          await runModelResearch(this.env.AI, this.env.DB);
-          this.log('✓ Model research complete');
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          this.log(`❌ Model research failed: ${errorMsg}`);
+        if (!this.env.AI) {
+          this.log('⚠️  AI not available, skipping model research');
+        } else {
+          try {
+            await runModelResearch(this.env.AI, this.env.DB);
+            this.log('✓ Model research complete');
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            this.log(`❌ Model research failed: ${errorMsg}`);
+          }
         }
       }
 
@@ -631,17 +697,17 @@ export class EvolutionAgent implements DurableObject {
       this.log('✓ Next cycle scheduled');
 
     } catch (error) {
-      console.error('CRITICAL ERROR in evolution cycle:', error);
+      logger.error('CRITICAL ERROR in evolution cycle', error instanceof Error ? error : new Error(String(error)));
       this.evolutionState.isRunning = false;
       this.evolutionState.lastError = `Cycle failed: ${error}`;
       await this.saveState();
 
       // Retry in 5 minutes on error
-      console.log('Scheduling retry in 5 minutes...');
+      logger.info('Scheduling retry in 5 minutes');
       try {
         await this.state.storage.setAlarm(Date.now() + 300000);
       } catch (alarmError) {
-        console.error('Failed to set alarm:', alarmError);
+        logger.error('Failed to set alarm', alarmError instanceof Error ? alarmError : new Error(String(alarmError)));
       }
     }
   }
@@ -650,7 +716,7 @@ export class EvolutionAgent implements DurableObject {
    * Fetch current sentiment data from news-sentiment-agent
    * Returns null if sentiment agent is not configured or fails
    */
-  private async fetchSentimentData(): Promise<any | null> {
+  private async fetchSentimentData(): Promise<SentimentData | null> {
     if (!this.env.SENTIMENT_AGENT_URL) {
       this.log('Sentiment agent URL not configured, skipping sentiment data');
       return null;
@@ -669,7 +735,7 @@ export class EvolutionAgent implements DurableObject {
         return null;
       }
 
-      const data = await response.json();
+      const data = await response.json() as SentimentData;
       this.log(`✓ Fetched sentiment: ${data.fear_greed_classification} (${data.fear_greed_index}), Regime: ${data.market_regime}`);
       return data;
     } catch (error) {
@@ -828,7 +894,7 @@ export class EvolutionAgent implements DurableObject {
   /**
    * Calculate real market indicators from historical candle data
    */
-  private calculateMarketState(candles: any[], index: number): MarketState {
+  private calculateMarketState(candles: Candle[], index: number): MarketState {
     const current = candles[index];
 
     // Calculate momentum (1 tick = 5 minutes)
@@ -877,19 +943,19 @@ export class EvolutionAgent implements DurableObject {
    * Generate simple chaos trades for regular evolution cycles
    */
   async generateChaosTrades(count: number): Promise<number> {
-    console.log(`Generating ${count} chaos trades...`);
+    logger.info('Generating chaos trades', { count });
 
     try {
       // Just call the historical generator with small count
       return await this.generateHistoricalTrades(count);
     } catch (error) {
-      console.error('Failed to generate chaos trades:', error);
+      logger.error('Failed to generate chaos trades', error instanceof Error ? error : new Error(String(error)));
       throw new Error(`Generate trades failed: ${error}`);
     }
   }
 
   async storeTrades(trades: ChaosTrade[]): Promise<void> {
-    console.log(`Storing ${trades.length} trades with ALL indicators in D1...`);
+    logger.info('Storing trades with indicators in D1', { count: trades.length });
 
     try {
       if (!this.env.DB) {
@@ -1037,12 +1103,12 @@ export class EvolutionAgent implements DurableObject {
         );
       });
 
-      console.log(`Executing batch insert of ${batch.length} trades...`);
+      logger.info('Executing batch insert', { count: batch.length });
       await this.env.DB.batch(batch);
-      console.log('✓ Batch insert complete');
+      logger.info('Batch insert complete');
 
     } catch (error) {
-      console.error('Failed to store trades:', error);
+      logger.error('Failed to store trades', error instanceof Error ? error : new Error(String(error)));
       throw new Error(`Store trades failed: ${error}`);
     }
   }
@@ -1140,7 +1206,7 @@ export class EvolutionAgent implements DurableObject {
 
       // AI-powered pattern discovery
       if (this.env.AI) {
-        console.log('🤖 Using AI for pattern discovery...');
+        logger.info('Using AI for pattern discovery');
         try {
           const aiPatterns = await analyzeWithAI(
             this.env.AI,
@@ -1149,7 +1215,7 @@ export class EvolutionAgent implements DurableObject {
             winners.results.length + losers.results.length
           );
 
-          console.log(`AI suggested ${aiPatterns.length} patterns`);
+          logger.info('AI suggested patterns', { count: aiPatterns.length });
 
           // Validate and add AI-discovered patterns
           for (const aiPattern of aiPatterns) {
@@ -1174,32 +1240,39 @@ export class EvolutionAgent implements DurableObject {
                   votes: 0
                 };
                 patternsFound.push(pattern);
-                console.log(`✓ AI discovered: ${aiPattern.patternName} (confidence: ${(aiPattern.confidence * 100).toFixed(0)}%, quality: ${(quality * 100).toFixed(0)}%)`);
-                console.log(`  Reasoning: ${aiPattern.reasoning}`);
+                logger.info('AI discovered pattern', {
+                  name: aiPattern.patternName,
+                  confidence: aiPattern.confidence,
+                  quality,
+                  reasoning: aiPattern.reasoning
+                });
               } else {
-                console.log(`✗ AI pattern rejected: ${aiPattern.patternName} (quality too low: ${(quality * 100).toFixed(0)}%)`);
+                logger.warn('AI pattern rejected (low quality)', {
+                  name: aiPattern.patternName,
+                  quality
+                });
               }
             } else {
-              console.log(`✗ AI pattern failed validation: ${aiPattern.patternName}`);
+              logger.warn('AI pattern failed validation', { name: aiPattern.patternName });
             }
           }
         } catch (error) {
-          console.error('AI pattern discovery failed:', error);
+          logger.error('AI pattern discovery failed', error instanceof Error ? error : new Error(String(error)));
           // Continue with statistical patterns only
         }
       } else {
-        console.log('⚠️ AI binding not available, using statistical analysis only');
+        logger.warn('AI binding not available, using statistical analysis only');
       }
 
       if (patternsFound.length > 0) {
-        console.log(`Storing ${patternsFound.length} total patterns (statistical + AI)...`);
+        logger.info('Storing patterns (statistical + AI)', { count: patternsFound.length });
         await this.storePatterns(patternsFound);
-        console.log('✓ Patterns stored');
+        logger.info('Patterns stored successfully');
       }
 
       return patternsFound.length;
     } catch (error) {
-      console.error('Pattern analysis failed:', error);
+      logger.error('Pattern analysis failed', error instanceof Error ? error : new Error(String(error)));
       throw new Error(`Analyze patterns failed: ${error}`);
     }
   }
@@ -1241,20 +1314,20 @@ export class EvolutionAgent implements DurableObject {
 
       await this.env.DB.batch(batch);
     } catch (error) {
-      console.error('Failed to store patterns:', error);
+      logger.error('Failed to store patterns', error instanceof Error ? error : new Error(String(error)));
       throw new Error(`Store patterns failed: ${error}`);
     }
   }
 
   async testStrategies(): Promise<number> {
-    console.log('Testing strategies...');
+    logger.info('Testing strategies');
 
     try {
       const patterns = await this.env.DB.prepare(
         'SELECT * FROM discovered_patterns WHERE tested = 0 LIMIT 5'
       ).all();
 
-      console.log(`Found ${patterns.results.length} untested patterns`);
+      logger.info('Found untested patterns', { count: patterns.results.length });
 
       if (patterns.results.length === 0) return 0;
 
@@ -1272,7 +1345,7 @@ export class EvolutionAgent implements DurableObject {
           votes: patternRow.votes as number
         };
 
-        console.log(`Testing pattern: ${pattern.name}`);
+        logger.info('Testing pattern', { name: pattern.name });
 
         // Run multiple test iterations to get performance metrics
         const numTestRuns = 10;
@@ -1298,10 +1371,20 @@ export class EvolutionAgent implements DurableObject {
         if (avgPerformance > randomPerformance) {
           vote = 1;
           winnersFound++;
-          console.log(`✓ ${pattern.name}: Winner! (avg: ${(avgPerformance * 100).toFixed(2)}%, max: ${(maxPerformance * 100).toFixed(2)}% vs random ${(randomPerformance * 100).toFixed(2)}%)`);
+          logger.info('Pattern is a winner', {
+            name: pattern.name,
+            avg_performance: (avgPerformance * 100).toFixed(2),
+            max_performance: (maxPerformance * 100).toFixed(2),
+            random_performance: (randomPerformance * 100).toFixed(2)
+          });
         } else {
           vote = -1;
-          console.log(`✗ ${pattern.name}: Loser (avg: ${(avgPerformance * 100).toFixed(2)}%, max: ${(maxPerformance * 100).toFixed(2)}% vs random ${(randomPerformance * 100).toFixed(2)}%)`);
+          logger.info('Pattern is a loser', {
+            name: pattern.name,
+            avg_performance: (avgPerformance * 100).toFixed(2),
+            max_performance: (maxPerformance * 100).toFixed(2),
+            random_performance: (randomPerformance * 100).toFixed(2)
+          });
         }
 
         // Update with performance tracking
@@ -1321,7 +1404,7 @@ export class EvolutionAgent implements DurableObject {
 
       return winnersFound;
     } catch (error) {
-      console.error('Strategy testing failed:', error);
+      logger.error('Strategy testing failed', error instanceof Error ? error : new Error(String(error)));
       throw new Error(`Test strategies failed: ${error}`);
     }
   }
@@ -1337,7 +1420,7 @@ export class EvolutionAgent implements DurableObject {
       const avgPnl = trades.results.reduce((sum, t) => sum + (t.pnl_pct as number), 0) / trades.results.length;
       return avgPnl / 100 + (Math.random() - 0.5) * 0.02;
     } catch (error) {
-      console.error('Failed to test pattern performance:', error);
+      logger.error('Failed to test pattern performance', error instanceof Error ? error : new Error(String(error)));
       return 0;
     }
   }
@@ -1353,7 +1436,7 @@ export class EvolutionAgent implements DurableObject {
       const avgPnl = trades.results.reduce((sum, t) => sum + (t.pnl_pct as number), 0) / trades.results.length;
       return avgPnl / 100;
     } catch (error) {
-      console.error('Failed to test random performance:', error);
+      logger.error('Failed to test random performance', error instanceof Error ? error : new Error(String(error)));
       return 0;
     }
   }
@@ -1361,7 +1444,7 @@ export class EvolutionAgent implements DurableObject {
   private log(message: string): void {
     const timestamp = new Date().toISOString();
     const logEntry = `[${timestamp}] ${message}`;
-    console.log(logEntry);
+    logger.info(message, { timestamp });
     this.logs.push(logEntry);
     if (this.logs.length > 200) {
       this.logs = this.logs.slice(-100); // Keep last 100
@@ -1410,7 +1493,7 @@ export class EvolutionAgent implements DurableObject {
  */
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    console.log(`Worker fetch: ${request.url}`);
+    logger.info('Worker fetch', { url: request.url });
 
     try {
       // Validate environment
@@ -1422,11 +1505,11 @@ export default {
         return errorResponse('DB binding not found', 'Check wrangler.toml configuration');
       }
 
-      console.log('Getting Durable Object instance...');
+      logger.debug('Getting Durable Object instance');
       const id = env.EVOLUTION_AGENT.idFromName('main-evolution-agent');
       const agent = env.EVOLUTION_AGENT.get(id);
 
-      console.log('Forwarding request to Durable Object...');
+      logger.debug('Forwarding request to Durable Object');
       return await agent.fetch(request);
 
     } catch (error) {
