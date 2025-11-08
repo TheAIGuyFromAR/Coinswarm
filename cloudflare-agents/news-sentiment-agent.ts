@@ -665,7 +665,26 @@ export default {
       }
     }
 
-    return new Response('News & Sentiment Agent\n\nRoutes:\n- GET / or /current - Current sentiment snapshot\n- GET /committee-weighting - Committee weighting recommendation\n- GET /historical?limit=30 - Historical Fear & Greed data\n- GET /news?limit=50 - Latest news articles with sentiment\n- GET /macro - Current macro indicators', {
+    // ========================================================================
+    // Route: Version Information
+    // ========================================================================
+    if (path === '/version') {
+      return new Response(JSON.stringify({
+        worker: 'news-sentiment-agent',
+        version: '2.1.0',
+        branch: 'claude/incomplete-description-011CUutLehm75rEefmt5WYQj',
+        deployed_at: '2025-11-08T11:52:00Z',
+        phase: 'Phase 3 - Code Quality Improvements',
+        changes: [
+          'Added version endpoint for deployment tracking',
+          'Ready for structured logging migration'
+        ]
+      }, null, 2), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    return new Response('News & Sentiment Agent\n\nRoutes:\n- GET / or /current - Current sentiment snapshot\n- GET /committee-weighting - Committee weighting recommendation\n- GET /historical?limit=30 - Historical Fear & Greed data\n- GET /news?limit=50 - Latest news articles with sentiment\n- GET /macro - Current macro indicators\n- GET /version - Version and deployment info', {
       headers: { 'Content-Type': 'text/plain' }
     });
   }
