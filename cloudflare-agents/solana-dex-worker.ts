@@ -23,6 +23,54 @@
  * - GET /arb-opportunities - CEX-DEX arbitrage opportunities
  */
 
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('SolanaDEXWorker', LogLevel.INFO);
+
+// API Response Interfaces
+interface JupiterAPIResponse {
+  data: Record<string, {price: number}>;
+}
+
+interface BirdeyeOHLCVResponse {
+  data?: {
+    items: Array<{
+      address: string;
+      type: string;
+      unixTime: number;
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+      volume: number;
+    }>;
+  };
+}
+
+interface BirdeyeTradesResponse {
+  data?: {
+    items: Array<{
+      blockUnixTime: number;
+      price: number;
+      amount: number;
+      side: string;
+      source?: string;
+      txHash: string;
+    }>;
+  };
+}
+
+interface BinancePriceResponse {
+  price: string;
+}
+
+interface TokenInfo {
+  name?: string;
+  symbol?: string;
+  decimals?: number;
+  liquidity?: number;
+}
+
 interface Env {
   SOLANA_DEX_KV: KVNamespace;
 }
@@ -99,7 +147,7 @@ class JupiterClient {
     try {
       const url = `${this.baseUrl}/price?ids=${mint}&vsToken=${vsMint}`;
       const response = await fetch(url);
-      const data = await response.json() as any;
+      const data = await response.json() as JupiterAPIResponse;
 
       if (data.data && data.data[mint]) {
         return data.data[mint].price;
@@ -107,7 +155,7 @@ class JupiterClient {
 
       return null;
     } catch (error) {
-      console.error('Jupiter API error:', error);
+      logger.error('Jupiter API error', error instanceof Error ? error : new Error(String(error)));
       return null;
     }
   }
@@ -120,16 +168,16 @@ class JupiterClient {
       const ids = mints.join(',');
       const url = `${this.baseUrl}/price?ids=${ids}&vsToken=${vsMint}`;
       const response = await fetch(url);
-      const data = await response.json() as any;
+      const data = await response.json() as JupiterAPIResponse;
 
       const prices: Record<string, number> = {};
       for (const [mint, priceData] of Object.entries(data.data || {})) {
-        prices[mint] = (priceData as any).price;
+        prices[mint] = priceData.price;
       }
 
       return prices;
     } catch (error) {
-      console.error('Jupiter API error:', error);
+      logger.error('Jupiter API error', error instanceof Error ? error : new Error(String(error)));
       return {};
     }
   }
@@ -168,11 +216,11 @@ class BirdeyeClient {
       if (timeTo) url += `&time_to=${timeTo}`;
 
       const response = await fetch(url, { headers });
-      const data = await response.json() as any;
+      const data = await response.json() as BirdeyeOHLCVResponse;
 
       return data.data?.items || [];
     } catch (error) {
-      console.error('Birdeye API error:', error);
+      logger.error('Birdeye API error', error instanceof Error ? error : new Error(String(error)));
       return [];
     }
   }
@@ -191,7 +239,7 @@ class BirdeyeClient {
 
       const url = `${this.baseUrl}/defi/txs/token?address=${address}&tx_type=swap&limit=${limit}`;
       const response = await fetch(url, { headers });
-      const data = await response.json() as any;
+      const data = await response.json() as BirdeyeTradesResponse;
 
       const trades: Trade[] = [];
       for (const tx of data.data?.items || []) {
@@ -199,7 +247,7 @@ class BirdeyeClient {
           timestamp: tx.blockUnixTime * 1000,
           price: tx.price,
           amount: tx.amount,
-          side: tx.side,
+          side: tx.side as 'buy' | 'sell',
           source: tx.source || 'unknown',
           signature: tx.txHash
         });
@@ -207,7 +255,7 @@ class BirdeyeClient {
 
       return trades;
     } catch (error) {
-      console.error('Birdeye API error:', error);
+      logger.error('Birdeye API error', error instanceof Error ? error : new Error(String(error)));
       return [];
     }
   }
@@ -215,7 +263,7 @@ class BirdeyeClient {
   /**
    * Get token info
    */
-  async getTokenInfo(address: string): Promise<any> {
+  async getTokenInfo(address: string): Promise<TokenInfo | null> {
     try {
       const headers: HeadersInit = {
         'Accept': 'application/json'
@@ -226,11 +274,11 @@ class BirdeyeClient {
 
       const url = `${this.baseUrl}/defi/token_overview?address=${address}`;
       const response = await fetch(url, { headers });
-      const data = await response.json() as any;
+      const data = await response.json() as {data?: TokenInfo};
 
       return data.data || null;
     } catch (error) {
-      console.error('Birdeye API error:', error);
+      logger.error('Birdeye API error', error instanceof Error ? error : new Error(String(error)));
       return null;
     }
   }
@@ -306,10 +354,10 @@ class SolanaArbitrageDetector {
     try {
       const url = `${this.binanceApiUrl}/api/v3/ticker/price?symbol=${symbol}`;
       const response = await fetch(url);
-      const data = await response.json() as any;
+      const data = await response.json() as BinancePriceResponse;
       return parseFloat(data.price);
     } catch (error) {
-      console.error('Binance API error:', error);
+      logger.error('Binance API error', error instanceof Error ? error : new Error(String(error)));
       return null;
     }
   }
@@ -359,7 +407,7 @@ export default {
         const prices = await jupiterClient.getPrices(mints);
 
         // Add symbols
-        const pricesWithSymbols: Record<string, any> = {};
+        const pricesWithSymbols: Record<string, {mint: string; price: number}> = {};
         for (const [symbol, mint] of Object.entries(TOKENS)) {
           if (prices[mint]) {
             pricesWithSymbols[symbol] = {
@@ -382,9 +430,9 @@ export default {
       if (path.startsWith('/ohlcv/')) {
         const parts = path.split('/');
         const tokenSymbol = parts[2];
-        const interval = (url.searchParams.get('interval') || '5m') as any;
+        const interval = (url.searchParams.get('interval') || '5m') as ('1m' | '5m' | '15m' | '1H' | '1D');
 
-        const mint = (TOKENS as any)[tokenSymbol.toUpperCase()];
+        const mint = (TOKENS as Record<string, string>)[tokenSymbol.toUpperCase()];
         if (!mint) {
           return new Response(JSON.stringify({
             success: false,
@@ -419,7 +467,7 @@ export default {
         const tokenSymbol = path.split('/')[2];
         const limit = parseInt(url.searchParams.get('limit') || '100');
 
-        const mint = (TOKENS as any)[tokenSymbol.toUpperCase()];
+        const mint = (TOKENS as Record<string, string>)[tokenSymbol.toUpperCase()];
         if (!mint) {
           return new Response(JSON.stringify({
             success: false,
@@ -478,11 +526,13 @@ export default {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
 
-    } catch (error: any) {
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error('Worker fetch failed', err);
       return new Response(JSON.stringify({
         success: false,
-        error: error.message,
-        stack: error.stack
+        error: err.message,
+        stack: err.stack
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
