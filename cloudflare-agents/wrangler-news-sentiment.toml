@@ -16,13 +16,8 @@ ENVIRONMENT = "production"
 # D1 Database binding for storing sentiment snapshots
 [[d1_databases]]
 binding = "DB"
-database_name = "coinswarm-evolution-db"
-database_id = "YOUR_D1_DATABASE_ID"  # Replace with your actual D1 database ID
-
-# KV namespace for caching sentiment data (optional)
-[[kv_namespaces]]
-binding = "SENTIMENT_CACHE"
-id = "YOUR_KV_NAMESPACE_ID"  # Replace with your KV namespace ID
+database_name = "coinswarm-evolution"
+database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
 
 # Cron trigger to fetch sentiment every 6 hours
 [triggers]

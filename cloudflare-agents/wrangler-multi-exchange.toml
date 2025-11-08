@@ -4,10 +4,10 @@ name = "coinswarm-multi-exchange-data"
 main = "multi-exchange-data-worker.ts"
 compatibility_date = "2024-01-01"
 
-# KV Namespace for historical price data (2 years)
-[[kv_namespaces]]
-binding = "HISTORICAL_PRICES"
-id = "your_historical_prices_kv_id"  # Create with: wrangler kv:namespace create HISTORICAL_PRICES
+# KV Namespace for historical price data (2 years) - Optional, disabled for now
+# [[kv_namespaces]]
+# binding = "HISTORICAL_PRICES"
+# id = "your_historical_prices_kv_id"  # Create with: wrangler kv:namespace create HISTORICAL_PRICES
 
 # Environment variables
 [vars]
