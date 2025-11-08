@@ -12,13 +12,43 @@
  * - Google Scholar
  */
 
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('AcademicPapersAgent', LogLevel.INFO);
+
+interface StrategyConditions {
+  entry?: string;
+  exit?: string;
+  momentum1tick?: number;
+  momentum5tick?: number;
+  holdMinutes?: number;
+  [key: string]: unknown;
+}
+
 interface TradingStrategy {
   name: string;
   description: string;
-  conditions: any;
+  conditions: StrategyConditions;
   reasoning: string;
   source: string;
   confidence: number;
+}
+
+interface Pattern {
+  patternId: string;
+  name: string;
+  conditions: Record<string, unknown>;
+  winRate: number;
+  sampleSize: number;
+  discoveredAt: string;
+  tested: number;
+  votes: number;
+  origin: string;
+  sourceDetail: string;
+}
+
+interface CloudflareAI {
+  run(model: string, inputs: Record<string, unknown>): Promise<{ response?: string }>;
 }
 
 interface Paper {
@@ -130,7 +160,7 @@ const ACADEMIC_STRATEGIES = [
  * Generates multiple variations with different parameters
  */
 export async function generateStrategyVariations(
-  ai: any,
+  ai: CloudflareAI,
   strategy: typeof ACADEMIC_STRATEGIES[0]
 ): Promise<TradingStrategy[]> {
 
@@ -175,7 +205,10 @@ OUTPUT FORMAT: Valid JSON array with these fields.`;
     return Array.isArray(result) ? result : [];
 
   } catch (error) {
-    console.error('Failed to generate strategy variations:', error);
+    logger.error('Failed to generate strategy variations', {
+      strategy: strategy.name,
+      error: error instanceof Error ? error.message : String(error)
+    });
 
     // Fallback: Create basic variations manually
     return generateFallbackVariations(strategy);
@@ -231,7 +264,7 @@ function generateFallbackVariations(strategy: typeof ACADEMIC_STRATEGIES[0]): Tr
 /**
  * Convert AI-generated strategy to our database pattern format
  */
-export function convertToPattern(strategy: TradingStrategy, origin: string = 'academic'): any {
+export function convertToPattern(strategy: TradingStrategy, origin: string = 'academic'): Pattern {
   return {
     patternId: `${origin}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     name: `[Academic] ${strategy.name}`,
@@ -255,8 +288,8 @@ export function convertToPattern(strategy: TradingStrategy, origin: string = 'ac
  * Main academic research cycle
  * Processes one strategy at a time, generates variations, stores patterns
  */
-export async function runAcademicResearch(ai: any, db: any): Promise<number> {
-  console.log('🎓 Academic Papers Agent: Starting research cycle...');
+export async function runAcademicResearch(ai: CloudflareAI, db: D1Database): Promise<number> {
+  logger.info('Academic research cycle starting');
 
   let patternsGenerated = 0;
 
@@ -265,12 +298,15 @@ export async function runAcademicResearch(ai: any, db: any): Promise<number> {
     const strategiesToProcess = ACADEMIC_STRATEGIES.slice(0, 3);
 
     for (const strategy of strategiesToProcess) {
-      console.log(`📄 Processing: ${strategy.name}`);
+      logger.info('Processing academic strategy', { strategy_name: strategy.name });
 
       try {
         // Generate variations using AI
         const variations = await generateStrategyVariations(ai, strategy);
-        console.log(`  ✓ Generated ${variations.length} variations`);
+        logger.info('Generated strategy variations', {
+          strategy_name: strategy.name,
+          count: variations.length
+        });
 
         // Convert to pattern format
         const patterns = variations.map(v => convertToPattern(v, 'academic'));
@@ -298,18 +334,26 @@ export async function runAcademicResearch(ai: any, db: any): Promise<number> {
           patternsGenerated++;
         }
 
-        console.log(`  ✓ Stored ${patterns.length} patterns`);
+        logger.info('Stored academic patterns', {
+          strategy_name: strategy.name,
+          count: patterns.length
+        });
 
       } catch (error) {
-        console.error(`  ✗ Failed to process ${strategy.name}:`, error);
+        logger.error('Failed to process academic strategy', {
+          strategy_name: strategy.name,
+          error: error instanceof Error ? error.message : String(error)
+        });
       }
     }
 
-    console.log(`✅ Academic research complete: ${patternsGenerated} patterns generated`);
+    logger.info('Academic research cycle complete', {
+      patterns_generated: patternsGenerated
+    });
     return patternsGenerated;
 
   } catch (error) {
-    console.error('❌ Academic research failed:', error);
+    logger.error('Academic research failed', error instanceof Error ? error : new Error(String(error)));
     return 0;
   }
 }
