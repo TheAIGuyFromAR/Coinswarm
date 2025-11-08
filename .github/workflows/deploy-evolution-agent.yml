@@ -67,6 +67,15 @@ jobs:
           wranglerVersion: "4.45.4"
           command: deploy --config wrangler-solana-dex.toml
 
+      - name: Deploy Sentiment Backfill Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-sentiment-backfill.toml
+
       - name: Deployment Complete
         run: |
           echo "✅ All workers deployed successfully!"
@@ -76,8 +85,15 @@ jobs:
           echo "2. News & Sentiment Agent (committee weighting)"
           echo "3. Multi-Exchange Data Worker (Binance + Coinbase)"
           echo "4. Solana DEX Worker (Jupiter, Raydium, Orca)"
+          echo "5. Sentiment Backfill Worker (historical data enrichment)"
           echo ""
           echo "Check your workers at: https://dash.cloudflare.com/8a330fc6c339f031a73905d4ca2f3e5d/workers"
           echo ""
-          echo "Trigger evolution cycle:"
-          echo "curl -X POST https://YOUR-EVOLUTION-AGENT-URL/trigger"
+          echo "Next steps:"
+          echo "1. Apply D1 migrations (run locally or via dashboard):"
+          echo "   npx wrangler d1 execute coinswarm-evolution --remote --file=cloudflare-agents/sentiment-data-schema.sql"
+          echo "   npx wrangler d1 execute coinswarm-evolution --remote --file=cloudflare-agents/sentiment-advanced-schema.sql"
+          echo "2. Start backfill process:"
+          echo "   curl -X POST https://coinswarm-sentiment-backfill.bamn86.workers.dev/backfill?batch=100"
+          echo "3. Check backfill progress:"
+          echo "   curl https://coinswarm-sentiment-backfill.bamn86.workers.dev/status"
