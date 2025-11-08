@@ -179,7 +179,10 @@ export async function runAgentCompetition(
   cycleNumber: number,
   tradesPerAgent: number = 5
 ): Promise<CompetitionResult> {
-  console.log(`\n🏆 AGENT COMPETITION - Cycle ${cycleNumber}`);
+  logger.info('Agent competition cycle started', {
+    cycle: cycleNumber,
+    trades_per_agent: tradesPerAgent,
+  });
 
   // Get all active agents
   const agents = await getActiveAgents(db);
@@ -188,7 +191,7 @@ export async function runAgentCompetition(
     throw new Error('No active agents found. Initialize population first.');
   }
 
-  console.log(`   ${agents.length} agents competing...`);
+  logger.info('Agents competing', { count: agents.length });
 
   // Each agent makes multiple trades
   const competitionResults: RankingResult[] = [];
@@ -219,10 +222,19 @@ export async function runAgentCompetition(
         if (outcome.outcome === 'win') wins++;
         trades++;
 
-        console.log(`      Trade ${i + 1}: ${outcome.outcome} (${outcome.roi.toFixed(2)}%)`);
+        logger.debug('Trade completed', {
+          agent_id: agent.agent_id,
+          trade_num: i + 1,
+          outcome: outcome.outcome,
+          roi: outcome.roi.toFixed(2),
+        });
 
       } catch (error) {
-        console.error(`      Error on trade ${i + 1}:`, error);
+        logger.error('Trade failed', {
+          agent_id: agent.agent_id,
+          trade_num: i + 1,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
 
       // Small delay between trades
@@ -260,9 +272,13 @@ export async function runAgentCompetition(
     r.rank = i + 1;
   });
 
-  console.log('\n   📊 Competition Results:');
-  competitionResults.slice(0, 3).forEach((r, i) => {
-    console.log(`      ${i + 1}. ${r.agent_name}: ${r.total_roi.toFixed(2)}% (${(r.win_rate * 100).toFixed(0)}% WR)`);
+  logger.info('Competition results', {
+    top_3: competitionResults.slice(0, 3).map((r, i) => ({
+      rank: i + 1,
+      name: r.agent_name,
+      roi: r.total_roi.toFixed(2),
+      win_rate: (r.win_rate * 100).toFixed(0),
+    })),
   });
 
   // Update agent fitness scores
@@ -333,7 +349,7 @@ export async function evolveAgentPopulation(
   const agents = await getActiveAgents(db);
 
   if (agents.length < 5) {
-    console.log('   ⚠️  Population too small for evolution, skipping');
+    logger.warn('Population too small for evolution, skipping', { agent_count: agents.length });
     return { eliminated: 0, cloned: 0 };
   }
 
@@ -356,9 +372,14 @@ export async function evolveAgentPopulation(
   const toEliminate = rankedAgents.results.slice(-eliminateCount);
   const eliminatedIds: string[] = [];
 
-  console.log(`\n   ☠️  Eliminating bottom ${eliminateCount} agents:`);
+  logger.info('Eliminating bottom agents', {
+    count: eliminateCount,
+  });
   for (const agent of toEliminate) {
-    console.log(`      - ${agent.agent_name} (Fitness: ${agent.fitness_score.toFixed(1)})`);
+    logger.debug('Eliminating agent', {
+      name: agent.agent_name,
+      fitness: agent.fitness_score.toFixed(1),
+    });
 
     await db.prepare(`
       UPDATE trading_agents
@@ -374,7 +395,7 @@ export async function evolveAgentPopulation(
   const toClone = rankedAgents.results.slice(0, cloneCount);
   const clonedIds: string[] = [];
 
-  console.log(`\n   🧬 Cloning top ${cloneCount} agents with mutations:`);
+  logger.info('Cloning top agents with mutations', { count: cloneCount });
   for (const parent of toClone) {
     const mutationType = Math.random();
     let newPersonality = parent.personality;
@@ -419,7 +440,11 @@ export async function evolveAgentPopulation(
 
     clonedIds.push(cloneId);
 
-    console.log(`      + ${cloneName} (from ${parent.agent_name}) - ${mutationDesc}`);
+    logger.info('Clone created', {
+      clone_name: cloneName,
+      parent_name: parent.agent_name,
+      mutation: mutationDesc,
+    });
   }
 
   // Update competition record with evolution outcomes
@@ -434,7 +459,10 @@ export async function evolveAgentPopulation(
     competition.competition_id
   ).run();
 
-  console.log(`\n   ✓ Evolution complete: ${eliminatedIds.length} eliminated, ${clonedIds.length} cloned`);
+  logger.info('Evolution cycle complete', {
+    eliminated_count: eliminatedIds.length,
+    cloned_count: clonedIds.length,
+  });
 
   return { eliminated: eliminatedIds.length, cloned: clonedIds.length };
 }
@@ -451,21 +479,27 @@ export async function runCompetitionCycle(
   const agents = await getActiveAgents(db);
 
   if (agents.length === 0) {
-    console.log('   No agents found, initializing population...');
+    logger.warn('No agents found, initializing population');
     await initializeAgentPopulation(db, 10);
   }
 
   // 2. Run competition
   const competition = await runAgentCompetition(ai, db, cycleNumber, 5);
 
-  console.log(`\n   🏆 Winner: ${competition.rankings[0].agent_name} (${competition.rankings[0].roi.toFixed(2)}%)`);
+  logger.info('Competition winner', {
+    winner: competition.rankings[0].agent_name,
+    roi: competition.rankings[0].roi.toFixed(2),
+  });
 
   // 3. Evolve population (every 5 competitions)
   if (cycleNumber % 5 === 0) {
     const evolution = await evolveAgentPopulation(ai, db, competition);
-    console.log(`   🧬 Population evolved: -${evolution.eliminated} +${evolution.cloned}`);
+    logger.info('Population evolved', {
+      eliminated: evolution.eliminated,
+      cloned: evolution.cloned,
+    });
   } else {
-    console.log('   ⏭️  Skipping evolution this round');
+    logger.info('Evolution skipped this round');
   }
 
   // 4. Show current population stats
@@ -473,10 +507,11 @@ export async function runCompetitionCycle(
   const avgFitness = updatedAgents.reduce((sum: number, a: TradingAgent) => sum + a.fitness_score, 0) / updatedAgents.length;
   const avgGeneration = updatedAgents.reduce((sum: number, a: TradingAgent) => sum + a.generation, 0) / updatedAgents.length;
 
-  console.log(`\n   📊 Population Stats:`);
-  console.log(`      Active agents: ${updatedAgents.length}`);
-  console.log(`      Avg fitness: ${avgFitness.toFixed(1)}`);
-  console.log(`      Avg generation: ${avgGeneration.toFixed(1)}`);
+  logger.info('Population stats', {
+    active_agents: updatedAgents.length,
+    avg_fitness: avgFitness.toFixed(1),
+    avg_generation: avgGeneration.toFixed(1),
+  });
 }
 
 export { CompetitionResult };
