@@ -6,9 +6,12 @@ main = "data-fetcher.js"
 compatibility_date = "2024-01-01"
 
 # KV namespace for caching
-[[kv_namespaces]]
-binding = "DATA_CACHE"
-id = "your_kv_namespace_id"  # Get from: wrangler kv:namespace create DATA_CACHE
+# IMPORTANT: Create KV namespace before deploying:
+#   wrangler kv:namespace create DATA_CACHE --preview false
+# Then uncomment and add the ID below:
+# [[kv_namespaces]]
+# binding = "DATA_CACHE"
+# id = "YOUR_ACTUAL_KV_ID_HERE"
 
 # Routes (optional - deploy to workers.dev subdomain for now)
 # routes = [

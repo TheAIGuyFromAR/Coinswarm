@@ -264,7 +264,7 @@ Remember: You are ${agent.personality}, so select patterns that match your perso
   }
 
   // Create memory record
-  const memoryId = generatePatternId();
+  const memoryId = generatePatternId(`memory-${agent.agent_id}-${cycleNumber}`);
   const memory: AgentMemory = {
     memory_id: memoryId,
     agent_id: agent.agent_id,
@@ -492,7 +492,7 @@ Respond in JSON format:
               preference_strength, confidence, times_validated, times_contradicted
             ) VALUES (?, ?, 'pattern_preference', ?, ?, ?, ?, ?)
           `).bind(
-            generatePatternId(),
+            generatePatternId(`knowledge-${agent.agent_id}-${patternId}`),
             agent.agent_id,
             patternId,
             adjustment,

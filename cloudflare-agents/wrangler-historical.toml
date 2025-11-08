@@ -5,9 +5,12 @@ main = "historical-data-worker.ts"
 compatibility_date = "2024-01-01"
 
 # KV Namespace for historical price data
-[[kv_namespaces]]
-binding = "HISTORICAL_PRICES"
-id = "your_historical_prices_kv_id"  # Create with: wrangler kv:namespace create HISTORICAL_PRICES
+# IMPORTANT: Create KV namespace before deploying:
+#   wrangler kv:namespace create HISTORICAL_PRICES --preview false
+# Then uncomment and add the ID below:
+# [[kv_namespaces]]
+# binding = "HISTORICAL_PRICES"
+# id = "YOUR_ACTUAL_KV_ID_HERE"
 
 # Environment variables
 [vars]

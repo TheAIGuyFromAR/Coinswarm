@@ -96,10 +96,44 @@ class PortfolioManager {
     return state;
   }
 
-  canOpenPosition(pair: string, size: number, price: number, maxPerPair: number = 0.3): boolean {
+  async canOpenPosition(pair: string, size: number, price: number, maxPerPair: number = 0.3): Promise<boolean> {
     // Check if we can open a position given risk limits
-    // For now, simplified check
-    return true; // TODO: Implement proper risk checks
+    const state = await this.getState();
+
+    // 1. Check if position already exists for this pair
+    if (state.positions[pair]) {
+      console.log(`Risk check failed: Position already exists for ${pair}`);
+      return false;
+    }
+
+    // 2. Check if we have enough cash
+    const positionValue = size * price;
+    if (positionValue > state.cash) {
+      console.log(`Risk check failed: Insufficient cash. Need ${positionValue}, have ${state.cash}`);
+      return false;
+    }
+
+    // 3. Check maximum exposure per pair (default 30% of total equity)
+    const maxPositionSize = state.totalEquity * maxPerPair;
+    if (positionValue > maxPositionSize) {
+      console.log(`Risk check failed: Position size ${positionValue} exceeds max ${maxPositionSize} (${maxPerPair * 100}% of equity)`);
+      return false;
+    }
+
+    // 4. Check total number of positions (max 5 positions to avoid over-diversification)
+    const positionCount = Object.keys(state.positions).length;
+    if (positionCount >= 5) {
+      console.log(`Risk check failed: Maximum positions reached (${positionCount}/5)`);
+      return false;
+    }
+
+    // 5. Basic sanity checks
+    if (size <= 0 || price <= 0) {
+      console.log(`Risk check failed: Invalid size ${size} or price ${price}`);
+      return false;
+    }
+
+    return true;
   }
 
   async openPosition(pair: string, size: number, price: number): Promise<void> {

@@ -434,7 +434,7 @@ What's happening and what should a conservative trader do? JSON:
   const avgTime = totalTime / testPrompts.length;
 
   const testResult: ModelTestResult = {
-    model_id: generatePatternId(),
+    model_id: generatePatternId(`model-test-${Date.now()}`),
     test_type: 'comprehensive',
     prompt: 'Multiple trading reasoning tests',
     response: JSON.stringify(results),
@@ -554,7 +554,7 @@ export async function runModelResearch(ai: any, db: any): Promise<void> {
         log_id, log_type, content, created_at
       ) VALUES (?, 'financial_models_found', ?, CURRENT_TIMESTAMP)
     `).bind(
-      generatePatternId(),
+      generatePatternId(`research-log-financial-${Date.now()}`),
       JSON.stringify({ models: financialModels })
     ).run();
   }
@@ -576,7 +576,7 @@ export async function runModelResearch(ai: any, db: any): Promise<void> {
         log_id, log_type, content, created_at
       ) VALUES (?, 'arxiv_papers', ?, CURRENT_TIMESTAMP)
     `).bind(
-      generatePatternId(),
+      generatePatternId(`research-log-arxiv-${Date.now()}`),
       JSON.stringify({
         query: 'deep learning time series forecasting',
         papers: arxivPapers.slice(0, 5)
@@ -601,7 +601,7 @@ export async function runModelResearch(ai: any, db: any): Promise<void> {
         log_id, log_type, content, created_at
       ) VALUES (?, 'model_search', ?, CURRENT_TIMESTAMP)
     `).bind(
-      generatePatternId(),
+      generatePatternId(`research-log-huggingface-${Date.now()}`),
       JSON.stringify({
         source: 'huggingface',
         query: 'time series forecasting',
@@ -649,7 +649,7 @@ export async function runModelResearch(ai: any, db: any): Promise<void> {
       log_id, log_type, content, created_at
     ) VALUES (?, 'model_research_complete', ?, CURRENT_TIMESTAMP)
   `).bind(
-    generatePatternId(),
+    generatePatternId(`research-log-complete-${Date.now()}`),
     JSON.stringify({
       best_model: bestModel,
       financial_models_found: financialModels.length,

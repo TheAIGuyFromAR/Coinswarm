@@ -47,8 +47,8 @@ export async function initializeAgentPopulation(
   const agents: TradingAgent[] = [];
 
   for (let i = 0; i < populationSize; i++) {
-    const agentId = generatePatternId();
     const personality = personalities[i % personalities.length];
+    const agentId = generatePatternId(`agent-${personality}-${i}`);
 
     const agent: TradingAgent = {
       agent_id: agentId,
@@ -257,7 +257,7 @@ export async function runAgentCompetition(
   }
 
   // Store competition record
-  const competitionId = generatePatternId();
+  const competitionId = generatePatternId(`competition-${Date.now()}`);
   await db.prepare(`
     INSERT INTO agent_competitions (
       competition_id,
@@ -361,7 +361,7 @@ export async function evolveAgentPopulation(
       mutationDesc = `personality: ${parent.personality} → ${newPersonality}`;
     }
 
-    const cloneId = generatePatternId();
+    const cloneId = generatePatternId(`clone-${newPersonality}-gen${parent.generation + 1}`);
     const cloneName = `${newPersonality.toUpperCase()}-GEN${parent.generation + 1}-${Math.floor(Math.random() * 1000)}`;
 
     await db.prepare(`
@@ -382,7 +382,7 @@ export async function evolveAgentPopulation(
         lineage_id, ancestor_id, descendant_id, generation_gap, mutation_type, mutation_details
       ) VALUES (?, ?, ?, 1, 'evolution', ?)
     `).bind(
-      generatePatternId(),
+      generatePatternId(`lineage-${parent.agent_id}-${cloneId}`),
       parent.agent_id,
       cloneId,
       JSON.stringify({ mutation: mutationDesc })

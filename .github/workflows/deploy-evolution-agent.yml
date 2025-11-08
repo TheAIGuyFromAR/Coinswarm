@@ -113,7 +113,7 @@ jobs:
           echo "- Sentiment time-series tables created (keywords, headlines, derivatives)"
           echo "- Ready for sentiment-enhanced pattern discovery"
           echo ""
-          echo "Check your workers at: https://dash.cloudflare.com/8a330fc6c339f031a73905d4ca2f3e5d/workers"
+          echo "Check your workers at: https://dash.cloudflare.com (login required)"
           echo ""
           echo "Optional: Start historical backfill to enrich 129,200 existing trades:"
           echo "  curl -X POST https://coinswarm-sentiment-backfill.bamn86.workers.dev/backfill?batch=100"

@@ -5,9 +5,12 @@ main = "solana-dex-worker.ts"
 compatibility_date = "2024-01-01"
 
 # KV Namespace for caching DEX data - Optional, disabled for now
+# IMPORTANT: Create KV namespace before enabling:
+#   wrangler kv:namespace create SOLANA_DEX_KV --preview false
+# Then uncomment and add the ID below:
 # [[kv_namespaces]]
 # binding = "SOLANA_DEX_KV"
-# id = "your_solana_dex_kv_id"  # Create with: wrangler kv:namespace create SOLANA_DEX_KV
+# id = "YOUR_ACTUAL_KV_ID_HERE"
 
 # Environment variables
 [vars]
