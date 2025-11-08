@@ -6,12 +6,25 @@
  */
 
 import { MarketState } from './evolution-agent-simple';
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('AIPatternAnalyzer', LogLevel.INFO);
+
+// Cloudflare AI binding interface
+interface CloudflareAI {
+  run(model: string, inputs: Record<string, unknown>): Promise<unknown>;
+}
+
+// Pattern conditions can be any structure from AI
+interface PatternConditions {
+  [key: string]: string | number | boolean | PatternConditions;
+}
 
 export interface PatternInsight {
   patternName: string;
   confidence: number;
   description: string;
-  conditions: any;
+  conditions: PatternConditions;
   reasoning: string;
 }
 
@@ -22,7 +35,7 @@ export interface PatternInsight {
  * non-obvious patterns and correlations
  */
 export async function analyzeWithAI(
-  ai: any,
+  ai: CloudflareAI,
   winnerStats: MarketState,
   loserStats: MarketState,
   sampleSize: number
@@ -81,15 +94,15 @@ Respond in JSON format:
       ],
       temperature: 0.3,  // Lower temperature for more consistent analysis
       max_tokens: 1000
-    });
+    }) as { response: string };
 
     // Parse AI response
-    const result = JSON.parse(response.response || '{"patterns": []}');
+    const result = JSON.parse(response.response || '{"patterns": []}') as { patterns: PatternInsight[] };
 
     return result.patterns || [];
 
   } catch (error) {
-    console.error('AI analysis failed:', error);
+    logger.error('AI analysis failed', error instanceof Error ? error : new Error(String(error)));
     return [];
   }
 }
