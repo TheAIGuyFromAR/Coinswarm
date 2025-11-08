@@ -20,33 +20,40 @@
 
 **Coinswarm has TWO integrated systems working together:**
 
-#### System 1: Pattern Discovery & Evolution (Built, Needs Redeployment)
+#### System 1: Pattern Discovery & Evolution (Live and Running!)
 
-**Evolutionary Architecture** (Cloudflare Worker - currently offline):
+**Evolutionary Architecture** (Cloudflare Worker - ✅ OPERATIONAL):
 
-**How it's designed to work**:
-1. **Chaos agents** generate random trades (discovery phase)
+**How it works**:
+1. **Chaos agents** generate random trades every minute (50 trades/cycle)
 2. **Pattern extraction** finds what works from successful chaos trades
-3. **Head-to-head testing** - patterns compete against each other
+3. **Head-to-head testing** - patterns compete every 3 cycles
 4. **Evolution** - winners survive and get cloned, losers eliminated
-5. **Academic research** tests established TA patterns (MA, RSI, Bollinger Bands)
-6. **Technical patterns** - classic chart patterns (triangles, H&S, etc.)
-7. **Best patterns** feed into the trading engine as proven strategies
+5. **Academic research** tests established TA patterns every 20 cycles
+6. **Technical patterns** - classic chart patterns every 15 cycles
+7. **Agent competition** - reasoning agents compete every 10 cycles
+8. **Best patterns** feed into the trading engine as proven strategies
 
-**Current Status**:
-- ✅ Dashboards working: [View them live](https://coinswarm-evolution-agent.bamn86.workers.dev/architecture)
-- ⚠️ Data is stale (showing data from hours ago - evolution cycle not running)
-- ✅ Code exists: `cloudflare-agents/evolution-agent-simple.ts` (58,549 lines)
-- ✅ Full schema: Pattern tables, agent tables, competition tracking
-- 🔨 **Need to fix**: Restart cron schedule or manually trigger evolution cycle
+**Current Status** (Last verified: Nov 8, 2025 21:43):
+- ✅ **System LIVE**: Evolution cycles running automatically every 60 seconds
+- ✅ **Cron trigger**: Fixed and operational
+- ✅ **Patterns labeled**: All patterns properly tagged by source (CHAOS/ACADEMIC/TECHNICAL)
+- ✅ **1,527 patterns discovered**, 362 winning strategies
+- ✅ **77,600 chaos trades** generated and analyzed
+- ✅ **Cycle 1553** completed successfully
+- ✅ **Dashboards live**: [View them here](https://coinswarm-evolution-agent.bamn86.workers.dev/architecture)
 
-**What the dashboards show**:
-- Pattern Leaderboard: 663 patterns discovered, 228 winning (last update: hours ago)
-- Agent Swarm: Population of competing agents
-- Pattern win rates and head-to-head records
-- System statistics
+**Live Dashboards** (updating in real-time):
+- **[Architecture](https://coinswarm-evolution-agent.bamn86.workers.dev/architecture)** - System design visualization
+- **[Pattern Leaderboard](https://coinswarm-evolution-agent.bamn86.workers.dev/patterns)** - 1,527 patterns with source labels
+- **[Agent Swarm](https://coinswarm-evolution-agent.bamn86.workers.dev/swarm)** - Competing agents (will populate at cycle 1560)
+- **[Agent Rankings](https://coinswarm-evolution-agent.bamn86.workers.dev/agents)** - Performance leaderboard
 
-**Note for stakeholders**: System is built and deployed, but needs the evolution cycle restarted to generate fresh data. The core trading engine (System 2) is independent.
+**Recent Fixes Applied**:
+- Fixed empty batch SQL error (no more "No SQL statements detected")
+- Added pattern source labeling (CHAOS/ACADEMIC/TECHNICAL)
+- Enabled cron triggers for continuous evolution
+- Added scheduled() handler for automatic cycle execution
 
 #### System 2: Core Trading Engine (Python - 40% Complete)
 **What's implemented**:
