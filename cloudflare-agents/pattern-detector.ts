@@ -5,6 +5,15 @@
  * Integrates with discovered patterns from chaos trading system
  */
 
+interface Pattern {
+  pattern_id: string;
+  name: string;
+  conditions: string;
+  win_rate: number;
+  votes: number;
+  tested: boolean;
+}
+
 export interface DetectedPattern {
   patternId: string;
   patternName: string;
@@ -27,7 +36,7 @@ export interface PatternMatch {
  * Returns matches with confidence scores
  */
 export class MultiPatternDetector {
-  private patterns: any[];
+  private patterns: Pattern[];
 
   constructor() {
     this.patterns = [];
@@ -36,7 +45,7 @@ export class MultiPatternDetector {
   /**
    * Load patterns from database or cache
    */
-  async loadPatterns(db: any): Promise<void> {
+  async loadPatterns(db: D1Database): Promise<void> {
     // TODO: Load top-performing patterns from discovered_patterns table
     // For now, return empty array
     this.patterns = [];
@@ -65,7 +74,7 @@ export class MultiPatternDetector {
   /**
    * Validate pattern still meets performance criteria
    */
-  async validatePattern(patternId: string, db: any): Promise<boolean> {
+  async validatePattern(patternId: string, db: D1Database): Promise<boolean> {
     // TODO: Check if pattern still has good win rate
     // For now, return true
     return true;
