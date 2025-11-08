@@ -15,10 +15,39 @@
  */
 
 import { MultiPatternDetector } from './pattern-detector';
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('TradingWorker', LogLevel.INFO);
 
 interface Env {
   TRADING_KV: KVNamespace;
   HISTORICAL_PRICES: KVNamespace;
+}
+
+interface BinancePriceResponse {
+  symbol: string;
+  price: string;
+}
+
+interface HistoricalDataResponse {
+  success: boolean;
+  dataset?: {
+    pair: string;
+    candles: Array<{
+      timestamp: number;
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+      volume: number;
+    }>;
+  };
+}
+
+interface TradeRequest {
+  action: 'BUY' | 'SELL';
+  pair: string;
+  size: number;
 }
 
 interface PortfolioPosition {
@@ -102,34 +131,47 @@ class PortfolioManager {
 
     // 1. Check if position already exists for this pair
     if (state.positions[pair]) {
-      console.log(`Risk check failed: Position already exists for ${pair}`);
+      logger.warn('Risk check failed: Position already exists', { pair });
       return false;
     }
 
     // 2. Check if we have enough cash
     const positionValue = size * price;
     if (positionValue > state.cash) {
-      console.log(`Risk check failed: Insufficient cash. Need ${positionValue}, have ${state.cash}`);
+      logger.warn('Risk check failed: Insufficient cash', {
+        pair,
+        required: positionValue,
+        available: state.cash,
+      });
       return false;
     }
 
     // 3. Check maximum exposure per pair (default 30% of total equity)
     const maxPositionSize = state.totalEquity * maxPerPair;
     if (positionValue > maxPositionSize) {
-      console.log(`Risk check failed: Position size ${positionValue} exceeds max ${maxPositionSize} (${maxPerPair * 100}% of equity)`);
+      logger.warn('Risk check failed: Position size exceeds maximum', {
+        pair,
+        positionValue,
+        maxPositionSize,
+        maxPercentage: maxPerPair * 100,
+      });
       return false;
     }
 
     // 4. Check total number of positions (max 5 positions to avoid over-diversification)
     const positionCount = Object.keys(state.positions).length;
     if (positionCount >= 5) {
-      console.log(`Risk check failed: Maximum positions reached (${positionCount}/5)`);
+      logger.warn('Risk check failed: Maximum positions reached', {
+        pair,
+        currentPositions: positionCount,
+        maxPositions: 5,
+      });
       return false;
     }
 
     // 5. Basic sanity checks
     if (size <= 0 || price <= 0) {
-      console.log(`Risk check failed: Invalid size ${size} or price ${price}`);
+      logger.warn('Risk check failed: Invalid size or price', { pair, size, price });
       return false;
     }
 
@@ -217,7 +259,7 @@ class PriceFetcher {
       const pricePromises = pairs.map(async (symbol) => {
         const url = `${this.binanceApiUrl}/api/v3/ticker/price?symbol=${symbol}`;
         const response = await fetch(url);
-        const data = await response.json() as any;
+        const data = (await response.json()) as BinancePriceResponse;
         return { symbol, price: parseFloat(data.price) };
       });
 
@@ -237,7 +279,7 @@ class PriceFetcher {
       }
 
     } catch (error) {
-      console.error('Error fetching Binance prices:', error);
+      logger.error('Error fetching Binance prices', error as Error);
       // Fallback to mock data if Binance fails
       return this.mockPrices();
     }
@@ -251,7 +293,7 @@ class PriceFetcher {
   private async fetchFromHistorical(): Promise<Record<string, number>> {
     try {
       const response = await fetch(`${this.historicalDataUrl}/random?interval=5m&minDays=1`);
-      const data = await response.json() as any;
+      const data = (await response.json()) as HistoricalDataResponse;
 
       if (data.success && data.dataset && data.dataset.candles.length > 0) {
         // Get latest candle
@@ -261,7 +303,7 @@ class PriceFetcher {
         };
       }
     } catch (error) {
-      console.error('Error fetching historical data:', error);
+      logger.error('Error fetching historical data', error as Error);
     }
 
     // Fallback
@@ -369,7 +411,7 @@ export default {
 
       // Route: Execute trade (POST)
       if (path === '/trade' && request.method === 'POST') {
-        const body = await request.json() as any;
+        const body = (await request.json()) as TradeRequest;
         const { action, pair, size } = body;
 
         const prices = await priceFetcher.fetchAllPrices();
@@ -423,14 +465,19 @@ export default {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
 
-    } catch (error: any) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: error.message
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    } catch (error) {
+      const err = error as Error;
+      logger.error('Worker error', err);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: err.message,
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
   }
 };
