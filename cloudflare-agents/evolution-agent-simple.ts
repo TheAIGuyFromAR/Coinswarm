@@ -942,7 +942,6 @@ export class EvolutionAgent implements DurableObject {
           ?, ?, ?, ?,
           ?, ?
         )
-        -- Note: Sentiment columns will be added back after migrations are verified
       `);
 
       const batch = trades.map(t => {
