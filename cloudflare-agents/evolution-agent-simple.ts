@@ -1049,8 +1049,8 @@ export class EvolutionAgent implements DurableObject {
           t.macroCPI ?? null,
           t.macroUnemployment ?? null,
           t.macro10yYield ?? null
-        )
-      );
+        );
+      });
 
       console.log(`Executing batch insert of ${batch.length} trades...`);
       await this.env.DB.batch(batch);
