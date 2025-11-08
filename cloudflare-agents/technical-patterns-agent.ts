@@ -10,11 +10,55 @@
  * Generates variations with different parameters
  */
 
+import { createLogger, LogLevel } from './structured-logger';
+
+const logger = createLogger('TechnicalPatternsAgent', LogLevel.INFO);
+
+interface TechnicalConditions {
+  structure?: string;
+  entry?: string;
+  exit?: string;
+  target?: string;
+  setup?: string;
+  timeframe?: string;
+  confirmation?: string;
+  [key: string]: unknown;
+}
+
+interface TechnicalVariation {
+  name?: string;
+  timeframe?: string;
+  momentum_threshold?: number;
+  volatility_range?: number;
+  volume_multiplier?: number;
+  hold_duration_minutes?: number;
+  stop_loss_pct?: number;
+  take_profit_pct?: number;
+  [key: string]: unknown;
+}
+
+interface Pattern {
+  patternId: string;
+  name: string;
+  conditions: Record<string, unknown>;
+  winRate: number;
+  sampleSize: number;
+  discoveredAt: string;
+  tested: number;
+  votes: number;
+  origin: string;
+  sourceDetail: string;
+}
+
+interface CloudflareAI {
+  run(model: string, inputs: Record<string, unknown>): Promise<{ response?: string }>;
+}
+
 interface TechnicalSetup {
   name: string;
   description: string;
   type: 'chart_pattern' | 'indicator' | 'fibonacci' | 'volume';
-  conditions: any;
+  conditions: TechnicalConditions;
   typical_success_rate: number;
 }
 
@@ -200,9 +244,9 @@ const TECHNICAL_SETUPS: TechnicalSetup[] = [
  * Generate variations of a technical setup using AI
  */
 export async function generateTechnicalVariations(
-  ai: any,
+  ai: CloudflareAI,
   setup: TechnicalSetup
-): Promise<any[]> {
+): Promise<TechnicalVariation[]> {
 
   const prompt = `You are an expert technical analyst. Create 3 specific trading patterns based on this setup for crypto day trading.
 
@@ -245,7 +289,10 @@ OUTPUT: Valid JSON array with these numeric fields.`;
     return Array.isArray(result) ? result : [];
 
   } catch (error) {
-    console.error(`Failed to generate variations for ${setup.name}:`, error);
+    logger.error('Failed to generate technical variations', {
+      setup_name: setup.name,
+      error: error instanceof Error ? error.message : String(error)
+    });
     return generateFallbackTechnicalVariations(setup);
   }
 }
@@ -253,7 +300,7 @@ OUTPUT: Valid JSON array with these numeric fields.`;
 /**
  * Fallback: Generate basic technical variations without AI
  */
-function generateFallbackTechnicalVariations(setup: TechnicalSetup): any[] {
+function generateFallbackTechnicalVariations(setup: TechnicalSetup): TechnicalVariation[] {
   return [
     {
       name: `${setup.name} - Short`,
@@ -291,7 +338,7 @@ function generateFallbackTechnicalVariations(setup: TechnicalSetup): any[] {
 /**
  * Convert technical setup variation to pattern format
  */
-export function convertToPattern(setup: TechnicalSetup, variation: any, origin: string = 'technical'): any {
+export function convertToPattern(setup: TechnicalSetup, variation: TechnicalVariation, origin: string = 'technical'): Pattern {
   return {
     patternId: `${origin}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     name: `[Technical] ${variation.name || setup.name}`,
@@ -314,8 +361,8 @@ export function convertToPattern(setup: TechnicalSetup, variation: any, origin: 
 /**
  * Main technical patterns research cycle
  */
-export async function runTechnicalResearch(ai: any, db: any): Promise<number> {
-  console.log('📊 Technical Patterns Agent: Starting research cycle...');
+export async function runTechnicalResearch(ai: CloudflareAI, db: D1Database): Promise<number> {
+  logger.info('Technical patterns research cycle starting');
 
   let patternsGenerated = 0;
 
@@ -324,12 +371,18 @@ export async function runTechnicalResearch(ai: any, db: any): Promise<number> {
     const setupsToProcess = TECHNICAL_SETUPS.slice(0, 3);
 
     for (const setup of setupsToProcess) {
-      console.log(`📐 Processing: ${setup.name} (${setup.type})`);
+      logger.info('Processing technical setup', {
+        setup_name: setup.name,
+        setup_type: setup.type
+      });
 
       try {
         // Generate variations using AI
         const variations = await generateTechnicalVariations(ai, setup);
-        console.log(`  ✓ Generated ${variations.length} variations`);
+        logger.info('Generated variations', {
+          setup_name: setup.name,
+          count: variations.length
+        });
 
         // Convert to pattern format and store
         for (const variation of variations) {
@@ -356,18 +409,26 @@ export async function runTechnicalResearch(ai: any, db: any): Promise<number> {
           patternsGenerated++;
         }
 
-        console.log(`  ✓ Stored ${variations.length} patterns`);
+        logger.info('Stored technical patterns', {
+          setup_name: setup.name,
+          count: variations.length
+        });
 
       } catch (error) {
-        console.error(`  ✗ Failed to process ${setup.name}:`, error);
+        logger.error('Failed to process technical setup', {
+          setup_name: setup.name,
+          error: error instanceof Error ? error.message : String(error)
+        });
       }
     }
 
-    console.log(`✅ Technical research complete: ${patternsGenerated} patterns generated`);
+    logger.info('Technical research cycle complete', {
+      patterns_generated: patternsGenerated
+    });
     return patternsGenerated;
 
   } catch (error) {
-    console.error('❌ Technical research failed:', error);
+    logger.error('Technical research failed', error instanceof Error ? error : new Error(String(error)));
     return 0;
   }
 }
