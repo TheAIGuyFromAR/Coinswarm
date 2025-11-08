@@ -43,20 +43,26 @@ logger = logging.getLogger(__name__)
 
 
 # Pairs to fetch
+# NOTE: 5m = 5-minute candles (288 per day, 525,600 for 2 years!)
+# NOTE: 1h = 1-hour candles (24 per day, 17,520 for 2 years)
 PAIRS = [
-    # BTC stablecoin pairs
-    ("BTC", "USDT", "1h"),
-    ("BTC", "USDC", "1h"),
-    ("BTC", "BUSD", "1h"),
+    # BTC stablecoin pairs - 5 MINUTE candles for maximum granularity
+    ("BTC", "USDT", "5m"),
+    ("BTC", "USDC", "5m"),
+    ("BTC", "BUSD", "5m"),
 
-    # SOL stablecoin pairs
-    ("SOL", "USDT", "1h"),
-    ("SOL", "USDC", "1h"),
-    ("SOL", "BUSD", "1h"),
+    # SOL stablecoin pairs - 5 MINUTE candles
+    ("SOL", "USDT", "5m"),
+    ("SOL", "USDC", "5m"),
+    ("SOL", "BUSD", "5m"),
 
-    # Direct pair
-    ("BTC", "SOL", "1h"),
-    ("SOL", "BTC", "1h"),
+    # ETH stablecoin pairs - 5 MINUTE candles
+    ("ETH", "USDT", "5m"),
+    ("ETH", "USDC", "5m"),
+
+    # Direct pair - 5 MINUTE candles
+    ("BTC", "SOL", "5m"),
+    ("SOL", "BTC", "5m"),
 ]
 
 # Data directory

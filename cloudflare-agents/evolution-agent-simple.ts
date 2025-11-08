@@ -24,12 +24,15 @@ import { runTechnicalResearch } from './technical-patterns-agent';
 import { runHeadToHeadCompetition } from './head-to-head-testing';
 import { runCompetitionCycle } from './agent-competition';
 import { runModelResearch } from './model-research-agent';
+import { runCrossAgentLearning } from './cross-agent-learning';
+import { calculateAllIndicators, generateTradeRationalization, type TechnicalIndicators } from './technical-indicators';
 
 // Environment bindings interface
 interface Env {
   DB: D1Database;
   EVOLUTION_AGENT: DurableObjectNamespace;
   AI?: any;
+  SENTIMENT_AGENT_URL?: string; // Optional: news-sentiment-agent worker URL
 }
 
 // Agent state interface
@@ -45,16 +48,29 @@ interface EvolutionState {
 
 // Trade data structure
 interface ChaosTrade {
+  pair: string;
   entryTime: string;
   exitTime: string;
   entryPrice: number;
   exitPrice: number;
   pnlPct: number;
   profitable: boolean;
-  buyReason: string;
-  buyState: MarketState;
-  sellReason: string;
-  sellState: MarketState;
+  holdDurationMinutes: number;
+  entryIndicators: TechnicalIndicators;
+  buyRationalization: string[];  // What indicators suggested buying
+  sellRationalization: string[];  // What indicators suggested selling
+  buyReason: string;  // Human readable summary
+  sellReason: string;  // Human readable summary
+  // Sentiment context (for pattern discovery)
+  sentimentFearGreed?: number;  // 0-100
+  sentimentOverall?: number;  // -1 to +1
+  sentimentRegime?: string;  // 'bull', 'bear', 'sideways', 'volatile'
+  sentimentClassification?: string;  // 'Extreme Fear', 'Fear', 'Neutral', 'Greed', 'Extreme Greed'
+  sentimentNewsScore?: number;  // -1 to +1 (news sentiment only)
+  macroFedRate?: number;
+  macroCPI?: number;
+  macroUnemployment?: number;
+  macro10yYield?: number;
 }
 
 // Market state at decision time
@@ -575,6 +591,18 @@ export class EvolutionAgent implements DurableObject {
         }
       }
 
+      // Step 7.5: Cross-agent learning (every 25 cycles)
+      if (this.evolutionState.totalCycles % 25 === 0 && this.evolutionState.totalCycles > 0) {
+        this.log('Step 7.5: Running cross-agent learning...');
+        try {
+          await runCrossAgentLearning(this.env.DB);
+          this.log('✓ Cross-agent learning complete');
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          this.log(`❌ Cross-agent learning failed: ${errorMsg}`);
+        }
+      }
+
       // Step 8: Model research agent (every 50 cycles)
       if (this.evolutionState.totalCycles % 50 === 0) {
         this.log('Step 8: Running model research...');
@@ -619,101 +647,230 @@ export class EvolutionAgent implements DurableObject {
   }
 
   /**
+   * Fetch current sentiment data from news-sentiment-agent
+   * Returns null if sentiment agent is not configured or fails
+   */
+  private async fetchSentimentData(): Promise<any | null> {
+    if (!this.env.SENTIMENT_AGENT_URL) {
+      this.log('Sentiment agent URL not configured, skipping sentiment data');
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${this.env.SENTIMENT_AGENT_URL}/current`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        this.log(`Sentiment agent returned ${response.status}, skipping sentiment data`);
+        return null;
+      }
+
+      const data = await response.json();
+      this.log(`✓ Fetched sentiment: ${data.fear_greed_classification} (${data.fear_greed_index}), Regime: ${data.market_regime}`);
+      return data;
+    } catch (error) {
+      this.log(`Failed to fetch sentiment data: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
+  }
+
+  /**
    * Generate historical trades with realistic price movements
    * - Random entry times over past 30 days
    * - Random hold durations (1 min to 24 hours)
    * - Trend-based price movements with volatility
    */
   async generateHistoricalTrades(count: number): Promise<number> {
-    this.log(`Generating ${count} historical trades with realistic price movements...`);
+    this.log(`Generating ${count} chaos trades using REAL historical data...`);
+
+    // Fetch current sentiment data (optional, for pattern discovery)
+    const sentimentData = await this.fetchSentimentData();
+    if (sentimentData) {
+      this.log(`Sentiment context: ${sentimentData.fear_greed_classification} | Regime: ${sentimentData.market_regime} | Overall: ${sentimentData.overall_sentiment.toFixed(2)}`);
+    }
 
     try {
       const trades: ChaosTrade[] = [];
-      const now = Date.now();
-      const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
 
-      // Generate realistic price series
-      let price = 60000 + Math.random() * 20000;
-      let trend = 0;
+      // Multi-pair configuration
+      const pairs = [
+        'BTC-USDT', 'BTC-USDC', 'BTC-BUSD',
+        'SOL-USDT', 'SOL-USDC', 'SOL-BUSD',
+        'ETH-USDT', 'ETH-USDC', 'ETH-BUSD'
+      ];
 
+      // Generate chaos trades
       for (let i = 0; i < count; i++) {
-        // Random entry time in past 30 days
-        const entryTime = new Date(thirtyDaysAgo + Math.random() * (now - thirtyDaysAgo));
+        try {
+          // Random pair selection
+          const pair = pairs[Math.floor(Math.random() * pairs.length)];
 
-        // Random hold duration: 1 minute to 24 hours
-        const holdMinutes = 1 + Math.floor(Math.random() * 1440);
-        const exitTime = new Date(entryTime.getTime() + holdMinutes * 60 * 1000);
+          // Fetch random historical segment (30 days minimum)
+          const historicalDataUrl = 'https://coinswarm-historical-data.your-subdomain.workers.dev';
+          const response = await fetch(`${historicalDataUrl}/random?pair=${pair}&interval=5m&minDays=30`);
 
-        // Realistic price movement with trend
-        if (Math.random() < 0.01) {
-          trend = (Math.random() - 0.5) * 0.001; // Trend shift
+          if (!response.ok) {
+            this.log(`Failed to fetch historical data for ${pair}, using fallback`);
+            continue;
+          }
+
+          const data = await response.json() as any;
+
+          if (!data.success || !data.dataset || !data.dataset.candles || data.dataset.candles.length === 0) {
+            this.log(`No candles available for ${pair}, skipping`);
+            continue;
+          }
+
+          const candles = data.dataset.candles;
+
+          // Random entry point in the historical data
+          // Random hold duration: 1 candle (5min) to 288 candles (24 hours)
+          const maxHoldCandles = Math.min(288, candles.length - 1);
+          const holdCandles = 1 + Math.floor(Math.random() * maxHoldCandles);
+
+          // Pick random entry that allows for hold duration
+          const maxEntryIndex = candles.length - holdCandles - 1;
+          if (maxEntryIndex < 0) {
+            this.log(`Not enough candles for ${pair}, skipping`);
+            continue;
+          }
+
+          const entryIndex = Math.floor(Math.random() * maxEntryIndex);
+          const exitIndex = entryIndex + holdCandles;
+
+          // Get REAL prices from historical data
+          const entryCandle = candles[entryIndex];
+          const exitCandle = candles[exitIndex];
+
+          const entryPrice = entryCandle.close;
+          const exitPrice = exitCandle.close;
+          const entryTime = new Date(entryCandle.timestamp);
+          const exitTime = new Date(exitCandle.timestamp);
+
+          const pnlPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+          const profitable = exitPrice > entryPrice;
+
+          // Calculate ALL technical indicators at entry
+          const entryIndicators = calculateAllIndicators(candles, entryIndex);
+
+          // Generate rationalization: what indicators would have suggested this trade?
+          const buyRationalization = generateTradeRationalization(entryIndicators, 'BUY');
+          const sellRationalization = generateTradeRationalization(entryIndicators, 'SELL');
+
+          const holdDurationMinutes = holdCandles * 5;
+
+          const buyReason = `Random chaos trade on ${pair} at $${entryPrice.toFixed(2)} (hold ${holdCandles} candles / ${holdDurationMinutes}min)`;
+          const sellReason = `Exit ${pair} after ${holdCandles} candles: ${profitable ? 'profit' : 'loss'} ${pnlPct.toFixed(2)}%`;
+
+          // Add sentiment data if available (for pattern discovery like "RSI oversold + extreme fear = 78% win")
+          const trade: ChaosTrade = {
+            pair,
+            entryTime: entryTime.toISOString(),
+            exitTime: exitTime.toISOString(),
+            entryPrice,
+            exitPrice,
+            pnlPct,
+            profitable,
+            holdDurationMinutes,
+            entryIndicators,
+            buyRationalization,
+            sellRationalization,
+            buyReason,
+            sellReason
+          };
+
+          if (sentimentData) {
+            trade.sentimentFearGreed = sentimentData.fear_greed_index;
+            trade.sentimentOverall = sentimentData.overall_sentiment;
+            trade.sentimentRegime = sentimentData.market_regime;
+            trade.sentimentClassification = sentimentData.fear_greed_classification;
+            trade.sentimentNewsScore = sentimentData.news_sentiment;
+
+            // Add macro indicators if available
+            if (sentimentData.macro_indicators && sentimentData.macro_indicators.length > 0) {
+              for (const macro of sentimentData.macro_indicators) {
+                if (macro.indicator_code === 'FEDFUNDS') trade.macroFedRate = macro.value;
+                else if (macro.indicator_code === 'CPIAUCSL') trade.macroCPI = macro.value;
+                else if (macro.indicator_code === 'UNRATE') trade.macroUnemployment = macro.value;
+                else if (macro.indicator_code === 'DGS10') trade.macro10yYield = macro.value;
+              }
+            }
+          }
+
+          trades.push(trade);
+
+        } catch (tradeError) {
+          this.log(`Error generating trade ${i}: ${tradeError}`);
+          // Continue with next trade
         }
 
-        const volatility = 0.01 + Math.random() * 0.02;
-        const entryPrice = price;
-
-        // Price movement during hold period
-        for (let t = 0; t < holdMinutes; t++) {
-          const trendMove = price * trend;
-          const randomMove = price * (Math.random() - 0.5) * volatility;
-          price = Math.max(20000, Math.min(100000, price + trendMove + randomMove));
-        }
-
-        const exitPrice = price;
-        const pnlPct = ((exitPrice - entryPrice) / entryPrice) * 100;
-        const profitable = exitPrice > entryPrice;
-
-        // Realistic market states based on price movement
-        const momentum = (exitPrice - entryPrice) / entryPrice;
-        const buyState: MarketState = {
-          price: entryPrice,
-          momentum1tick: (Math.random() - 0.5) * 0.02,
-          momentum5tick: (Math.random() - 0.5) * 0.05,
-          vsSma10: (Math.random() - 0.5) * 0.03,
-          volumeVsAvg: 0.5 + Math.random() * 2,
-          volatility
-        };
-
-        const sellState: MarketState = {
-          price: exitPrice,
-          momentum1tick: momentum * 0.7 + (Math.random() - 0.5) * 0.01,
-          momentum5tick: momentum * 0.5 + (Math.random() - 0.5) * 0.02,
-          vsSma10: (exitPrice - entryPrice) / entryPrice + (Math.random() - 0.5) * 0.02,
-          volumeVsAvg: 0.5 + Math.random() * 2,
-          volatility
-        };
-
-        const buyReason = `Entry at $${entryPrice.toFixed(2)} (hold ${holdMinutes}min)`;
-        const sellReason = `Exit after ${holdMinutes}min: ${profitable ? 'profit' : 'loss'} ${pnlPct.toFixed(2)}%`;
-
-        trades.push({
-          entryTime: entryTime.toISOString(),
-          exitTime: exitTime.toISOString(),
-          entryPrice,
-          exitPrice,
-          pnlPct,
-          profitable,
-          buyReason,
-          buyState,
-          sellReason,
-          sellState
-        });
-
-        if ((i + 1) % 1000 === 0) {
-          this.log(`Generated ${i + 1}/${count} trades...`);
+        if ((i + 1) % 100 === 0) {
+          this.log(`Generated ${i + 1}/${count} chaos trades...`);
         }
       }
 
-      this.log(`Generated ${trades.length} historical trades, storing in DB...`);
+      this.log(`Generated ${trades.length} chaos trades from REAL data, storing in DB...`);
       await this.storeTrades(trades);
-      this.log(`✓ Stored ${trades.length} historical trades`);
+      this.log(`✓ Stored ${trades.length} chaos trades`);
 
       return trades.length;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      this.log(`Failed to generate historical trades: ${errorMsg}`);
-      throw new Error(`Generate historical trades failed: ${error}`);
+      this.log(`Failed to generate chaos trades: ${errorMsg}`);
+      throw new Error(`Generate chaos trades failed: ${error}`);
     }
+  }
+
+  /**
+   * Calculate real market indicators from historical candle data
+   */
+  private calculateMarketState(candles: any[], index: number): MarketState {
+    const current = candles[index];
+
+    // Calculate momentum (1 tick = 5 minutes)
+    const momentum1tick = index >= 1
+      ? (candles[index].close - candles[index - 1].close) / candles[index - 1].close
+      : 0;
+
+    const momentum5tick = index >= 5
+      ? (candles[index].close - candles[index - 5].close) / candles[index - 5].close
+      : 0;
+
+    // Calculate SMA10 (10 candles = 50 minutes)
+    const sma10Start = Math.max(0, index - 9);
+    const sma10Candles = candles.slice(sma10Start, index + 1);
+    const sma10 = sma10Candles.reduce((sum, c) => sum + c.close, 0) / sma10Candles.length;
+    const vsSma10 = (current.close - sma10) / sma10;
+
+    // Calculate average volume (last 20 candles)
+    const volStart = Math.max(0, index - 19);
+    const volCandles = candles.slice(volStart, index + 1);
+    const avgVolume = volCandles.reduce((sum, c) => sum + c.volume, 0) / volCandles.length;
+    const volumeVsAvg = avgVolume > 0 ? current.volume / avgVolume : 1;
+
+    // Calculate volatility (std dev of last 10 returns)
+    const volatilityStart = Math.max(1, index - 9);
+    const returns = [];
+    for (let i = volatilityStart; i <= index; i++) {
+      const ret = (candles[i].close - candles[i - 1].close) / candles[i - 1].close;
+      returns.push(ret);
+    }
+    const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+    const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
+    const volatility = Math.sqrt(variance);
+
+    return {
+      price: current.close,
+      momentum1tick,
+      momentum5tick,
+      vsSma10,
+      volumeVsAvg,
+      volatility
+    };
   }
 
   /**
@@ -732,7 +889,7 @@ export class EvolutionAgent implements DurableObject {
   }
 
   async storeTrades(trades: ChaosTrade[]): Promise<void> {
-    console.log(`Storing ${trades.length} trades in D1...`);
+    console.log(`Storing ${trades.length} trades with ALL indicators in D1...`);
 
     try {
       if (!this.env.DB) {
@@ -741,25 +898,144 @@ export class EvolutionAgent implements DurableObject {
 
       const stmt = this.env.DB.prepare(`
         INSERT INTO chaos_trades (
-          entry_time, exit_time, entry_price, exit_price,
-          pnl_pct, profitable, buy_reason, buy_state, sell_reason, sell_state
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          pair, entry_time, exit_time, entry_price, exit_price,
+          pnl_pct, profitable, hold_duration_minutes,
+          entry_rsi_14, entry_rsi_oversold, entry_rsi_overbought,
+          entry_macd_line, entry_macd_signal, entry_macd_histogram,
+          entry_macd_bullish_cross, entry_macd_bearish_cross,
+          entry_bb_upper, entry_bb_middle, entry_bb_lower, entry_bb_position,
+          entry_bb_squeeze, entry_bb_at_lower, entry_bb_at_upper,
+          entry_sma_10, entry_sma_50, entry_sma_200, entry_ema_10, entry_ema_50,
+          entry_price_vs_sma10, entry_price_vs_sma50, entry_price_vs_sma200,
+          entry_above_sma10, entry_above_sma50, entry_above_sma200,
+          entry_golden_cross, entry_death_cross,
+          entry_stoch_k, entry_stoch_d, entry_stoch_oversold, entry_stoch_overbought,
+          entry_stoch_bullish_cross, entry_stoch_bearish_cross,
+          entry_atr_14, entry_volatility_regime,
+          entry_volume, entry_volume_sma_20, entry_volume_vs_avg,
+          entry_volume_spike, entry_volume_dry,
+          entry_momentum_1, entry_momentum_5, entry_momentum_10,
+          entry_momentum_positive, entry_momentum_strong,
+          entry_trend_regime, entry_higher_highs, entry_lower_lows,
+          entry_day_of_week, entry_hour_of_day, entry_month, entry_week_of_month,
+          entry_is_weekend, entry_is_monday, entry_is_tuesday, entry_is_wednesday,
+          entry_is_thursday, entry_is_friday, entry_is_market_hours,
+          entry_near_recent_high, entry_near_recent_low, entry_at_resistance, entry_at_support,
+          buy_rationalization, sell_rationalization
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?,
+          ?, ?, ?,
+          ?, ?,
+          ?, ?, ?, ?,
+          ?, ?,
+          ?, ?,
+          ?, ?, ?,
+          ?, ?,
+          ?, ?, ?,
+          ?, ?,
+          ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?,
+          ?, ?
+        )
       `);
 
-      const batch = trades.map(t =>
-        stmt.bind(
+      const batch = trades.map(t => {
+        const ind = t.entryIndicators;
+        return stmt.bind(
+          t.pair,
           t.entryTime,
           t.exitTime,
           t.entryPrice,
           t.exitPrice,
           t.pnlPct,
           t.profitable ? 1 : 0,
-          t.buyReason,
-          JSON.stringify(t.buyState),
-          t.sellReason,
-          JSON.stringify(t.sellState)
-        )
-      );
+          t.holdDurationMinutes,
+          // RSI
+          ind.rsi_14,
+          ind.rsi_oversold ? 1 : 0,
+          ind.rsi_overbought ? 1 : 0,
+          // MACD
+          ind.macd_line,
+          ind.macd_signal,
+          ind.macd_histogram,
+          ind.macd_bullish_cross ? 1 : 0,
+          ind.macd_bearish_cross ? 1 : 0,
+          // Bollinger Bands
+          ind.bb_upper,
+          ind.bb_middle,
+          ind.bb_lower,
+          ind.bb_position,
+          ind.bb_squeeze ? 1 : 0,
+          ind.bb_at_lower ? 1 : 0,
+          ind.bb_at_upper ? 1 : 0,
+          // Moving Averages
+          ind.sma_10,
+          ind.sma_50,
+          ind.sma_200,
+          ind.ema_10,
+          ind.ema_50,
+          ind.price_vs_sma10,
+          ind.price_vs_sma50,
+          ind.price_vs_sma200,
+          ind.above_sma10 ? 1 : 0,
+          ind.above_sma50 ? 1 : 0,
+          ind.above_sma200 ? 1 : 0,
+          ind.golden_cross ? 1 : 0,
+          ind.death_cross ? 1 : 0,
+          // Stochastic
+          ind.stoch_k,
+          ind.stoch_d,
+          ind.stoch_oversold ? 1 : 0,
+          ind.stoch_overbought ? 1 : 0,
+          ind.stoch_bullish_cross ? 1 : 0,
+          ind.stoch_bearish_cross ? 1 : 0,
+          // ATR / Volatility
+          ind.atr_14,
+          ind.volatility_regime,
+          // Volume
+          ind.volume,
+          ind.volume_sma_20,
+          ind.volume_vs_avg,
+          ind.volume_spike ? 1 : 0,
+          ind.volume_dry ? 1 : 0,
+          // Momentum
+          ind.momentum_1,
+          ind.momentum_5,
+          ind.momentum_10,
+          ind.momentum_positive ? 1 : 0,
+          ind.momentum_strong ? 1 : 0,
+          // Trend
+          ind.trend_regime,
+          ind.higher_highs ? 1 : 0,
+          ind.lower_lows ? 1 : 0,
+          // Temporal
+          ind.day_of_week,
+          ind.hour_of_day,
+          ind.month,
+          ind.week_of_month,
+          ind.is_weekend ? 1 : 0,
+          ind.is_monday ? 1 : 0,
+          ind.is_tuesday ? 1 : 0,
+          ind.is_wednesday ? 1 : 0,
+          ind.is_thursday ? 1 : 0,
+          ind.is_friday ? 1 : 0,
+          ind.is_market_hours ? 1 : 0,
+          // Support/Resistance
+          ind.near_recent_high ? 1 : 0,
+          ind.near_recent_low ? 1 : 0,
+          ind.at_resistance ? 1 : 0,
+          ind.at_support ? 1 : 0,
+          // Rationalization
+          JSON.stringify(t.buyRationalization),
+          JSON.stringify(t.sellRationalization)
+          // Note: Sentiment data binding will be added back after migrations are verified
+        );
+      });
 
       console.log(`Executing batch insert of ${batch.length} trades...`);
       await this.env.DB.batch(batch);
@@ -1158,3 +1434,4 @@ export default {
     }
   }
 };
+

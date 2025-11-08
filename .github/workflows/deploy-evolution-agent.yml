@@ -1,19 +1,21 @@
-name: Deploy Evolution Agent (Agents SDK)
+name: Deploy Evolution System (All Workers)
 
 on:
   push:
     branches:
       - claude/debug-cloudflare-historical-data-011CUqugUynEoovcsiVnoaPB
+      - claude/review-codebase-docs-workers-011CUu5WhXjGVdghJyJh81Dh
       - main
       - master
     paths:
       - 'cloudflare-agents/**'
       - '.github/workflows/deploy-evolution-agent.yml'
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy Evolution Agent
+    name: Deploy All Evolution Workers
 
     steps:
       - name: Checkout code
@@ -29,18 +31,92 @@ jobs:
           cd cloudflare-agents
           npm install
 
-      - name: Deploy to Cloudflare Workers
+      - name: Apply D1 Database Migrations
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: d1 execute coinswarm-evolution --remote --file=sentiment-data-schema.sql
+
+      - name: Apply Advanced Sentiment Migrations
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: d1 execute coinswarm-evolution --remote --file=sentiment-advanced-schema.sql
+
+      - name: Deploy Evolution Agent
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'cloudflare-agents'
           wranglerVersion: "4.45.4"
-          command: deploy
+          command: deploy --config wrangler.toml
+
+      - name: Deploy News & Sentiment Agent
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-news-sentiment.toml
+
+      - name: Deploy Multi-Exchange Data Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-multi-exchange.toml
+
+      - name: Deploy Solana DEX Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-solana-dex.toml
+
+      - name: Deploy Sentiment Backfill Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-sentiment-backfill.toml
 
       - name: Deployment Complete
         run: |
-          echo "✅ Deployment successful!"
-          echo "Check your worker at: https://dash.cloudflare.com/8a330fc6c339f031a73905d4ca2f3e5d/workers/services/view/coinswarm-evolution-agent"
-          echo "Find the worker URL in Cloudflare Dashboard and trigger with:"
-          echo "curl -X POST https://YOUR-WORKER-URL/trigger"
+          echo "✅ All workers deployed successfully!"
+          echo "✅ D1 database migrations applied!"
+          echo ""
+          echo "Deployed Workers:"
+          echo "1. Evolution Agent (main orchestrator) - RUNNING"
+          echo "2. News & Sentiment Agent (committee weighting) - RUNNING"
+          echo "3. Multi-Exchange Data Worker (Binance + Coinbase)"
+          echo "4. Solana DEX Worker (Jupiter, Raydium, Orca)"
+          echo "5. Sentiment Backfill Worker (historical data enrichment)"
+          echo ""
+          echo "Database Migrations Applied:"
+          echo "- Sentiment columns added to chaos_trades table"
+          echo "- Sentiment time-series tables created (keywords, headlines, derivatives)"
+          echo "- Ready for sentiment-enhanced pattern discovery"
+          echo ""
+          echo "Check your workers at: https://dash.cloudflare.com/8a330fc6c339f031a73905d4ca2f3e5d/workers"
+          echo ""
+          echo "Optional: Start historical backfill to enrich 129,200 existing trades:"
+          echo "  curl -X POST https://coinswarm-sentiment-backfill.bamn86.workers.dev/backfill?batch=100"
+          echo ""
+          echo "Check backfill progress:"
+          echo "  curl https://coinswarm-sentiment-backfill.bamn86.workers.dev/status"

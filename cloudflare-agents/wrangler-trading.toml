@@ -1,0 +1,27 @@
+# Wrangler configuration for Trading Worker
+
+name = "coinswarm-trading-agent"
+main = "trading-worker.ts"
+compatibility_date = "2024-01-01"
+
+# KV Namespaces for state storage
+[[kv_namespaces]]
+binding = "TRADING_KV"
+id = "your_trading_kv_namespace_id"  # Create with: wrangler kv:namespace create TRADING_KV
+
+[[kv_namespaces]]
+binding = "HISTORICAL_PRICES"
+id = "your_historical_prices_kv_id"  # Create with: wrangler kv:namespace create HISTORICAL_PRICES
+
+# Durable Objects for real-time coordination (optional)
+# [[durable_objects.bindings]]
+# name = "PORTFOLIO_STATE"
+# class_name = "PortfolioState"
+
+# Environment variables
+[vars]
+INITIAL_CAPITAL = "100000"
+MAX_POSITIONS = "10"
+MAX_PER_PAIR_PCT = "0.30"
+MAX_PER_ASSET_PCT = "0.50"
+MIN_PROFIT_THRESHOLD = "0.001"

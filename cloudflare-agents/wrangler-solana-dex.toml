@@ -1,0 +1,16 @@
+# Wrangler configuration for Solana DEX Worker
+
+name = "coinswarm-solana-dex"
+main = "solana-dex-worker.ts"
+compatibility_date = "2024-01-01"
+
+# KV Namespace for caching DEX data - Optional, disabled for now
+# [[kv_namespaces]]
+# binding = "SOLANA_DEX_KV"
+# id = "your_solana_dex_kv_id"  # Create with: wrangler kv:namespace create SOLANA_DEX_KV
+
+# Environment variables
+[vars]
+# Birdeye API key (optional, but recommended for higher rate limits)
+# Get from: https://birdeye.so
+# BIRDEYE_API_KEY = "your_api_key_here"

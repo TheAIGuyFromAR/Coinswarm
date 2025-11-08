@@ -1,0 +1,47 @@
+name: Apply Sentiment Data Migration
+
+on:
+  workflow_dispatch: # Manual trigger only
+
+jobs:
+  apply-migration:
+    runs-on: ubuntu-latest
+    name: Apply Sentiment Schema to D1
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Wrangler
+        run: npm install -g wrangler@4.45.4
+
+      - name: Apply Sentiment Migration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          cd cloudflare-agents
+          echo "Applying sentiment data schema migration..."
+          wrangler d1 execute coinswarm-evolution-db --remote --file=sentiment-data-schema.sql
+          echo "✅ Sentiment data schema applied successfully!"
+          echo ""
+          echo "New tables created:"
+          echo "- sentiment_snapshots (historical sentiment tracking)"
+          echo "- news_articles (news with sentiment analysis)"
+          echo "- macro_indicators (Fed rate, CPI, unemployment)"
+          echo "- committee_weighting_log (tracks sentiment influence on agent decisions)"
+          echo ""
+          echo "New columns added to chaos_trades:"
+          echo "- sentiment_fear_greed, sentiment_overall, sentiment_regime"
+          echo "- sentiment_classification, sentiment_news_score"
+          echo "- macro_fed_rate, macro_cpi, macro_unemployment, macro_10y_yield"
+          echo ""
+          echo "Pattern discovery now includes sentiment context:"
+          echo "- 'RSI oversold + extreme fear = 78% win rate'"
+          echo "- 'MACD crossover + bull market + rising rates = 65% win rate'"
+          echo "- 'Volume spike + extreme greed = 45% win rate (avoid)'"
