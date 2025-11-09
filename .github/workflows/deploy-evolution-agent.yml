@@ -164,14 +164,13 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'cloudflare-agents'
           wranglerVersion: "4.45.4"
-          command: deploy --config wrangler-historical-collection-cron.toml --verbose
+          command: deploy --config wrangler-historical-collection-cron.toml
           secrets: |
             COINGECKO
             CRYPTOCOMPARE_API_KEY
         env:
           COINGECKO: ${{ secrets.COINGECKO }}
           CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
-          WRANGLER_LOG: info
 
       - name: Deploy Real-Time Price Collection Cron
         uses: cloudflare/wrangler-action@v3
