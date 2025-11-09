@@ -100,6 +100,27 @@ jobs:
           wranglerVersion: "4.45.4"
           command: deploy --config wrangler-sentiment-backfill.toml
 
+      - name: Create KV Namespace for Historical Data
+        id: create-kv
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: kv namespace create HISTORICAL_PRICES
+
+      - name: Deploy Historical Data Worker
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-historical.toml
+
       - name: Deployment Complete
         run: |
           echo "✅ All workers deployed successfully!"

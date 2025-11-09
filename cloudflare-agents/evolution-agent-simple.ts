@@ -777,69 +777,45 @@ export class EvolutionAgent implements DurableObject {
           // Random pair selection
           const pair = pairs[Math.floor(Math.random() * pairs.length)];
 
-          // Fetch candles from Binance API (or use cached)
+          // Fetch candles from Binance API directly (or use cached)
           let candles = candleCache[pair];
           if (!candles) {
-            // Fetch ONLY real data from Binance - NO synthetic fallback
+            // Binance public API - fetch last 500 5-minute candles (~41 hours)
             const binanceUrl = `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=5m&limit=500`;
 
-            let fetchSuccess = false;
-            let lastError = '';
+            this.log(`Fetching REAL market data for ${pair} from Binance...`);
 
-            // Try multiple times with different approaches
-            for (let attempt = 0; attempt < 3 && !fetchSuccess; attempt++) {
-              try {
-                this.log(`Attempt ${attempt + 1}/3: Fetching real data for ${pair}...`);
+            try {
+              const response = await fetch(binanceUrl);
 
-                const response = await fetch(binanceUrl, {
-                  headers: {
-                    'Accept': 'application/json',
-                    'X-MBX-APIKEY': '' // Empty key for public endpoints
-                  }
-                });
-
-                if (response.ok) {
-                  const klines = await response.json() as any[];
-                  if (klines && klines.length > 0) {
-                    candles = klines.map(k => ({
-                      timestamp: k[0],
-                      open: parseFloat(k[1]),
-                      high: parseFloat(k[2]),
-                      low: parseFloat(k[3]),
-                      close: parseFloat(k[4]),
-                      volume: parseFloat(k[5])
-                    }));
-                    this.log(`✓ SUCCESS: Fetched ${candles.length} REAL candles for ${pair}`);
-                    fetchSuccess = true;
-                  }
+              if (response.ok) {
+                const klines = await response.json() as any[];
+                if (klines && klines.length > 0) {
+                  candles = klines.map(k => ({
+                    timestamp: k[0],
+                    open: parseFloat(k[1]),
+                    high: parseFloat(k[2]),
+                    low: parseFloat(k[3]),
+                    close: parseFloat(k[4]),
+                    volume: parseFloat(k[5])
+                  }));
+                  this.log(`✓ SUCCESS: Fetched ${candles.length} REAL candles for ${pair} from Binance`);
+                  candleCache[pair] = candles;
                 } else {
-                  const errorText = await response.text();
-                  lastError = `HTTP ${response.status}: ${errorText.substring(0, 200)}`;
-                  this.log(`Attempt ${attempt + 1} failed: ${lastError}`);
-
-                  // Wait before retry (exponential backoff)
-                  if (attempt < 2) {
-                    await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
-                  }
+                  this.log(`❌ Empty response from Binance for ${pair} - Skipping`);
+                  continue;
                 }
-              } catch (apiError) {
-                lastError = apiError instanceof Error ? apiError.message : String(apiError);
-                this.log(`Attempt ${attempt + 1} error: ${lastError}`);
-
-                if (attempt < 2) {
-                  await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
-                }
+              } else {
+                const errorText = await response.text();
+                this.log(`❌ Binance API error for ${pair}: HTTP ${response.status} - ${errorText.substring(0, 200)}`);
+                this.log(`⚠️  Skipping this trade - no synthetic data allowed`);
+                continue;
               }
+            } catch (error) {
+              this.log(`❌ Fetch error for ${pair}: ${error instanceof Error ? error.message : String(error)}`);
+              this.log(`⚠️  Skipping this trade - no synthetic data allowed`);
+              continue;
             }
-
-            // CRITICAL: If we can't get real data, SKIP this trade entirely
-            if (!candles) {
-              this.log(`❌ FAILED to fetch REAL data for ${pair} - Last error: ${lastError}`);
-              this.log(`⚠️  NO SYNTHETIC DATA ALLOWED - Skipping this trade`);
-              continue; // Skip to next trade iteration
-            }
-
-            candleCache[pair] = candles;
           }
 
           // Random entry point in the historical data
