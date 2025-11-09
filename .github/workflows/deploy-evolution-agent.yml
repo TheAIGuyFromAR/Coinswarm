@@ -45,6 +45,26 @@ jobs:
           wranglerVersion: "4.45.4"
           command: d1 execute coinswarm-evolution --remote --file=sentiment-data-schema.sql
 
+      - name: Apply Technical Indicators Schema
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: d1 execute coinswarm-evolution --remote --file=d1-schema-technical-indicators.sql
+
+      - name: Apply Price Data Schema
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: '.'
+          wranglerVersion: "4.45.4"
+          command: d1 execute coinswarm-evolution --remote --file=cloudflare-d1-schema.sql
+
       - name: Apply Advanced Sentiment Migrations
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
