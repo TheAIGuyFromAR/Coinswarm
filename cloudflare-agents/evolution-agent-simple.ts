@@ -1053,13 +1053,13 @@ export class EvolutionAgent implements DurableObject {
         throw new Error('D1 database binding not found');
       }
 
-      // Use simple INSERT that works with existing database schema
-      // Full technical indicators can be added later via schema migration
+      // Ultra-minimal INSERT using only columns guaranteed to exist
+      // Based on original chaos_trades schema from early implementation
       const stmt = this.env.DB.prepare(`
         INSERT INTO chaos_trades (
           entry_time, exit_time, entry_price, exit_price,
-          pnl_pct, profitable, hold_duration_minutes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          pnl_pct, profitable
+        ) VALUES (?, ?, ?, ?, ?, ?)
       `);
 
       const batch = trades.map(t => {
@@ -1069,8 +1069,7 @@ export class EvolutionAgent implements DurableObject {
           t.entryPrice,
           t.exitPrice,
           t.pnlPct,
-          t.profitable ? 1 : 0,
-          t.holdDurationMinutes
+          t.profitable ? 1 : 0
         );
       });
 
