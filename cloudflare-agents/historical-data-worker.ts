@@ -14,6 +14,8 @@
 
 interface Env {
   HISTORICAL_PRICES?: KVNamespace;  // Optional until KV namespace is created
+  COINGECKO_API_KEY?: string;       // CoinGecko Demo/Pro API key (optional, increases rate limit to 30/min)
+  CRYPTOCOMPARE_API_KEY?: string;   // CryptoCompare API key (optional, for stable 30/min limit)
 }
 
 interface BinanceKline {
@@ -192,7 +194,7 @@ class BinanceClient {
 
 /**
  * CoinGecko API Client
- * Free API with OHLC data - no API key required
+ * Free API with OHLC data - API key optional but recommended
  *
  * Rate Limits (Free/Demo Plan):
  * - 30 calls per minute (with free Demo account registration)
@@ -204,6 +206,11 @@ class BinanceClient {
  */
 class CoinGeckoClient {
   private baseUrl = 'https://api.coingecko.com/api/v3';
+  private apiKey?: string;
+
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey;
+  }
 
   /**
    * Fetch OHLC data from CoinGecko
@@ -213,11 +220,16 @@ class CoinGeckoClient {
     // CoinGecko OHLC endpoint: /coins/{id}/ohlc?vs_currency=usd&days={days}
     const url = `${this.baseUrl}/coins/${coinId}/ohlc?vs_currency=usd&days=${days}`;
 
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
+    const headers: Record<string, string> = {
+      'Accept': 'application/json'
+    };
+
+    // Add API key if provided (Demo or Pro plan)
+    if (this.apiKey) {
+      headers['x-cg-demo-api-key'] = this.apiKey;
+    }
+
+    const response = await fetch(url, { headers });
 
     if (!response.ok) {
       throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
@@ -272,6 +284,11 @@ class CoinGeckoClient {
  */
 class CryptoCompareClient {
   private baseUrl = 'https://min-api.cryptocompare.com/data';
+  private apiKey?: string;
+
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey;
+  }
 
   /**
    * Fetch historical minute data from CryptoCompare
@@ -283,7 +300,12 @@ class CryptoCompareClient {
     const tsym = 'USD';
 
     // CryptoCompare histominute endpoint
-    const url = `${this.baseUrl}/v2/histominute?fsym=${fsym}&tsym=${tsym}&limit=${limit}`;
+    let url = `${this.baseUrl}/v2/histominute?fsym=${fsym}&tsym=${tsym}&limit=${limit}`;
+
+    // Add API key as query parameter if provided
+    if (this.apiKey) {
+      url += `&api_key=${this.apiKey}`;
+    }
 
     const response = await fetch(url, {
       headers: {
@@ -603,8 +625,8 @@ export default {
 
     try {
       const binanceClient = new BinanceClient();
-      const coinGeckoClient = new CoinGeckoClient();
-      const cryptoCompareClient = new CryptoCompareClient();
+      const coinGeckoClient = new CoinGeckoClient(env.COINGECKO_API_KEY);
+      const cryptoCompareClient = new CryptoCompareClient(env.CRYPTOCOMPARE_API_KEY);
       const dexScreenerClient = new DexScreenerClient();
       const geckoTerminalClient = new GeckoTerminalClient();
       const dataManager = env.HISTORICAL_PRICES ? new HistoricalDataManager(env.HISTORICAL_PRICES) : null;

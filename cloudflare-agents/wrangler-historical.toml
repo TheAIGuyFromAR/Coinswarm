@@ -15,3 +15,16 @@ compatibility_date = "2024-01-01"
 [vars]
 # Binance.US API endpoint (US-compliant exchange)
 BINANCE_API_URL = "https://api.binance.us"
+
+# API Keys (Secrets - set via GitHub Secrets or `wrangler secret put`)
+# DO NOT commit actual API keys to this file!
+#
+# To set secrets locally:
+#   wrangler secret put COINGECKO_API_KEY --config wrangler-historical.toml
+#   wrangler secret put CRYPTOCOMPARE_API_KEY --config wrangler-historical.toml
+#
+# To set via GitHub Actions, add these to repository secrets:
+#   COINGECKO_API_KEY - CoinGecko Demo/Pro API key (get from https://www.coingecko.com/en/api)
+#   CRYPTOCOMPARE_API_KEY - CryptoCompare API key (get from https://min-api.cryptocompare.com/)
+#
+# These will be automatically available as env variables if set as GitHub secrets
