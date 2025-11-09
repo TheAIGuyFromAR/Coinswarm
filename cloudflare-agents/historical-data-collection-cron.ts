@@ -14,8 +14,9 @@
  * - Polygon: MATIC, QUICK
  * - Base: AERO
  *
- * Schedule: Runs every hour to collect ~30 days per token
- * Total time: ~15-45 days for complete 5-year dataset
+ * Schedule: Runs every 2 hours to collect ~30 days per token (75% of safe rate)
+ * Rate Limiting: 2.67 sec between calls (22.5 calls/min = 75% of 30/min limit)
+ * Total time: ~60-90 days for complete 5-year dataset
  */
 
 interface Env {
@@ -55,8 +56,8 @@ const TOKENS = [
 
 // Collection parameters
 const YEARS_TO_COLLECT = 5;
-const DAYS_PER_RUN = 30;        // Fetch 30 days per run to stay under rate limits
-const RATE_LIMIT_DELAY_MS = 2000;  // 2 seconds between API calls (30/min limit)
+const DAYS_PER_RUN = 30;           // Fetch 30 days per run to stay under rate limits
+const RATE_LIMIT_DELAY_MS = 2670;  // 2.67 seconds between API calls (22.5/min = 75% of 30/min limit)
 
 class CoinGeckoClient {
   private baseUrl = 'https://api.coingecko.com/api/v3';
@@ -324,9 +325,10 @@ export default {
         '/collect': 'Manual trigger (for testing)'
       },
       tokens: TOKENS.map(t => t.symbol),
-      schedule: 'Every hour',
+      schedule: 'Every 2 hours (75% of safe rate)',
       daysPerRun: DAYS_PER_RUN,
-      yearsToCollect: YEARS_TO_COLLECT
+      yearsToCollect: YEARS_TO_COLLECT,
+      rateLimitDelay: `${RATE_LIMIT_DELAY_MS}ms (22.5 calls/min)`
     }, null, 2), {
       headers: { 'Content-Type': 'application/json' }
     });

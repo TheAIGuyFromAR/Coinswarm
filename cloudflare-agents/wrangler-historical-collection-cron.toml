@@ -10,9 +10,9 @@ binding = "DB"
 database_name = "coinswarm-evolution"
 database_id = "4da0f0d9-60ef-4027-86a0-5fc0663ea6e2"
 
-# Cron trigger - runs every hour
+# Cron trigger - runs every 2 hours (75% slower than max safe rate)
 [triggers]
-crons = ["0 * * * *"]  # Every hour at minute 0
+crons = ["0 */2 * * *"]  # Every 2 hours at minute 0
 
 # Environment variables
 [vars]
