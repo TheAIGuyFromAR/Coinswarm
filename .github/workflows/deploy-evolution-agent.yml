@@ -157,6 +157,22 @@ jobs:
           COINGECKO: ${{ secrets.COINGECKO }}
           CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
 
+      - name: Deploy Real-Time Price Collection Cron
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-realtime-price-cron.toml
+          secrets: |
+            COINGECKO
+            CRYPTOCOMPARE_API_KEY
+        env:
+          COINGECKO: ${{ secrets.COINGECKO }}
+          CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
+
       - name: Deployment Complete
         run: |
           echo "✅ All workers deployed successfully!"
