@@ -97,7 +97,7 @@ class BinanceClient {
       throw new Error(`Binance API error: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json() as Array<[number, string, string, string, string, string, number, string, number, string, string]>;
+    const data = await response.json() as Array<[number, string, string, string, string, string, number, string, number, string, number, string]>;
 
     // Parse Binance kline format
     return data.map(k => ({
@@ -180,6 +180,66 @@ class BinanceClient {
 
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+/**
+ * CoinGecko API Client
+ * Free API with OHLC data - no API key required
+ */
+class CoinGeckoClient {
+  private baseUrl = 'https://api.coingecko.com/api/v3';
+
+  /**
+   * Fetch OHLC data from CoinGecko
+   * Note: CoinGecko uses different intervals (days back)
+   */
+  async fetchOHLC(coinId: string, days: number = 30): Promise<OHLCVCandle[]> {
+    // CoinGecko OHLC endpoint: /coins/{id}/ohlc?vs_currency=usd&days={days}
+    const url = `${this.baseUrl}/coins/${coinId}/ohlc?vs_currency=usd&days=${days}`;
+
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json() as Array<[number, number, number, number, number]>;
+
+    // CoinGecko format: [timestamp, open, high, low, close]
+    // No volume in OHLC endpoint
+    return data.map(candle => ({
+      timestamp: candle[0],
+      open: candle[1],
+      high: candle[2],
+      low: candle[3],
+      close: candle[4],
+      volume: 0 // CoinGecko OHLC doesn't include volume
+    }));
+  }
+
+  /**
+   * Map common symbols to CoinGecko IDs
+   */
+  private getCoinId(symbol: string): string {
+    const mapping: { [key: string]: string } = {
+      'BTCUSDT': 'bitcoin',
+      'ETHUSDT': 'ethereum',
+      'SOLUSDT': 'solana',
+      'BNBUSDT': 'binancecoin',
+      'ADAUSDT': 'cardano',
+      'DOTUSDT': 'polkadot'
+    };
+    return mapping[symbol] || 'bitcoin';
+  }
+
+  async fetchForSymbol(symbol: string, days: number = 30): Promise<OHLCVCandle[]> {
+    const coinId = this.getCoinId(symbol);
+    return await this.fetchOHLC(coinId, days);
   }
 }
 
@@ -298,18 +358,37 @@ export default {
 
     try {
       const binanceClient = new BinanceClient();
+      const coinGeckoClient = new CoinGeckoClient();
       const dataManager = env.HISTORICAL_PRICES ? new HistoricalDataManager(env.HISTORICAL_PRICES) : null;
 
-      // Route: Fetch fresh data from Binance (no caching)
+      // Route: Fetch fresh data with multi-source fallback
       if (path === '/fetch-fresh' && request.method === 'GET') {
         const symbol = url.searchParams.get('symbol') || 'BTCUSDT';
         const interval = url.searchParams.get('interval') || '5m';
         const limit = parseInt(url.searchParams.get('limit') || '500');
 
-        const endTime = Date.now();
-        const startTime = endTime - (limit * 5 * 60 * 1000); // 5 minutes per candle
+        let candles: OHLCVCandle[] = [];
+        let source = '';
+        let error = '';
 
-        const candles = await binanceClient.fetchLargeDataset(symbol, interval, startTime, endTime);
+        // Try CoinGecko first (free, no API key, reliable)
+        try {
+          const days = Math.ceil(limit * 5 / (60 * 24)); // Convert 5m candles to days
+          candles = await coinGeckoClient.fetchForSymbol(symbol, Math.max(days, 30));
+          source = 'coingecko';
+        } catch (e) {
+          error = `CoinGecko failed: ${e instanceof Error ? e.message : String(e)}`;
+
+          // Fallback to Binance
+          try {
+            const endTime = Date.now();
+            const startTime = endTime - (limit * 5 * 60 * 1000);
+            candles = await binanceClient.fetchLargeDataset(symbol, interval, startTime, endTime);
+            source = 'binance';
+          } catch (e2) {
+            throw new Error(`All sources failed. ${error}; Binance: ${e2 instanceof Error ? e2.message : String(e2)}`);
+          }
+        }
 
         return new Response(JSON.stringify({
           success: true,
@@ -317,8 +396,7 @@ export default {
           interval,
           candles,
           candleCount: candles.length,
-          startTime,
-          endTime,
+          source,
           cached: false
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
