@@ -780,40 +780,63 @@ export class EvolutionAgent implements DurableObject {
           // Fetch candles from Binance API (or use cached)
           let candles = candleCache[pair];
           if (!candles) {
-            // Try fetching from Binance API first
+            // Fetch ONLY real data from Binance - NO synthetic fallback
             const binanceUrl = `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=5m&limit=500`;
 
-            try {
-              const response = await fetch(binanceUrl, {
-                headers: {
-                  'User-Agent': 'Mozilla/5.0',
-                  'Accept': 'application/json'
-                }
-              });
+            let fetchSuccess = false;
+            let lastError = '';
 
-              if (response.ok) {
-                const klines = await response.json() as any[];
-                if (klines && klines.length > 0) {
-                  candles = klines.map(k => ({
-                    timestamp: k[0],
-                    open: parseFloat(k[1]),
-                    high: parseFloat(k[2]),
-                    low: parseFloat(k[3]),
-                    close: parseFloat(k[4]),
-                    volume: parseFloat(k[5])
-                  }));
-                  this.log(`✓ Fetched ${candles.length} candles for ${pair} from Binance`);
+            // Try multiple times with different approaches
+            for (let attempt = 0; attempt < 3 && !fetchSuccess; attempt++) {
+              try {
+                this.log(`Attempt ${attempt + 1}/3: Fetching real data for ${pair}...`);
+
+                const response = await fetch(binanceUrl, {
+                  headers: {
+                    'Accept': 'application/json',
+                    'X-MBX-APIKEY': '' // Empty key for public endpoints
+                  }
+                });
+
+                if (response.ok) {
+                  const klines = await response.json() as any[];
+                  if (klines && klines.length > 0) {
+                    candles = klines.map(k => ({
+                      timestamp: k[0],
+                      open: parseFloat(k[1]),
+                      high: parseFloat(k[2]),
+                      low: parseFloat(k[3]),
+                      close: parseFloat(k[4]),
+                      volume: parseFloat(k[5])
+                    }));
+                    this.log(`✓ SUCCESS: Fetched ${candles.length} REAL candles for ${pair}`);
+                    fetchSuccess = true;
+                  }
+                } else {
+                  const errorText = await response.text();
+                  lastError = `HTTP ${response.status}: ${errorText.substring(0, 200)}`;
+                  this.log(`Attempt ${attempt + 1} failed: ${lastError}`);
+
+                  // Wait before retry (exponential backoff)
+                  if (attempt < 2) {
+                    await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+                  }
+                }
+              } catch (apiError) {
+                lastError = apiError instanceof Error ? apiError.message : String(apiError);
+                this.log(`Attempt ${attempt + 1} error: ${lastError}`);
+
+                if (attempt < 2) {
+                  await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
                 }
               }
-            } catch (apiError) {
-              this.log(`Binance API unavailable: ${apiError instanceof Error ? apiError.message : String(apiError)}`);
             }
 
-            // Fallback to synthetic data if API failed
+            // CRITICAL: If we can't get real data, SKIP this trade entirely
             if (!candles) {
-              this.log(`Generating synthetic candles for ${pair}...`);
-              candles = this.generateSyntheticCandles(pair, 500);
-              this.log(`✓ Generated ${candles.length} synthetic candles for ${pair}`);
+              this.log(`❌ FAILED to fetch REAL data for ${pair} - Last error: ${lastError}`);
+              this.log(`⚠️  NO SYNTHETIC DATA ALLOWED - Skipping this trade`);
+              continue; // Skip to next trade iteration
             }
 
             candleCache[pair] = candles;
