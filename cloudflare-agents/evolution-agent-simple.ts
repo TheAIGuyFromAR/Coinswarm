@@ -273,7 +273,7 @@ export class EvolutionAgent implements DurableObject {
 
           // Get sample of chaos_trades with timestamps to check date range
           const sampleTrades = await this.env.DB.prepare(`
-            SELECT entry_time, exit_time, pair, entry_price, exit_price, pnl_pct
+            SELECT entry_time, exit_time, entry_price, exit_price, pnl_pct, profitable
             FROM chaos_trades
             ORDER BY RANDOM()
             LIMIT 5
