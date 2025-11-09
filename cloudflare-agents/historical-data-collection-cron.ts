@@ -2,8 +2,8 @@
  * Historical Data Collection Cron Worker
  *
  * Slowly collects 5 years of historical OHLCV data for all target tokens
- * Respects API rate limits (30 calls/min for CoinGecko)
- * Runs on schedule to progressively fill the price_data table
+ * Respects API rate limits (22.5 calls/min = 75% of CoinGecko's 30/min)
+ * Runs continuously until all data is collected
  *
  * Target Tokens (15 total):
  * - BTC, ETH, SOL
@@ -14,10 +14,11 @@
  * - Polygon: MATIC, QUICK
  * - Base: AERO
  *
- * Schedule: Runs 24/7 every hour (75% of monthly rate limit)
+ * Schedule: Cron runs every hour to ensure worker is running
+ * Execution: Continuous loop at 75% rate limit until completion
  * Rate Limiting: 2.67 sec between calls (22.5 calls/min)
  * Error Handling: Exponential backoff (5s, 10s, 20s, 40s, 80s), pauses after 3 errors
- * Total time: ~30-40 days for complete 5-year dataset
+ * Total time: ~40-60 minutes of continuous running (915 API calls)
  */
 
 interface Env {
@@ -157,13 +158,146 @@ class CoinGeckoClient {
 }
 
 /**
- * Cron handler - runs on schedule
+ * Continuous collection loop - runs until all tokens are collected
+ */
+async function runContinuousCollection(env: Env) {
+  console.log('Starting continuous collection loop');
+
+  const client = new CoinGeckoClient(env.COINGECKO);
+
+  while (true) {
+    // Get next token to process (pending or in_progress, not paused or completed, ordered by days_collected)
+    const nextToken = await env.DB.prepare(`
+      SELECT * FROM collection_progress
+      WHERE status NOT IN ('completed', 'paused')
+      ORDER BY days_collected ASC, error_count ASC
+      LIMIT 1
+    `).first<CollectionProgress>();
+
+    if (!nextToken) {
+      console.log('✅ All tokens have been collected! Collection complete.');
+
+      // Mark collection as no longer running
+      await env.DB.prepare(`
+        DELETE FROM collection_state WHERE key = 'is_running'
+      `).run();
+
+      return;
+    }
+
+    console.log(`Processing ${nextToken.symbol} (${nextToken.coinId})`);
+
+    // Update status to in_progress
+    await env.DB.prepare(`
+      UPDATE collection_progress
+      SET status = 'in_progress', last_run = ?
+      WHERE symbol = ?
+    `).bind(Date.now(), nextToken.symbol).run();
+
+    try {
+      // Fetch OHLCV data (CoinGecko supports up to 365 days)
+      const daysToFetch = Math.min(DAYS_PER_RUN, nextToken.totalDays - nextToken.daysCollected);
+
+      if (daysToFetch <= 0) {
+        // Mark as completed
+        await env.DB.prepare(`
+          UPDATE collection_progress
+          SET status = 'completed'
+          WHERE symbol = ?
+        `).bind(nextToken.symbol).run();
+
+        console.log(`✅ Completed collection for ${nextToken.symbol}`);
+        continue; // Move to next token immediately
+      }
+
+      console.log(`Fetching ${daysToFetch} days for ${nextToken.symbol}`);
+
+      // Fetch with exponential backoff retry
+      const candles = await client.fetchOHLCWithRetry(nextToken.coinId, daysToFetch);
+
+      console.log(`Received ${candles.length} candles for ${nextToken.symbol}`);
+
+      // Insert candles into price_data
+      let insertedCount = 0;
+
+      for (const candle of candles) {
+        try {
+          await env.DB.prepare(`
+            INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, source)
+            VALUES (?, ?, '1d', ?, ?, ?, ?, 'coingecko')
+          `).bind(
+            nextToken.symbol,
+            Math.floor(candle.timestamp / 1000),  // Convert to seconds
+            candle.open,
+            candle.high,
+            candle.low,
+            candle.close
+          ).run();
+
+          insertedCount++;
+        } catch (e) {
+          console.error(`Error inserting candle for ${nextToken.symbol}:`, e);
+        }
+      }
+
+      // Update progress - success, reset error count
+      const newDaysCollected = nextToken.daysCollected + daysToFetch;
+      const isCompleted = newDaysCollected >= nextToken.totalDays;
+
+      await env.DB.prepare(`
+        UPDATE collection_progress
+        SET days_collected = ?, status = ?, last_run = ?, error_count = 0, last_error = NULL
+        WHERE symbol = ?
+      `).bind(
+        newDaysCollected,
+        isCompleted ? 'completed' : 'pending',
+        Date.now(),
+        nextToken.symbol
+      ).run();
+
+      console.log(`✅ Inserted ${insertedCount} candles for ${nextToken.symbol}`);
+      console.log(`Progress: ${newDaysCollected}/${nextToken.totalDays} days (${Math.round(newDaysCollected / nextToken.totalDays * 100)}%)`);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`❌ Error collecting data for ${nextToken.symbol}:`, errorMessage);
+
+      // Increment error count
+      const newErrorCount = (nextToken.errorCount || 0) + 1;
+      const shouldPause = newErrorCount >= 3; // Pause after 3 consecutive errors
+
+      await env.DB.prepare(`
+        UPDATE collection_progress
+        SET status = ?, last_run = ?, error_count = ?, last_error = ?
+        WHERE symbol = ?
+      `).bind(
+        shouldPause ? 'paused' : 'pending',
+        Date.now(),
+        newErrorCount,
+        errorMessage.substring(0, 500), // Limit error message length
+        nextToken.symbol
+      ).run();
+
+      if (shouldPause) {
+        console.log(`⚠️ ${nextToken.symbol} paused after ${newErrorCount} consecutive errors`);
+        console.log(`Last error: ${errorMessage}`);
+      } else {
+        console.log(`Retry ${newErrorCount}/3 for ${nextToken.symbol}`);
+      }
+    }
+
+    // Rate limiting: sleep before next API call
+    console.log(`⏱️ Rate limiting: sleeping ${RATE_LIMIT_DELAY_MS}ms...`);
+    await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
+  }
+}
+
+/**
+ * Cron handler - ensures continuous collection is running
  */
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    console.log('Historical data collection cron started');
-
-    const client = new CoinGeckoClient(env.COINGECKO);
+    console.log('⏰ Cron trigger: Checking if collection is running...');
 
     // Initialize progress table if not exists
     await env.DB.prepare(`
