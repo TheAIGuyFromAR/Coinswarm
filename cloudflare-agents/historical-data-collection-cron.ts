@@ -278,7 +278,21 @@ export default {
       this.runMinuteCollection(env),
       this.runDailyCollection(env),
       this.runHourlyCollection(env)
-    ]));
+    ]).then(async () => {
+      // After data collection, trigger technical indicators calculation
+      try {
+        console.log('📊 Triggering technical indicators calculation...');
+        const indicatorsUrl = 'https://coinswarm-technical-indicators.bamn86.workers.dev/calculate';
+        const response = await fetch(indicatorsUrl, { method: 'POST' });
+        if (response.ok) {
+          console.log('✅ Technical indicators triggered successfully');
+        } else {
+          console.warn(`⚠️ Technical indicators trigger failed: ${response.status}`);
+        }
+      } catch (error) {
+        console.error('❌ Failed to trigger technical indicators:', error);
+      }
+    }));
   },
 
   /**
