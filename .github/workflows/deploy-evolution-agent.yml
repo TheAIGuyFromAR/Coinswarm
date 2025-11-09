@@ -216,7 +216,7 @@ jobs:
 
       - name: Deployment Complete
         run: |
-          echo "✅ All workers deployed successfully!"
+          echo "✅ All workers deployed successfully! (Latest deployment)"
           echo "✅ D1 database migrations applied!"
           echo ""
           echo "Deployed Workers:"
