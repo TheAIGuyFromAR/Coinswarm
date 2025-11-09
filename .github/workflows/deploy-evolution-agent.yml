@@ -75,6 +75,16 @@ jobs:
           wranglerVersion: "4.45.4"
           command: d1 execute coinswarm-evolution --remote --file=sentiment-advanced-schema.sql
 
+      - name: Apply Price Data Collection Schema
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: d1 execute coinswarm-evolution --remote --file=price-data-schema.sql
+
       - name: Deploy Evolution Agent
         uses: cloudflare/wrangler-action@v3
         with:
