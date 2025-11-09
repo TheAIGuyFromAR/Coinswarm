@@ -13,7 +13,7 @@
  */
 
 interface Env {
-  HISTORICAL_PRICES: KVNamespace;
+  HISTORICAL_PRICES?: KVNamespace;  // Optional until KV namespace is created
 }
 
 interface BinanceKline {
@@ -293,10 +293,42 @@ export default {
 
     try {
       const binanceClient = new BinanceClient();
-      const dataManager = new HistoricalDataManager(env.HISTORICAL_PRICES);
+      const dataManager = env.HISTORICAL_PRICES ? new HistoricalDataManager(env.HISTORICAL_PRICES) : null;
+
+      // Route: Fetch fresh data from Binance (no caching)
+      if (path === '/fetch-fresh' && request.method === 'GET') {
+        const symbol = url.searchParams.get('symbol') || 'BTCUSDT';
+        const interval = url.searchParams.get('interval') || '5m';
+        const limit = parseInt(url.searchParams.get('limit') || '500');
+
+        const endTime = Date.now();
+        const startTime = endTime - (limit * 5 * 60 * 1000); // 5 minutes per candle
+
+        const candles = await binanceClient.fetchLargeDataset(symbol, interval, startTime, endTime);
+
+        return new Response(JSON.stringify({
+          success: true,
+          symbol,
+          interval,
+          candles,
+          candleCount: candles.length,
+          startTime,
+          endTime,
+          cached: false
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
 
       // Route: Fetch historical data from Binance
       if (path === '/fetch' && request.method === 'POST') {
+        if (!dataManager) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'KV storage not configured. Use /fetch-fresh endpoint instead.'
+          }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
         const body = await request.json() as any;
         const { symbol, pair, interval, startTime, endTime } = body;
 

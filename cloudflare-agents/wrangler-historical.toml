@@ -5,12 +5,11 @@ main = "historical-data-worker.ts"
 compatibility_date = "2024-01-01"
 
 # KV Namespace for historical price data
-# Created via GitHub Actions workflow
-# ID will be auto-assigned on first deployment or fetched from dashboard
-[[kv_namespaces]]
-binding = "HISTORICAL_PRICES"
-# Note: ID will be populated after first KV namespace creation
-# Check GitHub Actions logs or Cloudflare dashboard for the namespace ID
+# TODO: Create KV namespace and uncomment after getting ID from GitHub Actions
+# For now, worker will fetch from Binance directly without caching
+# [[kv_namespaces]]
+# binding = "HISTORICAL_PRICES"
+# id = "TO_BE_POPULATED_AFTER_CREATION"
 
 # Environment variables
 [vars]

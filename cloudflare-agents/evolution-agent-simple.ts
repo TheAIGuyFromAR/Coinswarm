@@ -777,37 +777,30 @@ export class EvolutionAgent implements DurableObject {
           // Random pair selection
           const pair = pairs[Math.floor(Math.random() * pairs.length)];
 
-          // Fetch candles from Binance API directly (or use cached)
+          // Fetch candles from historical worker (or use cached)
           let candles = candleCache[pair];
           if (!candles) {
-            // Binance public API - fetch last 500 5-minute candles (~41 hours)
-            const binanceUrl = `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=5m&limit=500`;
+            // Call historical-data-worker to fetch real Binance data
+            const workerUrl = `https://coinswarm-historical-data.bamn86.workers.dev/fetch-fresh?symbol=${pair}&interval=5m&limit=500`;
 
-            this.log(`Fetching REAL market data for ${pair} from Binance...`);
+            this.log(`Fetching REAL market data for ${pair} via historical worker...`);
 
             try {
-              const response = await fetch(binanceUrl);
+              const response = await fetch(workerUrl);
 
               if (response.ok) {
-                const klines = await response.json() as any[];
-                if (klines && klines.length > 0) {
-                  candles = klines.map(k => ({
-                    timestamp: k[0],
-                    open: parseFloat(k[1]),
-                    high: parseFloat(k[2]),
-                    low: parseFloat(k[3]),
-                    close: parseFloat(k[4]),
-                    volume: parseFloat(k[5])
-                  }));
-                  this.log(`✓ SUCCESS: Fetched ${candles.length} REAL candles for ${pair} from Binance`);
+                const data = await response.json() as any;
+                if (data.success && data.candles && data.candles.length > 0) {
+                  candles = data.candles;
+                  this.log(`✓ SUCCESS: Fetched ${candles.length} REAL candles for ${pair} from historical worker`);
                   candleCache[pair] = candles;
                 } else {
-                  this.log(`❌ Empty response from Binance for ${pair} - Skipping`);
+                  this.log(`❌ Empty response from historical worker for ${pair} - Skipping`);
                   continue;
                 }
               } else {
                 const errorText = await response.text();
-                this.log(`❌ Binance API error for ${pair}: HTTP ${response.status} - ${errorText.substring(0, 200)}`);
+                this.log(`❌ Historical worker error for ${pair}: HTTP ${response.status} - ${errorText.substring(0, 200)}`);
                 this.log(`⚠️  Skipping this trade - no synthetic data allowed`);
                 continue;
               }
