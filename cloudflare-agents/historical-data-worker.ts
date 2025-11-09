@@ -67,7 +67,7 @@ const PAIRS = [
  * Fetches real historical klines (candlestick) data
  */
 class BinanceClient {
-  private baseUrl = 'https://data.binance.com';  // Public data endpoint - not region-blocked
+  private baseUrl = 'https://api.binance.com';  // Restore original working URL
 
   /**
    * Fetch historical klines from Binance
@@ -87,7 +87,12 @@ class BinanceClient {
   ): Promise<BinanceKline[]> {
     const url = `${this.baseUrl}/api/v3/klines?symbol=${symbol}&interval=${interval}&startTime=${startTime}&endTime=${endTime}&limit=${limit}`;
 
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'application/json'
+      }
+    });
     if (!response.ok) {
       throw new Error(`Binance API error: ${response.status} ${response.statusText}`);
     }
