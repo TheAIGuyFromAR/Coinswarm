@@ -279,10 +279,32 @@ export class EvolutionAgent implements DurableObject {
             LIMIT 5
           `).all();
 
+          // Check data_sources table
+          let dataSourcesInfo = null;
+          try {
+            const dsCount = await this.env.DB.prepare(`SELECT COUNT(*) as count FROM data_sources`).first<{ count: number }>();
+            const dsSample = await this.env.DB.prepare(`SELECT * FROM data_sources LIMIT 3`).all();
+            dataSourcesInfo = { count: dsCount?.count || 0, sample: dsSample.results };
+          } catch (e) {
+            dataSourcesInfo = { error: String(e) };
+          }
+
+          // Check if price_data table exists
+          let priceDataInfo = null;
+          try {
+            const pdCount = await this.env.DB.prepare(`SELECT COUNT(*) as count FROM price_data`).first<{ count: number }>();
+            const pdSample = await this.env.DB.prepare(`SELECT * FROM price_data LIMIT 3`).all();
+            priceDataInfo = { count: pdCount?.count || 0, sample: pdSample.results };
+          } catch (e) {
+            priceDataInfo = { error: String(e) };
+          }
+
           return new Response(JSON.stringify({
             tables: tables.results,
             chaos_trades_count: tradeCount?.count || 0,
             sample_trades: sampleTrades.results,
+            data_sources: dataSourcesInfo,
+            price_data: priceDataInfo,
             timestamp: new Date().toISOString()
           }, null, 2), {
             headers: { 'Content-Type': 'application/json' }
