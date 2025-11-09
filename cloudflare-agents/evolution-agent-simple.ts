@@ -320,6 +320,78 @@ export class EvolutionAgent implements DurableObject {
         }
       }
 
+      // Upload candles endpoint - accept historical data from external source
+      if (url.pathname === '/upload-candles' && request.method === 'POST') {
+        try {
+          const body = await request.json() as any;
+          const { symbol, interval, candles } = body;
+
+          if (!symbol || !interval || !candles || !Array.isArray(candles)) {
+            return new Response(JSON.stringify({
+              error: 'Missing required fields: symbol, interval, candles (array)'
+            }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+          }
+
+          // Ensure price_data table exists
+          await this.env.DB.prepare(`
+            CREATE TABLE IF NOT EXISTS price_data (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              symbol TEXT NOT NULL,
+              timestamp INTEGER NOT NULL,
+              timeframe TEXT NOT NULL,
+              open REAL NOT NULL,
+              high REAL NOT NULL,
+              low REAL NOT NULL,
+              close REAL NOT NULL,
+              volume REAL NOT NULL,
+              created_at INTEGER DEFAULT (strftime('%s', 'now')),
+              UNIQUE(symbol, timestamp, timeframe)
+            )
+          `).run();
+
+          // Insert candles
+          let inserted = 0;
+          for (const candle of candles) {
+            try {
+              await this.env.DB.prepare(`
+                INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, volume)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              `).bind(
+                symbol,
+                Math.floor(candle.timestamp / 1000), // Convert to seconds
+                interval,
+                candle.open,
+                candle.high,
+                candle.low,
+                candle.close,
+                candle.volume
+              ).run();
+              inserted++;
+            } catch (e) {
+              // Skip duplicates
+            }
+          }
+
+          return new Response(JSON.stringify({
+            success: true,
+            symbol,
+            interval,
+            candlesReceived: candles.length,
+            candlesInserted: inserted,
+            message: `Uploaded ${inserted} candles for ${symbol} ${interval}`
+          }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({
+            error: error instanceof Error ? error.message : String(error)
+          }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // Bulk import endpoint - generate historical trades quickly
       if (url.pathname === '/bulk-import') {
         const urlParams = url.searchParams;
