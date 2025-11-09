@@ -13,5 +13,5 @@ compatibility_date = "2024-01-01"
 
 # Environment variables
 [vars]
-# Binance public data API (not region restricted)
-BINANCE_API_URL = "https://data.binance.com"
+# Binance.US API endpoint (US-compliant exchange)
+BINANCE_API_URL = "https://api.binance.us"

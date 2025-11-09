@@ -63,11 +63,18 @@ const PAIRS = [
 ];
 
 /**
- * Binance API Client
- * Fetches real historical klines (candlestick) data
+ * Binance.US API Client
+ * Fetches real historical klines (candlestick) data from Binance.US
+ *
+ * Rate Limits:
+ * - Weight-based: 6000 weight per minute for API keys, 1200 for IP
+ * - Hard limit: 20 orders per second, 160,000 orders per day
+ * - Klines endpoint: 1 weight per request, max 1000 candles per request
+ *
+ * Documentation: https://docs.binance.us/
  */
 class BinanceClient {
-  private baseUrl = 'https://data.binance.com';  // Public data API - not region restricted
+  private baseUrl = 'https://api.binance.us';  // Binance.US API endpoint
 
   /**
    * Fetch historical klines from Binance
@@ -186,6 +193,14 @@ class BinanceClient {
 /**
  * CoinGecko API Client
  * Free API with OHLC data - no API key required
+ *
+ * Rate Limits (Free/Demo Plan):
+ * - 30 calls per minute (with free Demo account registration)
+ * - 10,000 calls per month
+ * - Public API (no registration): 5-15 calls per minute
+ *
+ * Paid plans: 500-1000 calls/min
+ * Documentation: https://www.coingecko.com/en/api/pricing
  */
 class CoinGeckoClient {
   private baseUrl = 'https://api.coingecko.com/api/v3';
@@ -246,6 +261,14 @@ class CoinGeckoClient {
 /**
  * CryptoCompare API Client
  * Free tier with good limits - supports minute-level data
+ *
+ * Rate Limits (Free Tier):
+ * - ~30 calls per minute (with free API key registration)
+ * - Few thousand calls per day
+ * - Requires API key for stable limits
+ *
+ * Paid plans: Start at $80/month for ~100k calls/month
+ * Documentation: https://min-api.cryptocompare.com/pricing
  */
 class CryptoCompareClient {
   private baseUrl = 'https://min-api.cryptocompare.com/data';
@@ -294,6 +317,14 @@ class CryptoCompareClient {
  * DexScreener API Client
  * FREE - Covers ALL chains and DEXes (50+ chains)
  * Supports: Ethereum, BSC, Solana, Arbitrum, Optimism, Polygon, Avalanche, Base, etc.
+ *
+ * Rate Limits (Free API):
+ * - DEX/Pairs endpoints: 300 requests per minute
+ * - Token Profile/Boost endpoints: 60 requests per minute
+ * - Returns 429 error when limit exceeded
+ *
+ * Paid plans available for higher limits
+ * Documentation: https://docs.dexscreener.com/api/reference
  */
 class DexScreenerClient {
   private baseUrl = 'https://api.dexscreener.com/latest/dex';
@@ -360,6 +391,14 @@ class DexScreenerClient {
  * GeckoTerminal API Client
  * FREE - CoinGecko's DEX aggregator for 100+ networks
  * Supports: All major DEXes on Ethereum, BSC, Solana, Arbitrum, Optimism, Polygon, Avalanche, etc.
+ *
+ * Rate Limits (Free API):
+ * - 30 calls per minute (increased from 10/min in 2024)
+ * - No API key required
+ * - Returns OHLCV data for DEX pools
+ *
+ * Paid plans: 500 calls/min (16x increase)
+ * Documentation: https://apiguide.geckoterminal.com/
  */
 class GeckoTerminalClient {
   private baseUrl = 'https://api.geckoterminal.com/api/v2';
