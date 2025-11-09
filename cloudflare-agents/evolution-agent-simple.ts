@@ -762,12 +762,14 @@ export class EvolutionAgent implements DurableObject {
     try {
       const trades: ChaosTrade[] = [];
 
-      // Multi-pair configuration
+      // Multi-pair configuration - convert to Binance format
       const pairs = [
-        'BTC-USDT', 'BTC-USDC', 'BTC-BUSD',
-        'SOL-USDT', 'SOL-USDC', 'SOL-BUSD',
-        'ETH-USDT', 'ETH-USDC', 'ETH-BUSD'
+        'BTCUSDT', 'SOLUSDT', 'ETHUSDT',
+        'BNBUSDT', 'ADAUSDT', 'DOTUSDT'
       ];
+
+      // Cache for candle data (fetch once per pair, reuse for multiple trades)
+      const candleCache: { [key: string]: Candle[] } = {};
 
       // Generate chaos trades
       for (let i = 0; i < count; i++) {
@@ -775,23 +777,41 @@ export class EvolutionAgent implements DurableObject {
           // Random pair selection
           const pair = pairs[Math.floor(Math.random() * pairs.length)];
 
-          // Fetch random historical segment (30 days minimum)
-          const historicalDataUrl = 'https://coinswarm-historical-data.your-subdomain.workers.dev';
-          const response = await fetch(`${historicalDataUrl}/random?pair=${pair}&interval=5m&minDays=30`);
+          // Fetch candles from Binance API (or use cached)
+          let candles = candleCache[pair];
+          if (!candles) {
+            this.log(`Fetching ${pair} data from Binance API...`);
 
-          if (!response.ok) {
-            this.log(`Failed to fetch historical data for ${pair}, using fallback`);
-            continue;
+            // Fetch last 500 5-minute candles (about 41 hours of data)
+            const binanceUrl = `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=5m&limit=500`;
+            const response = await fetch(binanceUrl);
+
+            if (!response.ok) {
+              this.log(`Failed to fetch Binance data for ${pair}: ${response.status}`);
+              continue;
+            }
+
+            const klines = await response.json() as any[];
+
+            if (!klines || klines.length === 0) {
+              this.log(`No candles available for ${pair}, skipping`);
+              continue;
+            }
+
+            // Convert Binance klines to our Candle format
+            // Binance format: [timestamp, open, high, low, close, volume, ...]
+            candles = klines.map(k => ({
+              timestamp: k[0],
+              open: parseFloat(k[1]),
+              high: parseFloat(k[2]),
+              low: parseFloat(k[3]),
+              close: parseFloat(k[4]),
+              volume: parseFloat(k[5])
+            }));
+
+            candleCache[pair] = candles;
+            this.log(`✓ Cached ${candles.length} candles for ${pair}`);
           }
-
-          const data = await response.json() as any;
-
-          if (!data.success || !data.dataset || !data.dataset.candles || data.dataset.candles.length === 0) {
-            this.log(`No candles available for ${pair}, skipping`);
-            continue;
-          }
-
-          const candles = data.dataset.candles;
 
           // Random entry point in the historical data
           // Random hold duration: 1 candle (5min) to 288 candles (24 hours)
@@ -957,11 +977,17 @@ export class EvolutionAgent implements DurableObject {
   async storeTrades(trades: ChaosTrade[]): Promise<void> {
     logger.info('Storing trades with indicators in D1', { count: trades.length });
 
-    // Skip if no trades to store
+    // Skip if no trades to store (this is normal when fetching fails)
     if (!trades || trades.length === 0) {
       logger.warn('No trades to store, skipping batch insert');
       return;
     }
+
+    logger.info('Storing trades to D1', {
+      count: trades.length,
+      sample_pair: trades[0]?.pair,
+      sample_pnl: trades[0]?.pnlPct
+    });
 
     try {
       if (!this.env.DB) {
