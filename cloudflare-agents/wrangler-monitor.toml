@@ -1,0 +1,14 @@
+# Wrangler configuration for Data Collection Monitor
+
+name = "coinswarm-data-monitor"
+main = "data-collection-monitor.ts"
+compatibility_date = "2024-01-01"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "coinswarm-evolution"
+database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
+
+# No cron needed - this is a web dashboard
+# Accessible via HTTP GET requests

@@ -6,6 +6,7 @@ on:
       - claude/debug-cloudflare-historical-data-011CUqugUynEoovcsiVnoaPB
       - claude/review-codebase-docs-workers-011CUu5WhXjGVdghJyJh81Dh
       - claude/incomplete-description-011CUutLehm75rEefmt5WYQj
+      - claude/full-code-review-011CUvqUcjpgrh9x49XzAs2v
       - main
       - master
     paths:
@@ -44,6 +45,26 @@ jobs:
           wranglerVersion: "4.45.4"
           command: d1 execute coinswarm-evolution --remote --file=sentiment-data-schema.sql
 
+      - name: Apply Technical Indicators Schema
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: d1 execute coinswarm-evolution --remote --file=d1-schema-technical-indicators.sql
+
+      - name: Apply Price Data Schema
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: '.'
+          wranglerVersion: "4.45.4"
+          command: d1 execute coinswarm-evolution --remote --file=cloudflare-d1-schema.sql
+
       - name: Apply Advanced Sentiment Migrations
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
@@ -53,6 +74,16 @@ jobs:
           workingDirectory: 'cloudflare-agents'
           wranglerVersion: "4.45.4"
           command: d1 execute coinswarm-evolution --remote --file=sentiment-advanced-schema.sql
+
+      - name: Apply Price Data Collection Schema
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: d1 execute coinswarm-evolution --remote --file=price-data-schema.sql
 
       - name: Deploy Evolution Agent
         uses: cloudflare/wrangler-action@v3
@@ -98,6 +129,84 @@ jobs:
           workingDirectory: 'cloudflare-agents'
           wranglerVersion: "4.45.4"
           command: deploy --config wrangler-sentiment-backfill.toml
+
+      - name: Create KV Namespace for Historical Data
+        id: create-kv
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: kv namespace create HISTORICAL_PRICES
+
+      - name: Deploy Historical Data Worker
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-historical.toml
+
+      - name: Deploy Historical Data Collection Cron
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-historical-collection-cron.toml
+          secrets: |
+            COINGECKO
+            CRYPTOCOMPARE_API_KEY
+        env:
+          COINGECKO: ${{ secrets.COINGECKO }}
+          CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
+
+      - name: Deploy Real-Time Price Collection Cron
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-realtime-price-cron.toml
+          secrets: |
+            COINGECKO
+            CRYPTOCOMPARE_API_KEY
+        env:
+          COINGECKO: ${{ secrets.COINGECKO }}
+          CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
+
+      - name: Deploy Data Collection Monitor Dashboard
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-monitor.toml
+
+      - name: Deploy Technical Indicators Agent
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-technical-indicators.toml
+
+      - name: Deploy Collection Alerts Agent
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-collection-alerts.toml
 
       - name: Deployment Complete
         run: |

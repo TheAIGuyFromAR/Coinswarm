@@ -13,7 +13,9 @@
  */
 
 interface Env {
-  HISTORICAL_PRICES: KVNamespace;
+  HISTORICAL_PRICES?: KVNamespace;  // Optional until KV namespace is created
+  COINGECKO?: string;                // CoinGecko Demo/Pro API key (optional, increases rate limit to 30/min)
+  CRYPTOCOMPARE_API_KEY?: string;   // CryptoCompare API key (optional, for stable 30/min limit)
 }
 
 interface BinanceKline {
@@ -63,11 +65,18 @@ const PAIRS = [
 ];
 
 /**
- * Binance API Client
- * Fetches real historical klines (candlestick) data
+ * Binance.US API Client
+ * Fetches real historical klines (candlestick) data from Binance.US
+ *
+ * Rate Limits:
+ * - Weight-based: 6000 weight per minute for API keys, 1200 for IP
+ * - Hard limit: 20 orders per second, 160,000 orders per day
+ * - Klines endpoint: 1 weight per request, max 1000 candles per request
+ *
+ * Documentation: https://docs.binance.us/
  */
 class BinanceClient {
-  private baseUrl = 'https://api.binance.com';
+  private baseUrl = 'https://api.binance.us';  // Binance.US API endpoint
 
   /**
    * Fetch historical klines from Binance
@@ -87,12 +96,17 @@ class BinanceClient {
   ): Promise<BinanceKline[]> {
     const url = `${this.baseUrl}/api/v3/klines?symbol=${symbol}&interval=${interval}&startTime=${startTime}&endTime=${endTime}&limit=${limit}`;
 
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'application/json'
+      }
+    });
     if (!response.ok) {
       throw new Error(`Binance API error: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json() as Array<[number, string, string, string, string, string, number, string, number, string, string]>;
+    const data = await response.json() as Array<[number, string, string, string, string, string, number, string, number, string, number, string]>;
 
     // Parse Binance kline format
     return data.map(k => ({
@@ -175,6 +189,324 @@ class BinanceClient {
 
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+/**
+ * CoinGecko API Client
+ * Free API with OHLC data - API key optional but recommended
+ *
+ * Rate Limits (Free/Demo Plan):
+ * - 30 calls per minute (with free Demo account registration)
+ * - 10,000 calls per month
+ * - Public API (no registration): 5-15 calls per minute
+ *
+ * Paid plans: 500-1000 calls/min
+ * Documentation: https://www.coingecko.com/en/api/pricing
+ */
+class CoinGeckoClient {
+  private baseUrl = 'https://api.coingecko.com/api/v3';
+  private apiKey?: string;
+
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey;
+  }
+
+  /**
+   * Fetch OHLC data from CoinGecko
+   * Note: CoinGecko uses different intervals (days back)
+   */
+  async fetchOHLC(coinId: string, days: number = 30): Promise<OHLCVCandle[]> {
+    // CoinGecko OHLC endpoint: /coins/{id}/ohlc?vs_currency=usd&days={days}
+    const url = `${this.baseUrl}/coins/${coinId}/ohlc?vs_currency=usd&days=${days}`;
+
+    const headers: Record<string, string> = {
+      'Accept': 'application/json'
+    };
+
+    // Add API key if provided (Demo or Pro plan)
+    if (this.apiKey) {
+      headers['x-cg-demo-api-key'] = this.apiKey;
+    }
+
+    const response = await fetch(url, { headers });
+
+    if (!response.ok) {
+      throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json() as Array<[number, number, number, number, number]>;
+
+    // CoinGecko format: [timestamp, open, high, low, close]
+    // No volume in OHLC endpoint
+    return data.map(candle => ({
+      timestamp: candle[0],
+      open: candle[1],
+      high: candle[2],
+      low: candle[3],
+      close: candle[4],
+      volume: 0 // CoinGecko OHLC doesn't include volume
+    }));
+  }
+
+  /**
+   * Map common symbols to CoinGecko IDs
+   */
+  private getCoinId(symbol: string): string {
+    const mapping: { [key: string]: string } = {
+      'BTCUSDT': 'bitcoin',
+      'ETHUSDT': 'ethereum',
+      'SOLUSDT': 'solana',
+      'BNBUSDT': 'binancecoin',
+      'ADAUSDT': 'cardano',
+      'DOTUSDT': 'polkadot'
+    };
+    return mapping[symbol] || 'bitcoin';
+  }
+
+  async fetchForSymbol(symbol: string, days: number = 30): Promise<OHLCVCandle[]> {
+    const coinId = this.getCoinId(symbol);
+    return await this.fetchOHLC(coinId, days);
+  }
+}
+
+/**
+ * CryptoCompare API Client
+ * Free tier with good limits - supports minute-level data
+ *
+ * Rate Limits (Free Tier):
+ * - ~30 calls per minute (with free API key registration)
+ * - Few thousand calls per day
+ * - Requires API key for stable limits
+ *
+ * Paid plans: Start at $80/month for ~100k calls/month
+ * Documentation: https://min-api.cryptocompare.com/pricing
+ */
+class CryptoCompareClient {
+  private baseUrl = 'https://min-api.cryptocompare.com/data';
+  private apiKey?: string;
+
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey;
+  }
+
+  /**
+   * Fetch historical minute data from CryptoCompare
+   * histominute endpoint gives minute-level OHLCV
+   */
+  async fetchHistoMinute(symbol: string, limit: number = 500): Promise<OHLCVCandle[]> {
+    // Extract base symbol (BTC from BTCUSDT)
+    const fsym = symbol.replace(/USDT|USDC|BUSD/g, '');
+    const tsym = 'USD';
+
+    // CryptoCompare histominute endpoint
+    let url = `${this.baseUrl}/v2/histominute?fsym=${fsym}&tsym=${tsym}&limit=${limit}`;
+
+    // Add API key as query parameter if provided
+    if (this.apiKey) {
+      url += `&api_key=${this.apiKey}`;
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`CryptoCompare API error: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json() as any;
+
+    if (result.Response !== 'Success') {
+      throw new Error(`CryptoCompare error: ${result.Message || 'Unknown error'}`);
+    }
+
+    // CryptoCompare format: {time, open, high, low, close, volumefrom, volumeto}
+    return result.Data.Data.map((candle: any) => ({
+      timestamp: candle.time * 1000, // Convert to ms
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      volume: candle.volumefrom
+    }));
+  }
+}
+
+/**
+ * DexScreener API Client
+ * FREE - Covers ALL chains and DEXes (50+ chains)
+ * Supports: Ethereum, BSC, Solana, Arbitrum, Optimism, Polygon, Avalanche, Base, etc.
+ *
+ * Rate Limits (Free API):
+ * - DEX/Pairs endpoints: 300 requests per minute
+ * - Token Profile/Boost endpoints: 60 requests per minute
+ * - Returns 429 error when limit exceeded
+ *
+ * Paid plans available for higher limits
+ * Documentation: https://docs.dexscreener.com/api/reference
+ */
+class DexScreenerClient {
+  private baseUrl = 'https://api.dexscreener.com/latest/dex';
+
+  /**
+   * Search for token across all chains
+   */
+  async searchToken(symbol: string): Promise<any> {
+    const url = `${this.baseUrl}/search?q=${symbol}`;
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) {
+      throw new Error(`DexScreener API error: ${response.status} ${response.statusText}`);
+    }
+    return await response.json();
+  }
+
+  /**
+   * Get price data for specific token pairs
+   */
+  async getTokenPairs(chainId: string, tokenAddress: string): Promise<any> {
+    const url = `${this.baseUrl}/tokens/${chainId}/${tokenAddress}`;
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) {
+      throw new Error(`DexScreener API error: ${response.status} ${response.statusText}`);
+    }
+    return await response.json();
+  }
+
+  /**
+   * Fetch OHLCV candles from DexScreener search results
+   * Returns best match for symbol with price data
+   */
+  async fetchForSymbol(symbol: string): Promise<OHLCVCandle[]> {
+    const baseSymbol = symbol.replace(/USDT|USDC|BUSD/g, '');
+    const searchResult = await this.searchToken(baseSymbol);
+
+    if (!searchResult.pairs || searchResult.pairs.length === 0) {
+      throw new Error(`No pairs found for ${symbol}`);
+    }
+
+    // Get the first pair with highest liquidity
+    const pair = searchResult.pairs.sort((a: any, b: any) =>
+      (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0)
+    )[0];
+
+    // DexScreener doesn't provide historical candles, just current price
+    // Return a single data point representing current state
+    return [{
+      timestamp: Date.now(),
+      open: parseFloat(pair.priceUsd || '0'),
+      high: parseFloat(pair.priceUsd || '0'),
+      low: parseFloat(pair.priceUsd || '0'),
+      close: parseFloat(pair.priceUsd || '0'),
+      volume: parseFloat(pair.volume?.h24 || '0')
+    }];
+  }
+}
+
+/**
+ * GeckoTerminal API Client
+ * FREE - CoinGecko's DEX aggregator for 100+ networks
+ * Supports: All major DEXes on Ethereum, BSC, Solana, Arbitrum, Optimism, Polygon, Avalanche, etc.
+ *
+ * Rate Limits (Free API):
+ * - 30 calls per minute (increased from 10/min in 2024)
+ * - No API key required
+ * - Returns OHLCV data for DEX pools
+ *
+ * Paid plans: 500 calls/min (16x increase)
+ * Documentation: https://apiguide.geckoterminal.com/
+ */
+class GeckoTerminalClient {
+  private baseUrl = 'https://api.geckoterminal.com/api/v2';
+
+  /**
+   * Get OHLCV data for a specific pool
+   */
+  async getPoolOHLCV(network: string, poolAddress: string, timeframe: string = '5m'): Promise<OHLCVCandle[]> {
+    // Timeframe options: '1m', '5m', '15m', '1h', '4h', '12h', '1d'
+    const url = `${this.baseUrl}/networks/${network}/pools/${poolAddress}/ohlcv/${timeframe}`;
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) {
+      throw new Error(`GeckoTerminal API error: ${response.status} ${response.statusText}`);
+    }
+    const result = await response.json() as any;
+
+    // GeckoTerminal format: {data: {attributes: {ohlcv_list: [[timestamp, open, high, low, close, volume]]}}}
+    const ohlcvList = result.data?.attributes?.ohlcv_list || [];
+    return ohlcvList.map((candle: any[]) => ({
+      timestamp: candle[0] * 1000, // Convert to ms
+      open: candle[1],
+      high: candle[2],
+      low: candle[3],
+      close: candle[4],
+      volume: candle[5]
+    }));
+  }
+
+  /**
+   * Search for token pools across all networks
+   */
+  async searchTokens(query: string): Promise<any> {
+    const url = `${this.baseUrl}/search/pools?query=${query}`;
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) {
+      throw new Error(`GeckoTerminal API error: ${response.status} ${response.statusText}`);
+    }
+    return await response.json();
+  }
+
+  /**
+   * Fetch OHLCV for a symbol by searching and getting best pool
+   */
+  async fetchForSymbol(symbol: string, timeframe: string = '5m'): Promise<OHLCVCandle[]> {
+    const baseSymbol = symbol.replace(/USDT|USDC|BUSD/g, '');
+    const searchResult = await this.searchTokens(baseSymbol);
+
+    if (!searchResult.data || searchResult.data.length === 0) {
+      throw new Error(`No pools found for ${symbol}`);
+    }
+
+    // Get the first pool (highest relevance)
+    const pool = searchResult.data[0];
+    const network = pool.relationships?.base_token?.data?.id?.split('_')[0];
+    const poolAddress = pool.attributes?.address;
+
+    if (!network || !poolAddress) {
+      throw new Error(`Invalid pool data for ${symbol}`);
+    }
+
+    return await this.getPoolOHLCV(network, poolAddress, timeframe);
+  }
+
+  /**
+   * Get network mapping for common symbols
+   */
+  private getNetwork(symbol: string): string {
+    const baseSymbol = symbol.replace(/USDT|USDC|BUSD/g, '');
+
+    // Common network mappings
+    const mapping: { [key: string]: string } = {
+      'BTC': 'eth', // Wrapped BTC on Ethereum
+      'ETH': 'eth',
+      'SOL': 'solana',
+      'BNB': 'bsc',
+      'AVAX': 'avax',
+      'MATIC': 'polygon',
+      'ARB': 'arbitrum',
+      'OP': 'optimism'
+    };
+
+    return mapping[baseSymbol] || 'eth'; // Default to Ethereum
   }
 }
 
@@ -293,10 +625,88 @@ export default {
 
     try {
       const binanceClient = new BinanceClient();
-      const dataManager = new HistoricalDataManager(env.HISTORICAL_PRICES);
+      const coinGeckoClient = new CoinGeckoClient(env.COINGECKO);
+      const cryptoCompareClient = new CryptoCompareClient(env.CRYPTOCOMPARE_API_KEY);
+      const dexScreenerClient = new DexScreenerClient();
+      const geckoTerminalClient = new GeckoTerminalClient();
+      const dataManager = env.HISTORICAL_PRICES ? new HistoricalDataManager(env.HISTORICAL_PRICES) : null;
+
+      // Route: Fetch fresh data with multi-source fallback
+      if (path === '/fetch-fresh' && request.method === 'GET') {
+        const symbol = url.searchParams.get('symbol') || 'BTCUSDT';
+        const interval = url.searchParams.get('interval') || '5m';
+        const limit = parseInt(url.searchParams.get('limit') || '500');
+
+        let candles: OHLCVCandle[] = [];
+        let source = '';
+        const errors: string[] = [];
+
+        // Try CryptoCompare first (minute-level data, has volume)
+        try {
+          candles = await cryptoCompareClient.fetchHistoMinute(symbol, limit);
+          source = 'cryptocompare';
+        } catch (e) {
+          errors.push(`CryptoCompare: ${e instanceof Error ? e.message : String(e)}`);
+
+          // Fallback to CoinGecko
+          try {
+            const days = Math.ceil(limit * 5 / (60 * 24));
+            candles = await coinGeckoClient.fetchForSymbol(symbol, Math.max(days, 30));
+            source = 'coingecko';
+          } catch (e2) {
+            errors.push(`CoinGecko: ${e2 instanceof Error ? e2.message : String(e2)}`);
+
+            // Fallback to GeckoTerminal (DEX aggregator with OHLCV)
+            try {
+              candles = await geckoTerminalClient.fetchForSymbol(symbol, interval);
+              source = 'geckoterminal';
+            } catch (e3) {
+              errors.push(`GeckoTerminal: ${e3 instanceof Error ? e3.message : String(e3)}`);
+
+              // Fallback to Binance
+              try {
+                const endTime = Date.now();
+                const startTime = endTime - (limit * 5 * 60 * 1000);
+                candles = await binanceClient.fetchLargeDataset(symbol, interval, startTime, endTime);
+                source = 'binance';
+              } catch (e4) {
+                errors.push(`Binance: ${e4 instanceof Error ? e4.message : String(e4)}`);
+
+                // Final fallback to DexScreener (current price only)
+                try {
+                  candles = await dexScreenerClient.fetchForSymbol(symbol);
+                  source = 'dexscreener';
+                } catch (e5) {
+                  errors.push(`DexScreener: ${e5 instanceof Error ? e5.message : String(e5)}`);
+                  throw new Error(`All sources failed: ${errors.join('; ')}`);
+                }
+              }
+            }
+          }
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          symbol,
+          interval,
+          candles,
+          candleCount: candles.length,
+          source,
+          cached: false
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
 
       // Route: Fetch historical data from Binance
       if (path === '/fetch' && request.method === 'POST') {
+        if (!dataManager) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'KV storage not configured. Use /fetch-fresh endpoint instead.'
+          }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
         const body = await request.json() as any;
         const { symbol, pair, interval, startTime, endTime } = body;
 

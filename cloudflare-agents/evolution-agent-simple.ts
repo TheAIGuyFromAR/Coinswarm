@@ -258,6 +258,140 @@ export class EvolutionAgent implements DurableObject {
         });
       }
 
+      // Debug endpoint - check database schema and sample data
+      if (url.pathname === '/debug/db') {
+        try {
+          // Get list of tables
+          const tables = await this.env.DB.prepare(`
+            SELECT name FROM sqlite_master WHERE type='table' ORDER BY name
+          `).all();
+
+          // Get count from chaos_trades if it exists
+          const tradeCount = await this.env.DB.prepare(`
+            SELECT COUNT(*) as count FROM chaos_trades
+          `).first<{ count: number }>();
+
+          // Get sample of chaos_trades with timestamps to check date range
+          const sampleTrades = await this.env.DB.prepare(`
+            SELECT entry_time, exit_time, entry_price, exit_price, pnl_pct, profitable
+            FROM chaos_trades
+            ORDER BY RANDOM()
+            LIMIT 5
+          `).all();
+
+          // Check data_sources table
+          let dataSourcesInfo = null;
+          try {
+            const dsCount = await this.env.DB.prepare(`SELECT COUNT(*) as count FROM data_sources`).first<{ count: number }>();
+            const dsSample = await this.env.DB.prepare(`SELECT * FROM data_sources LIMIT 3`).all();
+            dataSourcesInfo = { count: dsCount?.count || 0, sample: dsSample.results };
+          } catch (e) {
+            dataSourcesInfo = { error: String(e) };
+          }
+
+          // Check if price_data table exists
+          let priceDataInfo = null;
+          try {
+            const pdCount = await this.env.DB.prepare(`SELECT COUNT(*) as count FROM price_data`).first<{ count: number }>();
+            const pdSample = await this.env.DB.prepare(`SELECT * FROM price_data LIMIT 3`).all();
+            priceDataInfo = { count: pdCount?.count || 0, sample: pdSample.results };
+          } catch (e) {
+            priceDataInfo = { error: String(e) };
+          }
+
+          return new Response(JSON.stringify({
+            tables: tables.results,
+            chaos_trades_count: tradeCount?.count || 0,
+            sample_trades: sampleTrades.results,
+            data_sources: dataSourcesInfo,
+            price_data: priceDataInfo,
+            timestamp: new Date().toISOString()
+          }, null, 2), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+          }, null, 2), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      // Upload candles endpoint - accept historical data from external source
+      if (url.pathname === '/upload-candles' && request.method === 'POST') {
+        try {
+          const body = await request.json() as any;
+          const { symbol, interval, candles } = body;
+
+          if (!symbol || !interval || !candles || !Array.isArray(candles)) {
+            return new Response(JSON.stringify({
+              error: 'Missing required fields: symbol, interval, candles (array)'
+            }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+          }
+
+          // Ensure price_data table exists
+          await this.env.DB.prepare(`
+            CREATE TABLE IF NOT EXISTS price_data (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              symbol TEXT NOT NULL,
+              timestamp INTEGER NOT NULL,
+              timeframe TEXT NOT NULL,
+              open REAL NOT NULL,
+              high REAL NOT NULL,
+              low REAL NOT NULL,
+              close REAL NOT NULL,
+              volume REAL NOT NULL,
+              created_at INTEGER DEFAULT (strftime('%s', 'now')),
+              UNIQUE(symbol, timestamp, timeframe)
+            )
+          `).run();
+
+          // Insert candles
+          let inserted = 0;
+          for (const candle of candles) {
+            try {
+              await this.env.DB.prepare(`
+                INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, volume)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              `).bind(
+                symbol,
+                Math.floor(candle.timestamp / 1000), // Convert to seconds
+                interval,
+                candle.open,
+                candle.high,
+                candle.low,
+                candle.close,
+                candle.volume
+              ).run();
+              inserted++;
+            } catch (e) {
+              // Skip duplicates
+            }
+          }
+
+          return new Response(JSON.stringify({
+            success: true,
+            symbol,
+            interval,
+            candlesReceived: candles.length,
+            candlesInserted: inserted,
+            message: `Uploaded ${inserted} candles for ${symbol} ${interval}`
+          }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({
+            error: error instanceof Error ? error.message : String(error)
+          }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // Bulk import endpoint - generate historical trades quickly
       if (url.pathname === '/bulk-import') {
         const urlParams = url.searchParams;
@@ -762,12 +896,14 @@ export class EvolutionAgent implements DurableObject {
     try {
       const trades: ChaosTrade[] = [];
 
-      // Multi-pair configuration
+      // Multi-pair configuration - convert to Binance format
       const pairs = [
-        'BTC-USDT', 'BTC-USDC', 'BTC-BUSD',
-        'SOL-USDT', 'SOL-USDC', 'SOL-BUSD',
-        'ETH-USDT', 'ETH-USDC', 'ETH-BUSD'
+        'BTCUSDT', 'SOLUSDT', 'ETHUSDT',
+        'BNBUSDT', 'ADAUSDT', 'DOTUSDT'
       ];
+
+      // Cache for candle data (fetch once per pair, reuse for multiple trades)
+      const candleCache: { [key: string]: Candle[] } = {};
 
       // Generate chaos trades
       for (let i = 0; i < count; i++) {
@@ -775,23 +911,39 @@ export class EvolutionAgent implements DurableObject {
           // Random pair selection
           const pair = pairs[Math.floor(Math.random() * pairs.length)];
 
-          // Fetch random historical segment (30 days minimum)
-          const historicalDataUrl = 'https://coinswarm-historical-data.your-subdomain.workers.dev';
-          const response = await fetch(`${historicalDataUrl}/random?pair=${pair}&interval=5m&minDays=30`);
+          // Fetch candles from historical worker (or use cached)
+          let candles = candleCache[pair];
+          if (!candles) {
+            // Call historical-data-worker to fetch real Binance data
+            const workerUrl = `https://coinswarm-historical-data.bamn86.workers.dev/fetch-fresh?symbol=${pair}&interval=5m&limit=500`;
 
-          if (!response.ok) {
-            this.log(`Failed to fetch historical data for ${pair}, using fallback`);
-            continue;
+            this.log(`Fetching REAL market data for ${pair} via historical worker...`);
+
+            try {
+              const response = await fetch(workerUrl);
+
+              if (response.ok) {
+                const data = await response.json() as any;
+                if (data.success && data.candles && data.candles.length > 0) {
+                  candles = data.candles;
+                  this.log(`✓ SUCCESS: Fetched ${candles.length} REAL candles for ${pair} from historical worker`);
+                  candleCache[pair] = candles;
+                } else {
+                  this.log(`❌ Empty response from historical worker for ${pair} - Skipping`);
+                  continue;
+                }
+              } else {
+                const errorText = await response.text();
+                this.log(`❌ Historical worker error for ${pair}: HTTP ${response.status} - ${errorText.substring(0, 200)}`);
+                this.log(`⚠️  Skipping this trade - no synthetic data allowed`);
+                continue;
+              }
+            } catch (error) {
+              this.log(`❌ Fetch error for ${pair}: ${error instanceof Error ? error.message : String(error)}`);
+              this.log(`⚠️  Skipping this trade - no synthetic data allowed`);
+              continue;
+            }
           }
-
-          const data = await response.json() as any;
-
-          if (!data.success || !data.dataset || !data.dataset.candles || data.dataset.candles.length === 0) {
-            this.log(`No candles available for ${pair}, skipping`);
-            continue;
-          }
-
-          const candles = data.dataset.candles;
 
           // Random entry point in the historical data
           // Random hold duration: 1 candle (5min) to 288 candles (24 hours)
@@ -940,6 +1092,59 @@ export class EvolutionAgent implements DurableObject {
   }
 
   /**
+   * Generate synthetic candle data for testing when APIs are unavailable
+   * Creates realistic price movements with trends and volatility
+   */
+  private generateSyntheticCandles(pair: string, count: number): Candle[] {
+    const candles: Candle[] = [];
+    const now = Date.now();
+
+    // Base prices for different pairs
+    const basePrices: { [key: string]: number } = {
+      'BTCUSDT': 95000,
+      'ETHUSDT': 3500,
+      'SOLUSDT': 220,
+      'BNBUSDT': 680,
+      'ADAUSDT': 1.05,
+      'DOTUSDT': 8.50
+    };
+
+    let currentPrice = basePrices[pair] || 100;
+    const volatility = 0.02; // 2% volatility per candle
+
+    // Generate candles going backwards in time
+    for (let i = count - 1; i >= 0; i--) {
+      const timestamp = now - (i * 5 * 60 * 1000); // 5 minutes per candle
+
+      // Random price movement with slight upward bias (simulating market growth)
+      const change = (Math.random() - 0.48) * volatility; // -0.48 to 0.52 for slight upward bias
+      const open = currentPrice;
+      const close = currentPrice * (1 + change);
+
+      // High and low based on volatility
+      const high = Math.max(open, close) * (1 + Math.random() * volatility / 2);
+      const low = Math.min(open, close) * (1 - Math.random() * volatility / 2);
+
+      // Volume varies randomly
+      const baseVolume = 1000000;
+      const volume = baseVolume * (0.5 + Math.random());
+
+      candles.push({
+        timestamp,
+        open,
+        high,
+        low,
+        close,
+        volume
+      });
+
+      currentPrice = close;
+    }
+
+    return candles;
+  }
+
+  /**
    * Generate simple chaos trades for regular evolution cycles
    */
   async generateChaosTrades(count: number): Promise<number> {
@@ -957,149 +1162,40 @@ export class EvolutionAgent implements DurableObject {
   async storeTrades(trades: ChaosTrade[]): Promise<void> {
     logger.info('Storing trades with indicators in D1', { count: trades.length });
 
+    // Skip if no trades to store (this is normal when fetching fails)
+    if (!trades || trades.length === 0) {
+      logger.warn('No trades to store, skipping batch insert');
+      return;
+    }
+
+    logger.info('Storing trades to D1', {
+      count: trades.length,
+      sample_pair: trades[0]?.pair,
+      sample_pnl: trades[0]?.pnlPct
+    });
+
     try {
       if (!this.env.DB) {
         throw new Error('D1 database binding not found');
       }
 
+      // Ultra-minimal INSERT using only columns guaranteed to exist
+      // Based on original chaos_trades schema from early implementation
       const stmt = this.env.DB.prepare(`
         INSERT INTO chaos_trades (
-          pair, entry_time, exit_time, entry_price, exit_price,
-          pnl_pct, profitable, hold_duration_minutes,
-          entry_rsi_14, entry_rsi_oversold, entry_rsi_overbought,
-          entry_macd_line, entry_macd_signal, entry_macd_histogram,
-          entry_macd_bullish_cross, entry_macd_bearish_cross,
-          entry_bb_upper, entry_bb_middle, entry_bb_lower, entry_bb_position,
-          entry_bb_squeeze, entry_bb_at_lower, entry_bb_at_upper,
-          entry_sma_10, entry_sma_50, entry_sma_200, entry_ema_10, entry_ema_50,
-          entry_price_vs_sma10, entry_price_vs_sma50, entry_price_vs_sma200,
-          entry_above_sma10, entry_above_sma50, entry_above_sma200,
-          entry_golden_cross, entry_death_cross,
-          entry_stoch_k, entry_stoch_d, entry_stoch_oversold, entry_stoch_overbought,
-          entry_stoch_bullish_cross, entry_stoch_bearish_cross,
-          entry_atr_14, entry_volatility_regime,
-          entry_volume, entry_volume_sma_20, entry_volume_vs_avg,
-          entry_volume_spike, entry_volume_dry,
-          entry_momentum_1, entry_momentum_5, entry_momentum_10,
-          entry_momentum_positive, entry_momentum_strong,
-          entry_trend_regime, entry_higher_highs, entry_lower_lows,
-          entry_day_of_week, entry_hour_of_day, entry_month, entry_week_of_month,
-          entry_is_weekend, entry_is_monday, entry_is_tuesday, entry_is_wednesday,
-          entry_is_thursday, entry_is_friday, entry_is_market_hours,
-          entry_near_recent_high, entry_near_recent_low, entry_at_resistance, entry_at_support,
-          buy_rationalization, sell_rationalization
-        ) VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?,
-          ?, ?, ?, ?, ?, ?, ?, ?,
-          ?, ?, ?, ?, ?, ?, ?,
-          ?, ?, ?, ?, ?,
-          ?, ?, ?,
-          ?, ?, ?,
-          ?, ?,
-          ?, ?, ?, ?,
-          ?, ?,
-          ?, ?,
-          ?, ?, ?,
-          ?, ?,
-          ?, ?, ?,
-          ?, ?,
-          ?, ?, ?,
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-          ?, ?, ?, ?,
-          ?, ?
-        )
+          entry_time, exit_time, entry_price, exit_price,
+          pnl_pct, profitable
+        ) VALUES (?, ?, ?, ?, ?, ?)
       `);
 
       const batch = trades.map(t => {
-        const ind = t.entryIndicators;
         return stmt.bind(
-          t.pair,
           t.entryTime,
           t.exitTime,
           t.entryPrice,
           t.exitPrice,
           t.pnlPct,
-          t.profitable ? 1 : 0,
-          t.holdDurationMinutes,
-          // RSI
-          ind.rsi_14,
-          ind.rsi_oversold ? 1 : 0,
-          ind.rsi_overbought ? 1 : 0,
-          // MACD
-          ind.macd_line,
-          ind.macd_signal,
-          ind.macd_histogram,
-          ind.macd_bullish_cross ? 1 : 0,
-          ind.macd_bearish_cross ? 1 : 0,
-          // Bollinger Bands
-          ind.bb_upper,
-          ind.bb_middle,
-          ind.bb_lower,
-          ind.bb_position,
-          ind.bb_squeeze ? 1 : 0,
-          ind.bb_at_lower ? 1 : 0,
-          ind.bb_at_upper ? 1 : 0,
-          // Moving Averages
-          ind.sma_10,
-          ind.sma_50,
-          ind.sma_200,
-          ind.ema_10,
-          ind.ema_50,
-          ind.price_vs_sma10,
-          ind.price_vs_sma50,
-          ind.price_vs_sma200,
-          ind.above_sma10 ? 1 : 0,
-          ind.above_sma50 ? 1 : 0,
-          ind.above_sma200 ? 1 : 0,
-          ind.golden_cross ? 1 : 0,
-          ind.death_cross ? 1 : 0,
-          // Stochastic
-          ind.stoch_k,
-          ind.stoch_d,
-          ind.stoch_oversold ? 1 : 0,
-          ind.stoch_overbought ? 1 : 0,
-          ind.stoch_bullish_cross ? 1 : 0,
-          ind.stoch_bearish_cross ? 1 : 0,
-          // ATR / Volatility
-          ind.atr_14,
-          ind.volatility_regime,
-          // Volume
-          ind.volume,
-          ind.volume_sma_20,
-          ind.volume_vs_avg,
-          ind.volume_spike ? 1 : 0,
-          ind.volume_dry ? 1 : 0,
-          // Momentum
-          ind.momentum_1,
-          ind.momentum_5,
-          ind.momentum_10,
-          ind.momentum_positive ? 1 : 0,
-          ind.momentum_strong ? 1 : 0,
-          // Trend
-          ind.trend_regime,
-          ind.higher_highs ? 1 : 0,
-          ind.lower_lows ? 1 : 0,
-          // Temporal
-          ind.day_of_week,
-          ind.hour_of_day,
-          ind.month,
-          ind.week_of_month,
-          ind.is_weekend ? 1 : 0,
-          ind.is_monday ? 1 : 0,
-          ind.is_tuesday ? 1 : 0,
-          ind.is_wednesday ? 1 : 0,
-          ind.is_thursday ? 1 : 0,
-          ind.is_friday ? 1 : 0,
-          ind.is_market_hours ? 1 : 0,
-          // Support/Resistance
-          ind.near_recent_high ? 1 : 0,
-          ind.near_recent_low ? 1 : 0,
-          ind.at_resistance ? 1 : 0,
-          ind.at_support ? 1 : 0,
-          // Rationalization
-          JSON.stringify(t.buyRationalization),
-          JSON.stringify(t.sellRationalization)
-          // Note: Sentiment data binding will be added back after migrations are verified
+          t.profitable ? 1 : 0
         );
       });
 
@@ -1162,7 +1258,8 @@ export class EvolutionAgent implements DurableObject {
           sampleSize: winners.results.length + losers.results.length,
           discoveredAt: new Date().toISOString(),
           tested: false,
-          votes: 0
+          votes: 0,
+          origin: 'CHAOS'
         };
         patternsFound.push(pattern);
         this.log(`✓ Found momentum pattern: ${pattern.name} (${(momentumDiff*100).toFixed(3)}% diff)`);
@@ -1180,7 +1277,8 @@ export class EvolutionAgent implements DurableObject {
           sampleSize: winners.results.length + losers.results.length,
           discoveredAt: new Date().toISOString(),
           tested: false,
-          votes: 0
+          votes: 0,
+          origin: 'CHAOS'
         };
         patternsFound.push(pattern);
         this.log(`✓ Found volatility pattern: ${pattern.name} (${(volatilityDiff*100).toFixed(3)}% diff)`);
@@ -1198,7 +1296,8 @@ export class EvolutionAgent implements DurableObject {
           sampleSize: winners.results.length + losers.results.length,
           discoveredAt: new Date().toISOString(),
           tested: false,
-          votes: 0
+          votes: 0,
+          origin: 'CHAOS'
         };
         patternsFound.push(pattern);
         this.log(`✓ Found SMA10 pattern: ${pattern.name} (${(sma10Diff*100).toFixed(3)}% diff)`);
@@ -1237,7 +1336,8 @@ export class EvolutionAgent implements DurableObject {
                   sampleSize: winners.results.length + losers.results.length,
                   discoveredAt: new Date().toISOString(),
                   tested: false,
-                  votes: 0
+                  votes: 0,
+                  origin: 'CHAOS'
                 };
                 patternsFound.push(pattern);
                 logger.info('AI discovered pattern', {
@@ -1303,13 +1403,22 @@ export class EvolutionAgent implements DurableObject {
       const stmt = this.env.DB.prepare(`
         INSERT OR IGNORE INTO discovered_patterns (
           pattern_id, name, conditions, win_rate, sample_size,
-          discovered_at, tested, votes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          discovered_at, tested, votes, origin
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       const batch = patterns.map(p =>
-        stmt.bind(p.patternId, p.name, JSON.stringify(p.conditions),
-                  p.winRate, p.sampleSize, p.discoveredAt, p.tested ? 1 : 0, p.votes)
+        stmt.bind(
+          p.patternId,
+          p.name,
+          JSON.stringify(p.conditions),
+          p.winRate,
+          p.sampleSize,
+          p.discoveredAt,
+          p.tested ? 1 : 0,
+          p.votes,
+          p.origin || 'CHAOS'  // Default to CHAOS if not specified
+        )
       );
 
       await this.env.DB.batch(batch);
@@ -1514,6 +1623,35 @@ export default {
 
     } catch (error) {
       return errorResponse('Worker fetch failed', error);
+    }
+  },
+
+  // Scheduled handler for cron triggers
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    logger.info('Cron triggered evolution cycle');
+
+    try {
+      // Validate environment
+      if (!env.EVOLUTION_AGENT || !env.DB) {
+        logger.error('Missing required bindings in scheduled handler');
+        return;
+      }
+
+      // Get Durable Object instance
+      const id = env.EVOLUTION_AGENT.idFromName('main-evolution-agent');
+      const agent = env.EVOLUTION_AGENT.get(id);
+
+      // Trigger evolution cycle via fetch to /trigger endpoint
+      const triggerRequest = new Request('http://internal/trigger', {
+        method: 'POST'
+      });
+
+      // Use waitUntil to allow the operation to complete
+      ctx.waitUntil(agent.fetch(triggerRequest));
+
+      logger.info('Evolution cycle triggered via cron');
+    } catch (error) {
+      logger.error('Cron trigger failed', { error });
     }
   }
 };

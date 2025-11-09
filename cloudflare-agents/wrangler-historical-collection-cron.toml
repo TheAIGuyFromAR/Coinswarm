@@ -1,0 +1,37 @@
+# Wrangler configuration for Historical Data Collection Cron Worker
+
+name = "coinswarm-historical-collection-cron"
+main = "historical-data-collection-cron.ts"
+compatibility_date = "2024-01-01"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "coinswarm-evolution"
+database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
+
+# Cron trigger - runs 24/7 every hour (75% of monthly rate limit)
+[triggers]
+crons = ["0 * * * *"]  # Every hour at minute 0 - runs 24/7
+
+# Environment variables
+[vars]
+# Rate limiting configuration
+DAYS_PER_RUN = "30"
+YEARS_TO_COLLECT = "5"
+
+# API Keys (Secrets - set via GitHub Secrets or `wrangler secret put`)
+# DO NOT commit actual API keys to this file!
+#
+# To set secrets locally:
+#   wrangler secret put COINGECKO --config wrangler-historical-collection-cron.toml
+#   wrangler secret put CRYPTOCOMPARE_API_KEY --config wrangler-historical-collection-cron.toml
+#
+# To set via GitHub Actions, add to repository secrets:
+#   COINGECKO - CoinGecko Demo/Pro API key (for daily data)
+#   CRYPTOCOMPARE_API_KEY - CryptoCompare API key (for minute data)
+#
+# Data collection strategy (all run in parallel):
+#   - CryptoCompare: Minute-level data (runs forever)
+#   - CoinGecko: Daily data (until 5 years complete)
+#   - Binance.US: Hourly data (until 5 years complete, no API key needed)

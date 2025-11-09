@@ -1,0 +1,25 @@
+# Wrangler configuration for Technical Indicators Agent
+
+name = "coinswarm-technical-indicators"
+main = "technical-indicators-agent.ts"
+compatibility_date = "2024-01-01"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "coinswarm-evolution"
+database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
+
+# No cron trigger - called by historical-collection-cron after each run
+# Can also be triggered manually via HTTP GET request
+# [triggers]
+# crons = ["0 * * * *"]  # Removed to stay within 5 cron limit
+
+# Calculates technical indicators from collected price data:
+# - Simple Moving Averages (SMA 20, 50, 200)
+# - Exponential Moving Averages (EMA 12, 26, 50)
+# - Bollinger Bands (20-period, 2 std dev)
+# - MACD (12, 26, 9)
+# - RSI (14-period)
+# - Custom Fear/Greed Index (composite score)
+# - Volume indicators

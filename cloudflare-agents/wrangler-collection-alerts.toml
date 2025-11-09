@@ -1,0 +1,39 @@
+# Wrangler configuration for Collection Alerts Agent
+
+name = "coinswarm-collection-alerts"
+main = "collection-alerts-agent.ts"
+compatibility_date = "2024-01-01"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "coinswarm-evolution"
+database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
+
+# Cron trigger - runs every 15 minutes to check for milestone alerts
+[triggers]
+crons = ["*/15 * * * *"]  # Every 15 minutes
+
+# Optional: Set WEBHOOK_URL secret for external notifications
+# wrangler secret put WEBHOOK_URL --config wrangler-collection-alerts.toml
+#
+# Webhook payload format:
+# {
+#   "type": "daily_complete",
+#   "message": "Daily data collection complete!",
+#   "severity": "success",
+#   "timestamp": 1234567890,
+#   "metadata": null
+# }
+
+# Alert types:
+# - daily_complete: All tokens have 5 years of daily data
+# - hourly_complete: All tokens have 5 years of hourly data
+# - minute_25/50/75/100: Minute collection progress milestones
+# - tokens_paused: Tokens with repeated errors (paused state)
+# - token_complete_{symbol}: Individual token completion
+
+# Alerts are stored in collection_alerts table and can be:
+# - Queried via GET /alerts
+# - Acknowledged via POST /alerts/{id}
+# - Monitored via GET /summary
