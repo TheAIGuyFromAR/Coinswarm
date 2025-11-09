@@ -291,6 +291,165 @@ class CryptoCompareClient {
 }
 
 /**
+ * DexScreener API Client
+ * FREE - Covers ALL chains and DEXes (50+ chains)
+ * Supports: Ethereum, BSC, Solana, Arbitrum, Optimism, Polygon, Avalanche, Base, etc.
+ */
+class DexScreenerClient {
+  private baseUrl = 'https://api.dexscreener.com/latest/dex';
+
+  /**
+   * Search for token across all chains
+   */
+  async searchToken(symbol: string): Promise<any> {
+    const url = `${this.baseUrl}/search?q=${symbol}`;
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) {
+      throw new Error(`DexScreener API error: ${response.status} ${response.statusText}`);
+    }
+    return await response.json();
+  }
+
+  /**
+   * Get price data for specific token pairs
+   */
+  async getTokenPairs(chainId: string, tokenAddress: string): Promise<any> {
+    const url = `${this.baseUrl}/tokens/${chainId}/${tokenAddress}`;
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) {
+      throw new Error(`DexScreener API error: ${response.status} ${response.statusText}`);
+    }
+    return await response.json();
+  }
+
+  /**
+   * Fetch OHLCV candles from DexScreener search results
+   * Returns best match for symbol with price data
+   */
+  async fetchForSymbol(symbol: string): Promise<OHLCVCandle[]> {
+    const baseSymbol = symbol.replace(/USDT|USDC|BUSD/g, '');
+    const searchResult = await this.searchToken(baseSymbol);
+
+    if (!searchResult.pairs || searchResult.pairs.length === 0) {
+      throw new Error(`No pairs found for ${symbol}`);
+    }
+
+    // Get the first pair with highest liquidity
+    const pair = searchResult.pairs.sort((a: any, b: any) =>
+      (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0)
+    )[0];
+
+    // DexScreener doesn't provide historical candles, just current price
+    // Return a single data point representing current state
+    return [{
+      timestamp: Date.now(),
+      open: parseFloat(pair.priceUsd || '0'),
+      high: parseFloat(pair.priceUsd || '0'),
+      low: parseFloat(pair.priceUsd || '0'),
+      close: parseFloat(pair.priceUsd || '0'),
+      volume: parseFloat(pair.volume?.h24 || '0')
+    }];
+  }
+}
+
+/**
+ * GeckoTerminal API Client
+ * FREE - CoinGecko's DEX aggregator for 100+ networks
+ * Supports: All major DEXes on Ethereum, BSC, Solana, Arbitrum, Optimism, Polygon, Avalanche, etc.
+ */
+class GeckoTerminalClient {
+  private baseUrl = 'https://api.geckoterminal.com/api/v2';
+
+  /**
+   * Get OHLCV data for a specific pool
+   */
+  async getPoolOHLCV(network: string, poolAddress: string, timeframe: string = '5m'): Promise<OHLCVCandle[]> {
+    // Timeframe options: '1m', '5m', '15m', '1h', '4h', '12h', '1d'
+    const url = `${this.baseUrl}/networks/${network}/pools/${poolAddress}/ohlcv/${timeframe}`;
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) {
+      throw new Error(`GeckoTerminal API error: ${response.status} ${response.statusText}`);
+    }
+    const result = await response.json() as any;
+
+    // GeckoTerminal format: {data: {attributes: {ohlcv_list: [[timestamp, open, high, low, close, volume]]}}}
+    const ohlcvList = result.data?.attributes?.ohlcv_list || [];
+    return ohlcvList.map((candle: any[]) => ({
+      timestamp: candle[0] * 1000, // Convert to ms
+      open: candle[1],
+      high: candle[2],
+      low: candle[3],
+      close: candle[4],
+      volume: candle[5]
+    }));
+  }
+
+  /**
+   * Search for token pools across all networks
+   */
+  async searchTokens(query: string): Promise<any> {
+    const url = `${this.baseUrl}/search/pools?query=${query}`;
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) {
+      throw new Error(`GeckoTerminal API error: ${response.status} ${response.statusText}`);
+    }
+    return await response.json();
+  }
+
+  /**
+   * Fetch OHLCV for a symbol by searching and getting best pool
+   */
+  async fetchForSymbol(symbol: string, timeframe: string = '5m'): Promise<OHLCVCandle[]> {
+    const baseSymbol = symbol.replace(/USDT|USDC|BUSD/g, '');
+    const searchResult = await this.searchTokens(baseSymbol);
+
+    if (!searchResult.data || searchResult.data.length === 0) {
+      throw new Error(`No pools found for ${symbol}`);
+    }
+
+    // Get the first pool (highest relevance)
+    const pool = searchResult.data[0];
+    const network = pool.relationships?.base_token?.data?.id?.split('_')[0];
+    const poolAddress = pool.attributes?.address;
+
+    if (!network || !poolAddress) {
+      throw new Error(`Invalid pool data for ${symbol}`);
+    }
+
+    return await this.getPoolOHLCV(network, poolAddress, timeframe);
+  }
+
+  /**
+   * Get network mapping for common symbols
+   */
+  private getNetwork(symbol: string): string {
+    const baseSymbol = symbol.replace(/USDT|USDC|BUSD/g, '');
+
+    // Common network mappings
+    const mapping: { [key: string]: string } = {
+      'BTC': 'eth', // Wrapped BTC on Ethereum
+      'ETH': 'eth',
+      'SOL': 'solana',
+      'BNB': 'bsc',
+      'AVAX': 'avax',
+      'MATIC': 'polygon',
+      'ARB': 'arbitrum',
+      'OP': 'optimism'
+    };
+
+    return mapping[baseSymbol] || 'eth'; // Default to Ethereum
+  }
+}
+
+/**
  * Historical Data Manager
  * Manages storage and retrieval of historical data in KV
  */
@@ -407,6 +566,8 @@ export default {
       const binanceClient = new BinanceClient();
       const coinGeckoClient = new CoinGeckoClient();
       const cryptoCompareClient = new CryptoCompareClient();
+      const dexScreenerClient = new DexScreenerClient();
+      const geckoTerminalClient = new GeckoTerminalClient();
       const dataManager = env.HISTORICAL_PRICES ? new HistoricalDataManager(env.HISTORICAL_PRICES) : null;
 
       // Route: Fetch fresh data with multi-source fallback
@@ -434,15 +595,31 @@ export default {
           } catch (e2) {
             errors.push(`CoinGecko: ${e2 instanceof Error ? e2.message : String(e2)}`);
 
-            // Final fallback to Binance
+            // Fallback to GeckoTerminal (DEX aggregator with OHLCV)
             try {
-              const endTime = Date.now();
-              const startTime = endTime - (limit * 5 * 60 * 1000);
-              candles = await binanceClient.fetchLargeDataset(symbol, interval, startTime, endTime);
-              source = 'binance';
+              candles = await geckoTerminalClient.fetchForSymbol(symbol, interval);
+              source = 'geckoterminal';
             } catch (e3) {
-              errors.push(`Binance: ${e3 instanceof Error ? e3.message : String(e3)}`);
-              throw new Error(`All sources failed: ${errors.join('; ')}`);
+              errors.push(`GeckoTerminal: ${e3 instanceof Error ? e3.message : String(e3)}`);
+
+              // Fallback to Binance
+              try {
+                const endTime = Date.now();
+                const startTime = endTime - (limit * 5 * 60 * 1000);
+                candles = await binanceClient.fetchLargeDataset(symbol, interval, startTime, endTime);
+                source = 'binance';
+              } catch (e4) {
+                errors.push(`Binance: ${e4 instanceof Error ? e4.message : String(e4)}`);
+
+                // Final fallback to DexScreener (current price only)
+                try {
+                  candles = await dexScreenerClient.fetchForSymbol(symbol);
+                  source = 'dexscreener';
+                } catch (e5) {
+                  errors.push(`DexScreener: ${e5 instanceof Error ? e5.message : String(e5)}`);
+                  throw new Error(`All sources failed: ${errors.join('; ')}`);
+                }
+              }
             }
           }
         }
