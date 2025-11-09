@@ -25,7 +25,7 @@ import { createLogger, LogLevel } from './structured-logger';
 const logger = createLogger('MultiExchangeDataWorker', LogLevel.INFO);
 
 interface Env {
-  HISTORICAL_PRICES: KVNamespace;
+  HISTORICAL_PRICES?: KVNamespace;  // Optional - can work without KV
 }
 
 interface OHLCVCandle {
@@ -334,7 +334,7 @@ export default {
     try {
       const binanceClient = new BinanceClient();
       const coinbaseClient = new CoinbaseClient();
-      const dataManager = new MultiExchangeDataManager(env.HISTORICAL_PRICES);
+      const dataManager = env.HISTORICAL_PRICES ? new MultiExchangeDataManager(env.HISTORICAL_PRICES) : null;
 
       // Route: Fetch 2 years of data for all pairs
       if (path === '/fetch-2-years' && request.method === 'POST') {
@@ -369,7 +369,9 @@ export default {
               fetchedAt: new Date().toISOString()
             };
 
-            await dataManager.storeDataset(dataset);
+            if (dataManager) {
+              await dataManager.storeDataset(dataset);
+            }
 
             results.push({
               exchange: 'binance',
@@ -412,7 +414,9 @@ export default {
               fetchedAt: new Date().toISOString()
             };
 
-            await dataManager.storeDataset(dataset);
+            if (dataManager) {
+              await dataManager.storeDataset(dataset);
+            }
 
             results.push({
               exchange: 'coinbase',
