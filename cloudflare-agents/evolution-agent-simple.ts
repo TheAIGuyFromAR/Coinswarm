@@ -258,6 +258,46 @@ export class EvolutionAgent implements DurableObject {
         });
       }
 
+      // Debug endpoint - check database schema and sample data
+      if (url.pathname === '/debug/db') {
+        try {
+          // Get list of tables
+          const tables = await this.env.DB.prepare(`
+            SELECT name FROM sqlite_master WHERE type='table' ORDER BY name
+          `).all();
+
+          // Get count from chaos_trades if it exists
+          const tradeCount = await this.env.DB.prepare(`
+            SELECT COUNT(*) as count FROM chaos_trades
+          `).first<{ count: number }>();
+
+          // Get sample of chaos_trades with timestamps to check date range
+          const sampleTrades = await this.env.DB.prepare(`
+            SELECT entry_time, exit_time, pair, entry_price, exit_price, pnl_pct
+            FROM chaos_trades
+            ORDER BY RANDOM()
+            LIMIT 5
+          `).all();
+
+          return new Response(JSON.stringify({
+            tables: tables.results,
+            chaos_trades_count: tradeCount?.count || 0,
+            sample_trades: sampleTrades.results,
+            timestamp: new Date().toISOString()
+          }, null, 2), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+          }, null, 2), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // Bulk import endpoint - generate historical trades quickly
       if (url.pathname === '/bulk-import') {
         const urlParams = url.searchParams;
