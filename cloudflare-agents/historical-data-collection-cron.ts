@@ -1,70 +1,71 @@
 /**
  * Historical Data Collection Cron Worker
  *
- * Slowly collects 5 years of historical OHLCV data for all target tokens
- * Respects API rate limits (22.5 calls/min = 75% of CoinGecko's 30/min)
- * Runs continuously until all data is collected
+ * Strategy:
+ * 1. CryptoCompare: Minute-level data (runs forever, best minute data source)
+ * 2. CoinGecko: Daily data until 5 years complete
+ * 3. Binance.US: Hourly data after daily completes (fastest source)
  *
- * Target Tokens (15 total):
- * - BTC, ETH, SOL
- * - BSC: BNB, CAKE
- * - Solana: RAY, ORCA, JUP
- * - Arbitrum: ARB, GMX
- * - Optimism: OP, VELO
- * - Polygon: MATIC, QUICK
- * - Base: AERO
- *
- * Schedule: Cron runs every hour to ensure worker is running
- * Execution: Continuous loop at 75% rate limit until completion
- * Rate Limiting: 2.67 sec between calls (22.5 calls/min)
- * Error Handling: Exponential backoff (5s, 10s, 20s, 40s, 80s), pauses after 3 errors
- * Total time: ~40-60 minutes of continuous running (915 API calls)
+ * Rate limiting at 56.25% of max (75% then 25% slower = 56.25%)
  */
 
 interface Env {
   DB: D1Database;
-  COINGECKO?: string;  // CoinGecko API key from GitHub secrets
+  COINGECKO?: string;
+  CRYPTOCOMPARE_API_KEY?: string;
 }
 
 interface CollectionProgress {
   symbol: string;
   coinId: string;
-  startDate: string;      // YYYY-MM-DD
-  endDate: string;        // YYYY-MM-DD
+  minutesCollected: number;
   daysCollected: number;
+  hoursCollected: number;
+  totalMinutes: number;
   totalDays: number;
-  lastRun: number;        // Unix timestamp
-  status: 'pending' | 'in_progress' | 'completed' | 'paused';
-  errorCount: number;     // Track consecutive errors
-  lastError: string;      // Last error message
+  totalHours: number;
+  dailyStatus: 'pending' | 'in_progress' | 'completed' | 'paused';
+  minuteStatus: 'pending' | 'in_progress' | 'completed' | 'paused';
+  hourlyStatus: 'pending' | 'in_progress' | 'completed' | 'paused';
+  errorCount: number;
+  lastError: string;
 }
 
 // Token configuration
 const TOKENS = [
-  { symbol: 'BTCUSDT', coinId: 'bitcoin', name: 'Bitcoin' },
-  { symbol: 'ETHUSDT', coinId: 'ethereum', name: 'Ethereum' },
-  { symbol: 'SOLUSDT', coinId: 'solana', name: 'Solana' },
-  { symbol: 'BNBUSDT', coinId: 'binancecoin', name: 'BNB' },
-  { symbol: 'CAKEUSDT', coinId: 'pancakeswap-token', name: 'PancakeSwap' },
-  { symbol: 'RAYUSDT', coinId: 'raydium', name: 'Raydium' },
-  { symbol: 'ORCAUSDT', coinId: 'orca', name: 'Orca' },
-  { symbol: 'JUPUSDT', coinId: 'jupiter-exchange-solana', name: 'Jupiter' },
-  { symbol: 'ARBUSDT', coinId: 'arbitrum', name: 'Arbitrum' },
-  { symbol: 'GMXUSDT', coinId: 'gmx', name: 'GMX' },
-  { symbol: 'OPUSDT', coinId: 'optimism', name: 'Optimism' },
-  { symbol: 'VELOUSDT', coinId: 'velodrome-finance', name: 'Velodrome' },
-  { symbol: 'MATICUSDT', coinId: 'matic-network', name: 'Polygon' },
-  { symbol: 'QUICKUSDT', coinId: 'quickswap', name: 'QuickSwap' },
-  { symbol: 'AEROUSDT', coinId: 'aerodrome-finance', name: 'Aerodrome' }
+  { symbol: 'BTCUSDT', coinId: 'bitcoin' },
+  { symbol: 'ETHUSDT', coinId: 'ethereum' },
+  { symbol: 'SOLUSDT', coinId: 'solana' },
+  { symbol: 'BNBUSDT', coinId: 'binancecoin' },
+  { symbol: 'CAKEUSDT', coinId: 'pancakeswap-token' },
+  { symbol: 'RAYUSDT', coinId: 'raydium' },
+  { symbol: 'ORCAUSDT', coinId: 'orca' },
+  { symbol: 'JUPUSDT', coinId: 'jupiter-exchange-solana' },
+  { symbol: 'ARBUSDT', coinId: 'arbitrum' },
+  { symbol: 'GMXUSDT', coinId: 'gmx' },
+  { symbol: 'OPUSDT', coinId: 'optimism' },
+  { symbol: 'VELOUSDT', coinId: 'velodrome-finance' },
+  { symbol: 'MATICUSDT', coinId: 'matic-network' },
+  { symbol: 'QUICKUSDT', coinId: 'quickswap' },
+  { symbol: 'AEROUSDT', coinId: 'aerodrome-finance' }
 ];
+
+// Rate limiting at 56.25% of max (75% then 25% slower)
+// CryptoCompare max: 30 calls/min → 16.875 calls/min = 3.56s delay
+// CoinGecko max: 30 calls/min → 16.875 calls/min = 3.56s delay
+// Binance.US max: 1200 weight/min → 675 weight/min = 89ms delay
+const RATE_LIMIT_DELAY_MS = 3560; // 16.875 calls/min (56.25% of 30)
+const BINANCE_RATE_LIMIT_MS = 89; // 675 calls/min (56.25% of 1200)
 
 // Collection parameters
 const YEARS_TO_COLLECT = 5;
-const DAYS_PER_RUN = 30;           // Fetch 30 days per run to stay under rate limits
-const RATE_LIMIT_DELAY_MS = 2670;  // 2.67 seconds between API calls (22.5/min = 75% of 30/min limit)
-const MAX_RETRIES = 5;             // Maximum retry attempts with exponential backoff
-const INITIAL_BACKOFF_MS = 5000;   // Start with 5 second delay
+const DAYS_PER_RUN = 365;  // CoinGecko: 1 year at a time
+const MINUTES_PER_RUN = 2000;  // CryptoCompare: 2000 minutes (~33 hours) per call
+const HOURS_PER_RUN = 1000;  // Binance.US: 1000 hours (~41 days) per call
 
+/**
+ * CoinGecko API Client - Daily OHLC data
+ */
 class CoinGeckoClient {
   private baseUrl = 'https://api.coingecko.com/api/v3';
   private apiKey?: string;
@@ -73,9 +74,6 @@ class CoinGeckoClient {
     this.apiKey = apiKey;
   }
 
-  /**
-   * Fetch OHLC data for a specific date range
-   */
   async fetchOHLC(coinId: string, days: number): Promise<Array<{
     timestamp: number;
     open: number;
@@ -84,24 +82,18 @@ class CoinGeckoClient {
     close: number;
   }>> {
     const url = `${this.baseUrl}/coins/${coinId}/ohlc?vs_currency=usd&days=${days}`;
-
-    const headers: Record<string, string> = {
-      'Accept': 'application/json'
-    };
+    const headers: Record<string, string> = { 'Accept': 'application/json' };
 
     if (this.apiKey) {
       headers['x-cg-demo-api-key'] = this.apiKey;
     }
 
     const response = await fetch(url, { headers });
-
     if (!response.ok) {
       throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json() as Array<[number, number, number, number, number]>;
-
-    // CoinGecko format: [timestamp, open, high, low, close]
     return data.map(candle => ({
       timestamp: candle[0],
       open: candle[1],
@@ -110,426 +102,516 @@ class CoinGeckoClient {
       close: candle[4]
     }));
   }
+}
 
-  /**
-   * Sleep for rate limiting
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+/**
+ * CryptoCompare API Client - Minute data
+ * Best source for minute-level historical data
+ */
+class CryptoCompareClient {
+  private baseUrl = 'https://min-api.cryptocompare.com/data';
+  private apiKey?: string;
+
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey;
   }
 
   /**
-   * Fetch with exponential backoff retry
+   * Fetch minute-level OHLCV data
+   * @param symbol - Token symbol (e.g., 'BTCUSDT')
+   * @param limit - Number of minutes to fetch (max 2000)
+   * @param toTs - End timestamp (optional, defaults to now)
    */
-  async fetchOHLCWithRetry(coinId: string, days: number, maxRetries = MAX_RETRIES): Promise<Array<{
+  async fetchHistoMinute(symbol: string, limit: number = 2000, toTs?: number): Promise<Array<{
     timestamp: number;
     open: number;
     high: number;
     low: number;
     close: number;
+    volume: number;
   }>> {
-    let lastError: Error | null = null;
+    const fsym = symbol.replace(/USDT|USDC|BUSD/g, '');
+    const tsym = 'USD';
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        return await this.fetchOHLC(coinId, days);
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-
-        // Don't retry on 4xx errors (client errors)
-        if (lastError.message.includes('400') || lastError.message.includes('404')) {
-          throw lastError;
-        }
-
-        // Exponential backoff: 5s, 10s, 20s, 40s, 80s
-        const backoffMs = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
-
-        console.log(`Attempt ${attempt + 1}/${maxRetries} failed for ${coinId}: ${lastError.message}`);
-        console.log(`Retrying in ${backoffMs}ms...`);
-
-        if (attempt < maxRetries - 1) {
-          await this.sleep(backoffMs);
-        }
-      }
+    let url = `${this.baseUrl}/v2/histominute?fsym=${fsym}&tsym=${tsym}&limit=${limit}`;
+    if (toTs) {
+      url += `&toTs=${Math.floor(toTs)}`;
     }
 
-    throw new Error(`Failed after ${maxRetries} attempts: ${lastError?.message}`);
+    if (this.apiKey) {
+      url += `&api_key=${this.apiKey}`;
+    }
+
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) {
+      throw new Error(`CryptoCompare API error: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json() as any;
+
+    if (result.Response === 'Error') {
+      throw new Error(`CryptoCompare: ${result.Message}`);
+    }
+
+    return result.Data.Data.map((candle: any) => ({
+      timestamp: candle.time * 1000,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      volume: candle.volumefrom
+    }));
   }
 }
 
 /**
- * Continuous collection loop - runs until all tokens are collected
+ * Binance.US API Client - Hourly klines
+ * Fast and reliable for hourly historical data
  */
-async function runContinuousCollection(env: Env) {
-  console.log('Starting continuous collection loop');
+class BinanceClient {
+  private baseUrl = 'https://api.binance.us';
 
-  const client = new CoinGeckoClient(env.COINGECKO);
+  /**
+   * Fetch hourly klines from Binance.US
+   * @param symbol - Binance symbol (e.g., 'BTCUSDT')
+   * @param limit - Number of hours to fetch (max 1000)
+   * @param endTime - End timestamp in ms (optional, defaults to now)
+   */
+  async fetchKlines(symbol: string, limit: number = 1000, endTime?: number): Promise<Array<{
+    timestamp: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+  }>> {
+    let url = `${this.baseUrl}/api/v3/klines?symbol=${symbol}&interval=1h&limit=${limit}`;
 
-  while (true) {
-    // Get next token to process (pending or in_progress, not paused or completed, ordered by days_collected)
-    const nextToken = await env.DB.prepare(`
-      SELECT * FROM collection_progress
-      WHERE status NOT IN ('completed', 'paused')
-      ORDER BY days_collected ASC, error_count ASC
-      LIMIT 1
-    `).first<CollectionProgress>();
-
-    if (!nextToken) {
-      console.log('✅ All tokens have been collected! Collection complete.');
-
-      // Mark collection as no longer running
-      await env.DB.prepare(`
-        DELETE FROM collection_state WHERE key = 'is_running'
-      `).run();
-
-      return;
+    if (endTime) {
+      url += `&endTime=${endTime}`;
     }
 
-    console.log(`Processing ${nextToken.symbol} (${nextToken.coinId})`);
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
 
-    // Update status to in_progress
-    await env.DB.prepare(`
-      UPDATE collection_progress
-      SET status = 'in_progress', last_run = ?
-      WHERE symbol = ?
-    `).bind(Date.now(), nextToken.symbol).run();
-
-    try {
-      // Fetch OHLCV data (CoinGecko supports up to 365 days)
-      const daysToFetch = Math.min(DAYS_PER_RUN, nextToken.totalDays - nextToken.daysCollected);
-
-      if (daysToFetch <= 0) {
-        // Mark as completed
-        await env.DB.prepare(`
-          UPDATE collection_progress
-          SET status = 'completed'
-          WHERE symbol = ?
-        `).bind(nextToken.symbol).run();
-
-        console.log(`✅ Completed collection for ${nextToken.symbol}`);
-        continue; // Move to next token immediately
-      }
-
-      console.log(`Fetching ${daysToFetch} days for ${nextToken.symbol}`);
-
-      // Fetch with exponential backoff retry
-      const candles = await client.fetchOHLCWithRetry(nextToken.coinId, daysToFetch);
-
-      console.log(`Received ${candles.length} candles for ${nextToken.symbol}`);
-
-      // Insert candles into price_data
-      let insertedCount = 0;
-
-      for (const candle of candles) {
-        try {
-          await env.DB.prepare(`
-            INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, source)
-            VALUES (?, ?, '1d', ?, ?, ?, ?, 'coingecko')
-          `).bind(
-            nextToken.symbol,
-            Math.floor(candle.timestamp / 1000),  // Convert to seconds
-            candle.open,
-            candle.high,
-            candle.low,
-            candle.close
-          ).run();
-
-          insertedCount++;
-        } catch (e) {
-          console.error(`Error inserting candle for ${nextToken.symbol}:`, e);
-        }
-      }
-
-      // Update progress - success, reset error count
-      const newDaysCollected = nextToken.daysCollected + daysToFetch;
-      const isCompleted = newDaysCollected >= nextToken.totalDays;
-
-      await env.DB.prepare(`
-        UPDATE collection_progress
-        SET days_collected = ?, status = ?, last_run = ?, error_count = 0, last_error = NULL
-        WHERE symbol = ?
-      `).bind(
-        newDaysCollected,
-        isCompleted ? 'completed' : 'pending',
-        Date.now(),
-        nextToken.symbol
-      ).run();
-
-      console.log(`✅ Inserted ${insertedCount} candles for ${nextToken.symbol}`);
-      console.log(`Progress: ${newDaysCollected}/${nextToken.totalDays} days (${Math.round(newDaysCollected / nextToken.totalDays * 100)}%)`);
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`❌ Error collecting data for ${nextToken.symbol}:`, errorMessage);
-
-      // Increment error count
-      const newErrorCount = (nextToken.errorCount || 0) + 1;
-      const shouldPause = newErrorCount >= 3; // Pause after 3 consecutive errors
-
-      await env.DB.prepare(`
-        UPDATE collection_progress
-        SET status = ?, last_run = ?, error_count = ?, last_error = ?
-        WHERE symbol = ?
-      `).bind(
-        shouldPause ? 'paused' : 'pending',
-        Date.now(),
-        newErrorCount,
-        errorMessage.substring(0, 500), // Limit error message length
-        nextToken.symbol
-      ).run();
-
-      if (shouldPause) {
-        console.log(`⚠️ ${nextToken.symbol} paused after ${newErrorCount} consecutive errors`);
-        console.log(`Last error: ${errorMessage}`);
-      } else {
-        console.log(`Retry ${newErrorCount}/3 for ${nextToken.symbol}`);
-      }
+    if (!response.ok) {
+      throw new Error(`Binance API error: ${response.status} ${response.statusText}`);
     }
 
-    // Rate limiting: sleep before next API call
-    console.log(`⏱️ Rate limiting: sleeping ${RATE_LIMIT_DELAY_MS}ms...`);
-    await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
+    const data = await response.json() as Array<any>;
+
+    return data.map((kline: any) => ({
+      timestamp: kline[0], // Open time in ms
+      open: parseFloat(kline[1]),
+      high: parseFloat(kline[2]),
+      low: parseFloat(kline[3]),
+      close: parseFloat(kline[4]),
+      volume: parseFloat(kline[5])
+    }));
   }
 }
 
-/**
- * Cron handler - ensures continuous collection is running
- */
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    console.log('⏰ Cron trigger: Checking if collection is running...');
+    console.log('⏰ Starting multi-timeframe collection...');
 
-    // Initialize progress table if not exists
+    // Initialize tables
     await env.DB.prepare(`
       CREATE TABLE IF NOT EXISTS collection_progress (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        symbol TEXT NOT NULL,
+        symbol TEXT PRIMARY KEY,
         coin_id TEXT NOT NULL,
-        start_date TEXT NOT NULL,
-        end_date TEXT NOT NULL,
+        minutes_collected INTEGER DEFAULT 0,
         days_collected INTEGER DEFAULT 0,
+        hours_collected INTEGER DEFAULT 0,
+        total_minutes INTEGER NOT NULL,
         total_days INTEGER NOT NULL,
-        last_run INTEGER,
-        status TEXT DEFAULT 'pending',
+        total_hours INTEGER NOT NULL,
+        daily_status TEXT DEFAULT 'pending',
+        minute_status TEXT DEFAULT 'pending',
+        hourly_status TEXT DEFAULT 'pending',
         error_count INTEGER DEFAULT 0,
         last_error TEXT,
-        UNIQUE(symbol)
+        last_minute_timestamp INTEGER,
+        last_run INTEGER
       )
     `).run();
 
-    // Initialize price_data table if not exists
     await env.DB.prepare(`
       CREATE TABLE IF NOT EXISTS price_data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         symbol TEXT NOT NULL,
         timestamp INTEGER NOT NULL,
-        timeframe TEXT NOT NULL DEFAULT '1d',
+        timeframe TEXT NOT NULL,
         open REAL NOT NULL,
         high REAL NOT NULL,
         low REAL NOT NULL,
         close REAL NOT NULL,
         volume REAL DEFAULT 0,
-        source TEXT DEFAULT 'coingecko',
+        source TEXT NOT NULL,
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
-        UNIQUE(symbol, timestamp, timeframe)
+        UNIQUE(symbol, timestamp, timeframe, source)
       )
     `).run();
 
-    // Seed progress for all tokens if empty
-    const progressCount = await env.DB.prepare(`
-      SELECT COUNT(*) as count FROM collection_progress
-    `).first<{ count: number }>();
+    // Seed tokens
+    const totalMinutes = 365 * 24 * 60 * YEARS_TO_COLLECT; // 5 years of minutes
+    const totalDays = 365 * YEARS_TO_COLLECT;
+    const totalHours = 365 * 24 * YEARS_TO_COLLECT;
 
-    if (!progressCount || progressCount.count === 0) {
-      console.log('Initializing collection progress for all tokens');
-
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setFullYear(endDate.getFullYear() - YEARS_TO_COLLECT);
-
-      const totalDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-
-      for (const token of TOKENS) {
-        await env.DB.prepare(`
-          INSERT INTO collection_progress (symbol, coin_id, start_date, end_date, total_days, status)
-          VALUES (?, ?, ?, ?, ?, 'pending')
-        `).bind(
-          token.symbol,
-          token.coinId,
-          startDate.toISOString().split('T')[0],
-          endDate.toISOString().split('T')[0],
-          totalDays
-        ).run();
-      }
+    for (const token of TOKENS) {
+      await env.DB.prepare(`
+        INSERT OR IGNORE INTO collection_progress (
+          symbol, coin_id,
+          total_minutes, total_days, total_hours,
+          daily_status, minute_status, hourly_status
+        )
+        VALUES (?, ?, ?, ?, ?, 'pending', 'pending', 'pending')
+      `).bind(token.symbol, token.coinId, totalMinutes, totalDays, totalHours).run();
     }
 
-    // Get next token to process (pending or in_progress, not paused or completed, ordered by days_collected)
-    const nextToken = await env.DB.prepare(`
-      SELECT * FROM collection_progress
-      WHERE status NOT IN ('completed', 'paused')
-      ORDER BY days_collected ASC, error_count ASC
-      LIMIT 1
-    `).first<CollectionProgress>();
+    // Run both collectors in parallel
+    ctx.waitUntil(Promise.all([
+      this.runMinuteCollection(env),
+      this.runDailyCollection(env)
+    ]));
+  },
 
-    if (!nextToken) {
-      console.log('All tokens have been collected!');
+  /**
+   * Continuous minute-level data collection (runs forever)
+   * Uses CryptoCompare to fetch minute candles working backwards from now
+   */
+  async runMinuteCollection(env: Env) {
+    if (!env.CRYPTOCOMPARE_API_KEY) {
+      console.warn('⚠️ CRYPTOCOMPARE_API_KEY not set, skipping minute collection');
       return;
     }
 
-    console.log(`Collecting data for ${nextToken.symbol} (${nextToken.coinId})`);
+    const client = new CryptoCompareClient(env.CRYPTOCOMPARE_API_KEY);
 
-    // Update status to in_progress
-    await env.DB.prepare(`
-      UPDATE collection_progress
-      SET status = 'in_progress', last_run = ?
-      WHERE symbol = ?
-    `).bind(Date.now(), nextToken.symbol).run();
+    while (true) {
+      // Get next token for minute data collection
+      const token = await env.DB.prepare(`
+        SELECT * FROM collection_progress
+        WHERE minute_status NOT IN ('completed', 'paused')
+        ORDER BY minutes_collected ASC
+        LIMIT 1
+      `).first<CollectionProgress>();
 
-    try {
-      // Fetch OHLCV data (CoinGecko supports up to 365 days)
-      const daysToFetch = Math.min(DAYS_PER_RUN, nextToken.totalDays - nextToken.daysCollected);
-
-      if (daysToFetch <= 0) {
-        // Mark as completed
+      if (!token) {
+        console.log('✅ All minute data collected! Restarting from beginning...');
+        // Reset all tokens to continue collecting forever
         await env.DB.prepare(`
           UPDATE collection_progress
-          SET status = 'completed'
-          WHERE symbol = ?
-        `).bind(nextToken.symbol).run();
-
-        console.log(`Completed collection for ${nextToken.symbol}`);
-        return;
+          SET minute_status = 'pending', minutes_collected = 0, last_minute_timestamp = NULL
+        `).run();
+        continue;
       }
 
-      console.log(`Fetching ${daysToFetch} days for ${nextToken.symbol}`);
+      try {
+        const minutesToFetch = Math.min(MINUTES_PER_RUN, token.totalMinutes - token.minutesCollected);
 
-      // Fetch with exponential backoff retry
-      const candles = await client.fetchOHLCWithRetry(nextToken.coinId, daysToFetch);
-
-      console.log(`Received ${candles.length} candles for ${nextToken.symbol}`);
-
-      // Insert candles into price_data
-      let insertedCount = 0;
-
-      for (const candle of candles) {
-        try {
+        if (minutesToFetch <= 0) {
           await env.DB.prepare(`
-            INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, source)
-            VALUES (?, ?, '1d', ?, ?, ?, ?, 'coingecko')
+            UPDATE collection_progress SET minute_status = 'completed' WHERE symbol = ?
+          `).bind(token.symbol).run();
+          continue;
+        }
+
+        // Work backwards from the last timestamp we collected (or now if first run)
+        const toTs = token.lastMinuteTimestamp
+          ? token.lastMinuteTimestamp / 1000
+          : Math.floor(Date.now() / 1000);
+
+        console.log(`📊 Fetching ${minutesToFetch} minutes for ${token.symbol} (minute data)`);
+        const candles = await client.fetchHistoMinute(token.symbol, minutesToFetch, toTs);
+
+        if (candles.length === 0) {
+          console.log(`⚠️ No minute data returned for ${token.symbol}`);
+          await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
+          continue;
+        }
+
+        // Insert candles
+        for (const candle of candles) {
+          await env.DB.prepare(`
+            INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, volume, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).bind(
-            nextToken.symbol,
-            Math.floor(candle.timestamp / 1000),  // Convert to seconds
+            token.symbol,
+            Math.floor(candle.timestamp / 1000),
+            '1m',
             candle.open,
             candle.high,
             candle.low,
-            candle.close
+            candle.close,
+            candle.volume,
+            'cryptocompare'
           ).run();
-
-          insertedCount++;
-        } catch (e) {
-          console.error(`Error inserting candle for ${nextToken.symbol}:`, e);
         }
+
+        // Update progress - track the oldest timestamp we've collected
+        const oldestTimestamp = Math.min(...candles.map(c => c.timestamp));
+        const newMinutes = token.minutesCollected + candles.length;
+
+        await env.DB.prepare(`
+          UPDATE collection_progress
+          SET minutes_collected = ?,
+              last_minute_timestamp = ?,
+              minute_status = ?,
+              error_count = 0,
+              last_error = NULL
+          WHERE symbol = ?
+        `).bind(
+          newMinutes,
+          oldestTimestamp,
+          newMinutes >= token.totalMinutes ? 'completed' : 'pending',
+          token.symbol
+        ).run();
+
+        console.log(`✅ ${token.symbol}: ${newMinutes}/${token.totalMinutes} minutes (${Math.round(newMinutes/token.totalMinutes*100)}%)`);
+
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        const newErrorCount = (token.errorCount || 0) + 1;
+
+        await env.DB.prepare(`
+          UPDATE collection_progress
+          SET minute_status = ?, error_count = ?, last_error = ?
+          WHERE symbol = ?
+        `).bind(
+          newErrorCount >= 3 ? 'paused' : 'pending',
+          newErrorCount,
+          errorMsg.substring(0, 500),
+          token.symbol
+        ).run();
+
+        console.error(`❌ ${token.symbol} minute error (${newErrorCount}/3): ${errorMsg}`);
       }
 
-      // Update progress - success, reset error count
-      const newDaysCollected = nextToken.daysCollected + daysToFetch;
-      const isCompleted = newDaysCollected >= nextToken.totalDays;
-
-      await env.DB.prepare(`
-        UPDATE collection_progress
-        SET days_collected = ?, status = ?, last_run = ?, error_count = 0, last_error = NULL
-        WHERE symbol = ?
-      `).bind(
-        newDaysCollected,
-        isCompleted ? 'completed' : 'pending',
-        Date.now(),
-        nextToken.symbol
-      ).run();
-
-      console.log(`Successfully inserted ${insertedCount} candles for ${nextToken.symbol}`);
-      console.log(`Progress: ${newDaysCollected}/${nextToken.totalDays} days (${Math.round(newDaysCollected / nextToken.totalDays * 100)}%)`);
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`Error collecting data for ${nextToken.symbol}:`, errorMessage);
-
-      // Increment error count
-      const newErrorCount = (nextToken.errorCount || 0) + 1;
-      const shouldPause = newErrorCount >= 3; // Pause after 3 consecutive errors
-
-      await env.DB.prepare(`
-        UPDATE collection_progress
-        SET status = ?, last_run = ?, error_count = ?, last_error = ?
-        WHERE symbol = ?
-      `).bind(
-        shouldPause ? 'paused' : 'pending',
-        Date.now(),
-        newErrorCount,
-        errorMessage.substring(0, 500), // Limit error message length
-        nextToken.symbol
-      ).run();
-
-      if (shouldPause) {
-        console.log(`⚠️ ${nextToken.symbol} paused after ${newErrorCount} consecutive errors`);
-        console.log(`Last error: ${errorMessage}`);
-      } else {
-        console.log(`Retry ${newErrorCount}/3 for ${nextToken.symbol}`);
-      }
+      // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
     }
   },
 
   /**
-   * HTTP handler for manual testing and status checks
+   * Daily data collection (until 5 years complete, then switch to hourly)
+   * Uses CoinGecko for daily candles, then Binance.US for hourly
    */
+  async runDailyCollection(env: Env) {
+    const coinGeckoClient = new CoinGeckoClient(env.COINGECKO);
+    const binanceClient = new BinanceClient();
+
+    while (true) {
+      // Check if daily collection is complete
+      const dailyComplete = await env.DB.prepare(`
+        SELECT COUNT(*) as count FROM collection_progress WHERE daily_status = 'completed'
+      `).first<{ count: number }>();
+
+      const allDailyComplete = dailyComplete && dailyComplete.count === TOKENS.length;
+
+      if (allDailyComplete) {
+        // Switch to hourly collection
+        console.log('📈 Daily collection complete, starting hourly collection...');
+        await this.runHourlyCollection(env, binanceClient);
+        return;
+      }
+
+      // Get next token for daily data
+      const token = await env.DB.prepare(`
+        SELECT * FROM collection_progress
+        WHERE daily_status NOT IN ('completed', 'paused')
+        ORDER BY days_collected ASC
+        LIMIT 1
+      `).first<CollectionProgress>();
+
+      if (!token) {
+        console.log('✅ All daily data collected! Starting hourly collection...');
+        await this.runHourlyCollection(env, binanceClient);
+        return;
+      }
+
+      try {
+        const daysToFetch = Math.min(DAYS_PER_RUN, token.totalDays - token.daysCollected);
+
+        if (daysToFetch <= 0) {
+          await env.DB.prepare(`
+            UPDATE collection_progress SET daily_status = 'completed' WHERE symbol = ?
+          `).bind(token.symbol).run();
+          continue;
+        }
+
+        console.log(`📅 Fetching ${daysToFetch} days for ${token.symbol} (daily data)`);
+        const candles = await coinGeckoClient.fetchOHLC(token.coinId, daysToFetch);
+
+        for (const candle of candles) {
+          await env.DB.prepare(`
+            INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            token.symbol,
+            Math.floor(candle.timestamp / 1000),
+            '1d',
+            candle.open,
+            candle.high,
+            candle.low,
+            candle.close,
+            'coingecko'
+          ).run();
+        }
+
+        const newDays = token.daysCollected + daysToFetch;
+        await env.DB.prepare(`
+          UPDATE collection_progress
+          SET days_collected = ?, daily_status = ?, error_count = 0, last_error = NULL
+          WHERE symbol = ?
+        `).bind(newDays, newDays >= token.totalDays ? 'completed' : 'pending', token.symbol).run();
+
+        console.log(`✅ ${token.symbol}: ${newDays}/${token.totalDays} days (${Math.round(newDays/token.totalDays*100)}%)`);
+
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        const newErrorCount = (token.errorCount || 0) + 1;
+
+        await env.DB.prepare(`
+          UPDATE collection_progress
+          SET daily_status = ?, error_count = ?, last_error = ?
+          WHERE symbol = ?
+        `).bind(
+          newErrorCount >= 3 ? 'paused' : 'pending',
+          newErrorCount,
+          errorMsg.substring(0, 500),
+          token.symbol
+        ).run();
+
+        console.error(`❌ ${token.symbol} daily error (${newErrorCount}/3): ${errorMsg}`);
+      }
+
+      // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
+    }
+  },
+
+  /**
+   * Hourly data collection (runs after daily collection completes)
+   * Uses Binance.US for fast, reliable hourly klines
+   */
+  async runHourlyCollection(env: Env, client: BinanceClient) {
+    while (true) {
+      const token = await env.DB.prepare(`
+        SELECT * FROM collection_progress
+        WHERE hourly_status NOT IN ('completed', 'paused')
+        ORDER BY hours_collected ASC
+        LIMIT 1
+      `).first<CollectionProgress>();
+
+      if (!token) {
+        console.log('✅ All hourly data collected!');
+        return;
+      }
+
+      try {
+        const hoursToFetch = Math.min(HOURS_PER_RUN, token.totalHours - token.hoursCollected);
+
+        if (hoursToFetch <= 0) {
+          await env.DB.prepare(`
+            UPDATE collection_progress SET hourly_status = 'completed' WHERE symbol = ?
+          `).bind(token.symbol).run();
+          continue;
+        }
+
+        console.log(`⏰ Fetching ${hoursToFetch} hours for ${token.symbol} (hourly data)`);
+
+        // Calculate endTime for fetching backwards
+        const endTime = token.hoursCollected === 0
+          ? Date.now()
+          : Date.now() - (token.hoursCollected * 60 * 60 * 1000);
+
+        const candles = await client.fetchKlines(token.symbol, hoursToFetch, endTime);
+
+        for (const candle of candles) {
+          await env.DB.prepare(`
+            INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, volume, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            token.symbol,
+            Math.floor(candle.timestamp / 1000),
+            '1h',
+            candle.open,
+            candle.high,
+            candle.low,
+            candle.close,
+            candle.volume,
+            'binance'
+          ).run();
+        }
+
+        const newHours = token.hoursCollected + candles.length;
+        await env.DB.prepare(`
+          UPDATE collection_progress
+          SET hours_collected = ?, hourly_status = ?, error_count = 0, last_error = NULL
+          WHERE symbol = ?
+        `).bind(newHours, newHours >= token.totalHours ? 'completed' : 'pending', token.symbol).run();
+
+        console.log(`✅ ${token.symbol}: ${newHours}/${token.totalHours} hours (${Math.round(newHours/token.totalHours*100)}%)`);
+
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        const newErrorCount = (token.errorCount || 0) + 1;
+
+        await env.DB.prepare(`
+          UPDATE collection_progress
+          SET hourly_status = ?, error_count = ?, last_error = ?
+          WHERE symbol = ?
+        `).bind(
+          newErrorCount >= 3 ? 'paused' : 'pending',
+          newErrorCount,
+          errorMsg.substring(0, 500),
+          token.symbol
+        ).run();
+
+        console.error(`❌ ${token.symbol} hourly error (${newErrorCount}/3): ${errorMsg}`);
+      }
+
+      // Binance.US rate limiting (much faster than CoinGecko/CryptoCompare)
+      await new Promise(resolve => setTimeout(resolve, BINANCE_RATE_LIMIT_MS));
+    }
+  },
+
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    // Get collection progress
     if (url.pathname === '/status') {
       const progress = await env.DB.prepare(`
-        SELECT * FROM collection_progress
-        ORDER BY days_collected ASC
+        SELECT * FROM collection_progress ORDER BY days_collected ASC
       `).all();
 
-      return new Response(JSON.stringify({
-        success: true,
+      const stats = {
         tokens: progress.results,
-        totalTokens: TOKENS.length,
-        completedTokens: progress.results.filter((t: any) => t.status === 'completed').length
-      }, null, 2), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
+        dailyCompleted: progress.results.filter((t: any) => t.daily_status === 'completed').length,
+        minuteCompleted: progress.results.filter((t: any) => t.minute_status === 'completed').length,
+        hourlyCompleted: progress.results.filter((t: any) => t.hourly_status === 'completed').length,
+        totalTokens: TOKENS.length
+      };
 
-    // Manual trigger (for testing)
-    if (url.pathname === '/collect') {
-      const event = { cron: 'manual', scheduledTime: Date.now() } as ScheduledEvent;
-      await this.scheduled(event, env, {} as ExecutionContext);
-
-      return new Response(JSON.stringify({
-        success: true,
-        message: 'Collection run triggered manually'
-      }), {
+      return new Response(JSON.stringify(stats, null, 2), {
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
     return new Response(JSON.stringify({
       status: 'ok',
-      name: 'Historical Data Collection Cron Worker',
-      endpoints: {
-        '/status': 'Get collection progress',
-        '/collect': 'Manual trigger (for testing)'
+      name: 'Multi-Timeframe Historical Data Collection Worker',
+      strategy: {
+        minute: 'CryptoCompare - runs forever (16.875 calls/min)',
+        daily: 'CoinGecko - until 5 years complete (16.875 calls/min)',
+        hourly: 'Binance.US - after daily completes (675 calls/min)'
       },
-      tokens: TOKENS.map(t => t.symbol),
-      schedule: 'Every hour - runs 24/7 (75% of monthly limit)',
-      daysPerRun: DAYS_PER_RUN,
-      yearsToCollect: YEARS_TO_COLLECT,
-      rateLimitDelay: `${RATE_LIMIT_DELAY_MS}ms (22.5 calls/min)`,
-      errorHandling: 'Exponential backoff (5s→80s), pauses after 3 errors',
-      maxRetries: MAX_RETRIES
-    }, null, 2), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+      tokens: TOKENS.length,
+      timeframes: ['1m', '1h', '1d']
+    }, null, 2), { headers: { 'Content-Type': 'application/json' } });
   }
 };

@@ -25,8 +25,13 @@ YEARS_TO_COLLECT = "5"
 #
 # To set secrets locally:
 #   wrangler secret put COINGECKO --config wrangler-historical-collection-cron.toml
+#   wrangler secret put CRYPTOCOMPARE_API_KEY --config wrangler-historical-collection-cron.toml
 #
 # To set via GitHub Actions, add to repository secrets:
-#   COINGECKO - CoinGecko Demo/Pro API key
+#   COINGECKO - CoinGecko Demo/Pro API key (for daily data)
+#   CRYPTOCOMPARE_API_KEY - CryptoCompare API key (for minute data)
 #
-# The cron worker will use the same API key as the historical-data-worker
+# Data collection strategy:
+#   - CryptoCompare: Minute-level data (runs forever)
+#   - CoinGecko: Daily data (until 5 years complete)
+#   - Binance.US: Hourly data (after daily completes, no API key needed)
