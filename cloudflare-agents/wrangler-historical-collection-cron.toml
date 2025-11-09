@@ -31,7 +31,7 @@ YEARS_TO_COLLECT = "5"
 #   COINGECKO - CoinGecko Demo/Pro API key (for daily data)
 #   CRYPTOCOMPARE_API_KEY - CryptoCompare API key (for minute data)
 #
-# Data collection strategy:
+# Data collection strategy (all run in parallel):
 #   - CryptoCompare: Minute-level data (runs forever)
 #   - CoinGecko: Daily data (until 5 years complete)
-#   - Binance.US: Hourly data (after daily completes, no API key needed)
+#   - Binance.US: Hourly data (until 5 years complete, no API key needed)

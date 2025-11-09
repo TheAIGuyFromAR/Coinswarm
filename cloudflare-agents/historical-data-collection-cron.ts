@@ -1,10 +1,10 @@
 /**
  * Historical Data Collection Cron Worker
  *
- * Strategy:
+ * Strategy (all run in parallel):
  * 1. CryptoCompare: Minute-level data (runs forever, best minute data source)
  * 2. CoinGecko: Daily data until 5 years complete
- * 3. Binance.US: Hourly data after daily completes (fastest source)
+ * 3. Binance.US: Hourly data until 5 years complete (fastest source)
  *
  * Rate limiting at 56.25% of max (75% then 25% slower = 56.25%)
  */
@@ -273,10 +273,11 @@ export default {
       `).bind(token.symbol, token.coinId, totalMinutes, totalDays, totalHours).run();
     }
 
-    // Run both collectors in parallel
+    // Run all three collectors in parallel
     ctx.waitUntil(Promise.all([
       this.runMinuteCollection(env),
-      this.runDailyCollection(env)
+      this.runDailyCollection(env),
+      this.runHourlyCollection(env)
     ]));
   },
 
@@ -398,28 +399,13 @@ export default {
   },
 
   /**
-   * Daily data collection (until 5 years complete, then switch to hourly)
-   * Uses CoinGecko for daily candles, then Binance.US for hourly
+   * Daily data collection (until 5 years complete)
+   * Uses CoinGecko for daily candles
    */
   async runDailyCollection(env: Env) {
     const coinGeckoClient = new CoinGeckoClient(env.COINGECKO);
-    const binanceClient = new BinanceClient();
 
     while (true) {
-      // Check if daily collection is complete
-      const dailyComplete = await env.DB.prepare(`
-        SELECT COUNT(*) as count FROM collection_progress WHERE daily_status = 'completed'
-      `).first<{ count: number }>();
-
-      const allDailyComplete = dailyComplete && dailyComplete.count === TOKENS.length;
-
-      if (allDailyComplete) {
-        // Switch to hourly collection
-        console.log('📈 Daily collection complete, starting hourly collection...');
-        await this.runHourlyCollection(env, binanceClient);
-        return;
-      }
-
       // Get next token for daily data
       const token = await env.DB.prepare(`
         SELECT * FROM collection_progress
@@ -429,8 +415,7 @@ export default {
       `).first<CollectionProgress>();
 
       if (!token) {
-        console.log('✅ All daily data collected! Starting hourly collection...');
-        await this.runHourlyCollection(env, binanceClient);
+        console.log('✅ All daily data collected!');
         return;
       }
 
@@ -496,10 +481,11 @@ export default {
   },
 
   /**
-   * Hourly data collection (runs after daily collection completes)
+   * Hourly data collection (runs in parallel with daily)
    * Uses Binance.US for fast, reliable hourly klines
    */
-  async runHourlyCollection(env: Env, client: BinanceClient) {
+  async runHourlyCollection(env: Env) {
+    const client = new BinanceClient();
     while (true) {
       const token = await env.DB.prepare(`
         SELECT * FROM collection_progress
@@ -608,8 +594,9 @@ export default {
       strategy: {
         minute: 'CryptoCompare - runs forever (16.875 calls/min)',
         daily: 'CoinGecko - until 5 years complete (16.875 calls/min)',
-        hourly: 'Binance.US - after daily completes (675 calls/min)'
+        hourly: 'Binance.US - until 5 years complete (675 calls/min)'
       },
+      parallel: 'All three collectors run simultaneously',
       tokens: TOKENS.length,
       timeframes: ['1m', '1h', '1d']
     }, null, 2), { headers: { 'Content-Type': 'application/json' } });
