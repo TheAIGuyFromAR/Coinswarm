@@ -67,7 +67,7 @@ const PAIRS = [
  * Fetches real historical klines (candlestick) data
  */
 class BinanceClient {
-  private baseUrl = 'https://api.binance.com';  // Restore original working URL
+  private baseUrl = 'https://data.binance.com';  // Public data API - not region restricted
 
   /**
    * Fetch historical klines from Binance
