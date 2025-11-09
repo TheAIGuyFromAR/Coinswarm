@@ -14,7 +14,7 @@
 
 interface Env {
   HISTORICAL_PRICES?: KVNamespace;  // Optional until KV namespace is created
-  COINGECKO_API_KEY?: string;       // CoinGecko Demo/Pro API key (optional, increases rate limit to 30/min)
+  COINGECKO?: string;                // CoinGecko Demo/Pro API key (optional, increases rate limit to 30/min)
   CRYPTOCOMPARE_API_KEY?: string;   // CryptoCompare API key (optional, for stable 30/min limit)
 }
 
@@ -625,7 +625,7 @@ export default {
 
     try {
       const binanceClient = new BinanceClient();
-      const coinGeckoClient = new CoinGeckoClient(env.COINGECKO_API_KEY);
+      const coinGeckoClient = new CoinGeckoClient(env.COINGECKO);
       const cryptoCompareClient = new CryptoCompareClient(env.CRYPTOCOMPARE_API_KEY);
       const dexScreenerClient = new DexScreenerClient();
       const geckoTerminalClient = new GeckoTerminalClient();
