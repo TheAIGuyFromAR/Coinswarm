@@ -244,6 +244,53 @@ class CoinGeckoClient {
 }
 
 /**
+ * CryptoCompare API Client
+ * Free tier with good limits - supports minute-level data
+ */
+class CryptoCompareClient {
+  private baseUrl = 'https://min-api.cryptocompare.com/data';
+
+  /**
+   * Fetch historical minute data from CryptoCompare
+   * histominute endpoint gives minute-level OHLCV
+   */
+  async fetchHistoMinute(symbol: string, limit: number = 500): Promise<OHLCVCandle[]> {
+    // Extract base symbol (BTC from BTCUSDT)
+    const fsym = symbol.replace(/USDT|USDC|BUSD/g, '');
+    const tsym = 'USD';
+
+    // CryptoCompare histominute endpoint
+    const url = `${this.baseUrl}/v2/histominute?fsym=${fsym}&tsym=${tsym}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`CryptoCompare API error: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json() as any;
+
+    if (result.Response !== 'Success') {
+      throw new Error(`CryptoCompare error: ${result.Message || 'Unknown error'}`);
+    }
+
+    // CryptoCompare format: {time, open, high, low, close, volumefrom, volumeto}
+    return result.Data.Data.map((candle: any) => ({
+      timestamp: candle.time * 1000, // Convert to ms
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      volume: candle.volumefrom
+    }));
+  }
+}
+
+/**
  * Historical Data Manager
  * Manages storage and retrieval of historical data in KV
  */
@@ -359,6 +406,7 @@ export default {
     try {
       const binanceClient = new BinanceClient();
       const coinGeckoClient = new CoinGeckoClient();
+      const cryptoCompareClient = new CryptoCompareClient();
       const dataManager = env.HISTORICAL_PRICES ? new HistoricalDataManager(env.HISTORICAL_PRICES) : null;
 
       // Route: Fetch fresh data with multi-source fallback
@@ -369,24 +417,33 @@ export default {
 
         let candles: OHLCVCandle[] = [];
         let source = '';
-        let error = '';
+        const errors: string[] = [];
 
-        // Try CoinGecko first (free, no API key, reliable)
+        // Try CryptoCompare first (minute-level data, has volume)
         try {
-          const days = Math.ceil(limit * 5 / (60 * 24)); // Convert 5m candles to days
-          candles = await coinGeckoClient.fetchForSymbol(symbol, Math.max(days, 30));
-          source = 'coingecko';
+          candles = await cryptoCompareClient.fetchHistoMinute(symbol, limit);
+          source = 'cryptocompare';
         } catch (e) {
-          error = `CoinGecko failed: ${e instanceof Error ? e.message : String(e)}`;
+          errors.push(`CryptoCompare: ${e instanceof Error ? e.message : String(e)}`);
 
-          // Fallback to Binance
+          // Fallback to CoinGecko
           try {
-            const endTime = Date.now();
-            const startTime = endTime - (limit * 5 * 60 * 1000);
-            candles = await binanceClient.fetchLargeDataset(symbol, interval, startTime, endTime);
-            source = 'binance';
+            const days = Math.ceil(limit * 5 / (60 * 24));
+            candles = await coinGeckoClient.fetchForSymbol(symbol, Math.max(days, 30));
+            source = 'coingecko';
           } catch (e2) {
-            throw new Error(`All sources failed. ${error}; Binance: ${e2 instanceof Error ? e2.message : String(e2)}`);
+            errors.push(`CoinGecko: ${e2 instanceof Error ? e2.message : String(e2)}`);
+
+            // Final fallback to Binance
+            try {
+              const endTime = Date.now();
+              const startTime = endTime - (limit * 5 * 60 * 1000);
+              candles = await binanceClient.fetchLargeDataset(symbol, interval, startTime, endTime);
+              source = 'binance';
+            } catch (e3) {
+              errors.push(`Binance: ${e3 instanceof Error ? e3.message : String(e3)}`);
+              throw new Error(`All sources failed: ${errors.join('; ')}`);
+            }
           }
         }
 
