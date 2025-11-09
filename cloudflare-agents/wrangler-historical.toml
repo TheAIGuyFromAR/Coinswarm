@@ -13,5 +13,5 @@ compatibility_date = "2024-01-01"
 
 # Environment variables
 [vars]
-# Binance API base URL (public, no auth needed for historical data)
-BINANCE_API_URL = "https://api.binance.com"
+# Binance public data API (not region-blocked like api.binance.com)
+BINANCE_API_URL = "https://data.binance.com"
