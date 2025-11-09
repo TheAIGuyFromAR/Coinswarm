@@ -4,7 +4,7 @@
 
 set -e
 
-SUBDOMAIN="theaiguyfrom"
+SUBDOMAIN="bamn86"
 BASE_URL="https://coinswarm"
 
 echo "🧪 Testing Coinswarm Workers..."

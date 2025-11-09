@@ -22,4 +22,4 @@ Verified via GitHub Actions API - all deployment steps completed with "success" 
 ./test-workers.sh
 ```
 
-Or visit: https://coinswarm-data-monitor.theaiguyfrom.workers.dev/
+Or visit: https://coinswarm-data-monitor.bamn86.workers.dev/

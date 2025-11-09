@@ -50,7 +50,7 @@ Or manually test each worker:
 
 ```bash
 # Historical collection cron
-curl https://coinswarm-historical-collection-cron.theaiguyfrom.workers.dev/
+curl https://coinswarm-historical-collection-cron.bamn86.workers.dev/
 
 # Expected response:
 {
@@ -67,7 +67,7 @@ curl https://coinswarm-historical-collection-cron.theaiguyfrom.workers.dev/
 }
 
 # Real-time price collector
-curl https://coinswarm-realtime-price-cron.theaiguyfrom.workers.dev/
+curl https://coinswarm-realtime-price-cron.bamn86.workers.dev/
 
 # Expected response:
 {
@@ -81,7 +81,7 @@ curl https://coinswarm-realtime-price-cron.theaiguyfrom.workers.dev/
 }
 
 # Technical indicators
-curl https://coinswarm-technical-indicators.theaiguyfrom.workers.dev/
+curl https://coinswarm-technical-indicators.bamn86.workers.dev/
 
 # Expected response:
 {
@@ -92,7 +92,7 @@ curl https://coinswarm-technical-indicators.theaiguyfrom.workers.dev/
 }
 
 # Collection alerts
-curl https://coinswarm-collection-alerts.theaiguyfrom.workers.dev/
+curl https://coinswarm-collection-alerts.bamn86.workers.dev/
 
 # Expected response:
 {
@@ -103,10 +103,10 @@ curl https://coinswarm-collection-alerts.theaiguyfrom.workers.dev/
 }
 
 # Monitoring dashboard
-curl https://coinswarm-data-monitor.theaiguyfrom.workers.dev/
+curl https://coinswarm-data-monitor.bamn86.workers.dev/
 # Expected: HTML page with "Coinswarm Data Collection Monitor"
 
-curl https://coinswarm-data-monitor.theaiguyfrom.workers.dev/api/stats
+curl https://coinswarm-data-monitor.bamn86.workers.dev/api/stats
 # Expected: JSON with collection stats
 ```
 

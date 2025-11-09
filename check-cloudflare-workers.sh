@@ -86,7 +86,7 @@ echo "============================"
 
 for worker in "${workers[@]}"; do
     if echo "$response" | jq -r '.result[].id' | grep -q "^${worker}$"; then
-        url="https://${worker}.theaiguyfrom.workers.dev/"
+        url="https://${worker}.bamn86.workers.dev/"
         echo -n "Testing $worker... "
 
         test_response=$(curl -s -w "\n%{http_code}" "$url" 2>&1 | tail -1)
