@@ -217,7 +217,7 @@ class BinanceClient {
 
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    console.log('⏰ Starting multi-timeframe collection...');
+    console.log('⏰ Starting multi-timeframe collection... (v2.0)');
 
     // Initialize tables
     await env.DB.prepare(`
