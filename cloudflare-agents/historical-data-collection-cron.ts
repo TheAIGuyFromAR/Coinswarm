@@ -7,6 +7,8 @@
  * 3. Binance.US: Hourly data until 5 years complete (fastest source)
  *
  * Rate limiting at 56.25% of max (75% then 25% slower = 56.25%)
+ *
+ * Requires secrets: COINGECKO, CRYPTOCOMPARE_API_KEY (deployed via GitHub Actions)
  */
 
 interface Env {
@@ -162,7 +164,8 @@ class CryptoCompareClient {
       high: candle.high,
       low: candle.low,
       close: candle.close,
-      volume: candle.volumefrom
+      volumeFrom: candle.volumefrom,
+      volumeTo: candle.volumeto
     }));
   }
 }
@@ -353,8 +356,8 @@ export default {
         // Insert candles
         for (const candle of candles) {
           await env.DB.prepare(`
-            INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, volume, source)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, volume_from, volume_to, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).bind(
             token.symbol,
             Math.floor(candle.timestamp / 1000),
@@ -363,7 +366,8 @@ export default {
             candle.high,
             candle.low,
             candle.close,
-            candle.volume,
+            candle.volumeFrom,
+            candle.volumeTo,
             'cryptocompare'
           ).run();
         }
@@ -534,8 +538,8 @@ export default {
 
         for (const candle of candles) {
           await env.DB.prepare(`
-            INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, volume, source)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, volume_from, volume_to, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).bind(
             token.symbol,
             Math.floor(candle.timestamp / 1000),
@@ -545,6 +549,7 @@ export default {
             candle.low,
             candle.close,
             candle.volume,
+            null, // Binance doesn't provide volume_to
             'binance'
           ).run();
         }

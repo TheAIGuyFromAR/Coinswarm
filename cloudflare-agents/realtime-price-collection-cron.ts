@@ -11,6 +11,8 @@
  * - DexScreener: 75 calls/min (25% of 300)
  *
  * Algorithm: Choose source with highest available capacity percentage
+ *
+ * Requires secrets: COINGECKO, CRYPTOCOMPARE_API_KEY (deployed via GitHub Actions)
  */
 
 interface Env {

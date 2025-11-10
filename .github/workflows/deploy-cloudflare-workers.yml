@@ -1,24 +1,22 @@
-name: Deploy Evolution System (All Workers)
+name: Deploy All Cloudflare Workers
 
 on:
   push:
     branches:
-      - claude/audit-historical-data-system-011CUx7r66ZDX5rTp6bRDQYE
-      - claude/debug-cloudflare-historical-data-011CUqugUynEoovcsiVnoaPB
-      - claude/review-codebase-docs-workers-011CUu5WhXjGVdghJyJh81Dh
-      - claude/incomplete-description-011CUutLehm75rEefmt5WYQj
-      - claude/full-code-review-011CUvqUcjpgrh9x49XzAs2v
+      - claude/**  # All Claude branches
       - main
       - master
     paths:
       - 'cloudflare-agents/**'
-      - '.github/workflows/deploy-evolution-agent.yml'
+      - 'cloudflare-workers/**'
+      - 'wrangler*.toml'
+      - '.github/workflows/deploy-cloudflare-workers.yml'
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy All Evolution Workers
+    name: Deploy Cloudflare Workers
 
     steps:
       - name: Checkout code
@@ -36,7 +34,70 @@ jobs:
           cd cloudflare-agents
           npm install
 
+      - name: Detect changed files
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            # cloudflare-agents/ workers (TypeScript)
+            evolution:
+              - 'cloudflare-agents/evolution-agent-simple.ts'
+              - 'cloudflare-agents/wrangler.toml'
+            news-sentiment:
+              - 'cloudflare-agents/news-sentiment-agent.ts'
+              - 'cloudflare-agents/wrangler-news-sentiment.toml'
+            multi-exchange:
+              - 'cloudflare-agents/multi-exchange-data-worker.ts'
+              - 'cloudflare-agents/wrangler-multi-exchange.toml'
+            solana-dex:
+              - 'cloudflare-agents/solana-dex-worker.ts'
+              - 'cloudflare-agents/wrangler-solana-dex.toml'
+            sentiment-backfill:
+              - 'cloudflare-agents/sentiment-backfill-worker.ts'
+              - 'cloudflare-agents/wrangler-sentiment-backfill.toml'
+            historical:
+              - 'cloudflare-agents/historical-data-worker.ts'
+              - 'cloudflare-agents/wrangler-historical.toml'
+            historical-cron:
+              - 'cloudflare-agents/historical-data-collection-cron.ts'
+              - 'cloudflare-agents/wrangler-historical-collection-cron.toml'
+            realtime-cron:
+              - 'cloudflare-agents/realtime-price-collection-cron.ts'
+              - 'cloudflare-agents/wrangler-realtime-price-cron.toml'
+            monitor:
+              - 'cloudflare-agents/data-collection-monitor.ts'
+              - 'cloudflare-agents/wrangler-monitor.toml'
+            technical-indicators:
+              - 'cloudflare-agents/technical-indicators-agent.ts'
+              - 'cloudflare-agents/wrangler-technical-indicators.toml'
+            collection-alerts:
+              - 'cloudflare-agents/collection-alerts-agent.ts'
+              - 'cloudflare-agents/wrangler-collection-alerts.toml'
+            dashboards:
+              - 'cloudflare-agents/dashboards-worker.ts'
+              - 'cloudflare-agents/dashboards/**/*.html'
+              - 'cloudflare-agents/wrangler-dashboards.toml'
+            # cloudflare-workers/ workers (JavaScript)
+            comprehensive-data:
+              - 'cloudflare-workers/comprehensive-data-worker.js'
+              - 'wrangler.toml'
+            data-backfill:
+              - 'cloudflare-workers/data-backfill-worker.js'
+              - 'wrangler-data-ingestion.toml'
+            # Schema changes
+            schemas:
+              - 'cloudflare-agents/**/*.sql'
+              - 'cloudflare-d1-schema.sql'
+            # Workflow changes - redeploy everything
+            workflow:
+              - '.github/workflows/deploy-cloudflare-workers.yml'
+
+      # ===========================================
+      # D1 Database Migrations (Schema Changes)
+      # ===========================================
+
       - name: Apply D1 Database Migrations
+        if: steps.filter.outputs.schemas == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -47,6 +108,7 @@ jobs:
           command: d1 execute coinswarm-evolution --remote --file=sentiment-data-schema.sql
 
       - name: Apply Technical Indicators Schema
+        if: steps.filter.outputs.schemas == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -57,6 +119,7 @@ jobs:
           command: d1 execute coinswarm-evolution --remote --file=d1-schema-technical-indicators.sql
 
       - name: Apply Price Data Schema
+        if: steps.filter.outputs.schemas == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -67,6 +130,7 @@ jobs:
           command: d1 execute coinswarm-evolution --remote --file=cloudflare-d1-schema.sql
 
       - name: Apply Advanced Sentiment Migrations
+        if: steps.filter.outputs.schemas == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -77,6 +141,7 @@ jobs:
           command: d1 execute coinswarm-evolution --remote --file=sentiment-advanced-schema.sql
 
       - name: Apply Price Data Collection Schema
+        if: steps.filter.outputs.schemas == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -86,7 +151,12 @@ jobs:
           wranglerVersion: "4.45.4"
           command: d1 execute coinswarm-evolution --remote --file=price-data-schema.sql
 
+      # ===========================================
+      # cloudflare-agents/ Workers (TypeScript)
+      # ===========================================
+
       - name: Deploy Evolution Agent
+        if: steps.filter.outputs.evolution == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -97,6 +167,7 @@ jobs:
           command: deploy --config wrangler.toml
 
       - name: Deploy News & Sentiment Agent
+        if: steps.filter.outputs.news-sentiment == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -107,6 +178,7 @@ jobs:
           command: deploy --config wrangler-news-sentiment.toml
 
       - name: Deploy Multi-Exchange Data Worker
+        if: steps.filter.outputs.multi-exchange == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -117,6 +189,7 @@ jobs:
           command: deploy --config wrangler-multi-exchange.toml
 
       - name: Deploy Solana DEX Worker
+        if: steps.filter.outputs.solana-dex == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -127,6 +200,7 @@ jobs:
           command: deploy --config wrangler-solana-dex.toml
 
       - name: Deploy Sentiment Backfill Worker
+        if: steps.filter.outputs.sentiment-backfill == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -137,6 +211,7 @@ jobs:
           command: deploy --config wrangler-sentiment-backfill.toml
 
       - name: Create KV Namespace for Historical Data
+        if: steps.filter.outputs.historical == 'true' || steps.filter.outputs.workflow == 'true'
         id: create-kv
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
@@ -148,6 +223,7 @@ jobs:
           command: kv namespace create HISTORICAL_PRICES
 
       - name: Deploy Historical Data Worker
+        if: steps.filter.outputs.historical == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -158,6 +234,7 @@ jobs:
           command: deploy --config wrangler-historical.toml
 
       - name: Deploy Historical Data Collection Cron
+        if: steps.filter.outputs.historical-cron == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -173,6 +250,7 @@ jobs:
           CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
 
       - name: Deploy Real-Time Price Collection Cron
+        if: steps.filter.outputs.realtime-cron == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -188,6 +266,7 @@ jobs:
           CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
 
       - name: Deploy Data Collection Monitor Dashboard
+        if: steps.filter.outputs.monitor == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -197,6 +276,7 @@ jobs:
           command: deploy --config wrangler-monitor.toml
 
       - name: Deploy Technical Indicators Agent
+        if: steps.filter.outputs.technical-indicators == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -206,6 +286,7 @@ jobs:
           command: deploy --config wrangler-technical-indicators.toml
 
       - name: Deploy Collection Alerts Agent
+        if: steps.filter.outputs.collection-alerts == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -214,27 +295,55 @@ jobs:
           wranglerVersion: "4.45.4"
           command: deploy --config wrangler-collection-alerts.toml
 
+      - name: Deploy Dashboards
+        if: steps.filter.outputs.dashboards == 'true' || steps.filter.outputs.workflow == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-dashboards.toml
+
+      # ===========================================
+      # cloudflare-workers/ Workers (JavaScript)
+      # ===========================================
+
+      - name: Deploy Comprehensive Data Worker
+        if: steps.filter.outputs.comprehensive-data == 'true' || steps.filter.outputs.workflow == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: '.'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler.toml
+
+      - name: Deploy Data Backfill Worker
+        if: steps.filter.outputs.data-backfill == 'true' || steps.filter.outputs.workflow == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: '.'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-data-ingestion.toml
+
+      # ===========================================
+      # Deployment Summary
+      # ===========================================
+
       - name: Deployment Complete
         run: |
-          echo "✅ All workers deployed successfully! (Latest deployment)"
-          echo "✅ D1 database migrations applied!"
+          echo "✅ Worker deployment workflow completed!"
           echo ""
-          echo "Deployed Workers:"
-          echo "1. Evolution Agent (main orchestrator) - RUNNING"
-          echo "2. News & Sentiment Agent (committee weighting) - RUNNING"
-          echo "3. Multi-Exchange Data Worker (Binance + Coinbase)"
-          echo "4. Solana DEX Worker (Jupiter, Raydium, Orca)"
-          echo "5. Sentiment Backfill Worker (historical data enrichment)"
+          echo "📊 Conditional Deployment Summary:"
+          echo "- Only workers with file changes were deployed"
+          echo "- Reduced deployment time by skipping unchanged workers"
+          echo "- Check individual step logs above for deployment details"
           echo ""
-          echo "Database Migrations Applied:"
-          echo "- Sentiment columns added to chaos_trades table"
-          echo "- Sentiment time-series tables created (keywords, headlines, derivatives)"
-          echo "- Ready for sentiment-enhanced pattern discovery"
-          echo ""
-          echo "Check your workers at: https://dash.cloudflare.com (login required)"
-          echo ""
-          echo "Optional: Start historical backfill to enrich 129,200 existing trades:"
-          echo "  curl -X POST https://coinswarm-sentiment-backfill.bamn86.workers.dev/backfill?batch=100"
-          echo ""
-          echo "Check backfill progress:"
-          echo "  curl https://coinswarm-sentiment-backfill.bamn86.workers.dev/status"
+          echo "🔍 View deployed workers at: https://dash.cloudflare.com"
+          echo "📈 Total workers managed: 14 (12 TypeScript + 2 JavaScript)"
+          echo "   - 12 TypeScript workers (cloudflare-agents/)"
+          echo "   - 2 JavaScript workers (cloudflare-workers/)"
+          echo "   - Static dashboards worker included"

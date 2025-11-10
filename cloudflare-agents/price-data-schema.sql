@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS price_data (
   high REAL NOT NULL,
   low REAL NOT NULL,
   close REAL NOT NULL,
-  volume REAL,
+  volume_from REAL, -- Base currency volume (e.g., BTC amount)
+  volume_to REAL,   -- Quote currency volume (e.g., USDT value)
   source TEXT NOT NULL, -- 'cryptocompare', 'coingecko', 'binance', 'dexscreener'
   created_at INTEGER DEFAULT (unixepoch()),
   UNIQUE(symbol, timestamp, timeframe, source)
