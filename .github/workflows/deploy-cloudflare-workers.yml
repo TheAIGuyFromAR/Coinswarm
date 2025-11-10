@@ -325,6 +325,8 @@ jobs:
           echo ""
           echo "📊 Conditional Deployment Summary:"
           echo "- Only workers with file changes were deployed"
+          echo "- Reduced deployment time by skipping unchanged workers"
           echo "- Check individual step logs above for deployment details"
           echo ""
           echo "🔍 View deployed workers at: https://dash.cloudflare.com"
+          echo "📈 Total workers managed: 13+ (11 TypeScript + 2 JavaScript)"
