@@ -1,5 +1,6 @@
 # Wrangler configuration for Dashboards Worker
 # Serves static HTML dashboards for the Coinswarm evolution system
+# Pure static assets - no Durable Objects, no D1 (dashboards fetch via API)
 
 name = "dashboards"
 main = "dashboards-worker.ts"
@@ -15,11 +16,11 @@ compatibility_flags = ["nodejs_compat"]
 directory = "dashboards"
 binding = "ASSETS"
 
-# D1 Database binding (if dashboards need to query data)
-[[d1_databases]]
-binding = "DB"
-database_name = "coinswarm-evolution"
-database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
+# Note: Dashboards fetch data from the Evolution Agent API, not directly from D1
+# No D1 binding needed here
+# No Durable Objects needed - this is a pure static file server
 
-# No cron needed - this is a static dashboard service
-# Accessible via HTTP GET requests
+# Migration to remove incorrectly configured Durable Objects from previous deployments
+[[migrations]]
+tag = "v2-remove-durable-objects"
+deleted_classes = ["EvolutionAgent"]
