@@ -1,0 +1,25 @@
+# Wrangler configuration for Dashboards Worker
+# Serves static HTML dashboards for the Coinswarm evolution system
+
+name = "dashboards"
+main = "dashboards-worker.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Account ID - Set via environment variable CLOUDFLARE_ACCOUNT_ID or GitHub Secrets
+# account_id = "8a330fc6c339f031a73905d4ca2f3e5d"
+
+# Static assets for dashboards
+# Serves HTML files from dashboards directory
+[assets]
+directory = "dashboards"
+binding = "ASSETS"
+
+# D1 Database binding (if dashboards need to query data)
+[[d1_databases]]
+binding = "DB"
+database_name = "coinswarm-evolution"
+database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
+
+# No cron needed - this is a static dashboard service
+# Accessible via HTTP GET requests

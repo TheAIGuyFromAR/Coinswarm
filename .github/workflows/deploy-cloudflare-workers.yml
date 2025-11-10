@@ -73,6 +73,10 @@ jobs:
             collection-alerts:
               - 'cloudflare-agents/collection-alerts-agent.ts'
               - 'cloudflare-agents/wrangler-collection-alerts.toml'
+            dashboards:
+              - 'cloudflare-agents/dashboards-worker.ts'
+              - 'cloudflare-agents/dashboards/**/*.html'
+              - 'cloudflare-agents/wrangler-dashboards.toml'
             # cloudflare-workers/ workers (JavaScript)
             comprehensive-data:
               - 'cloudflare-workers/comprehensive-data-worker.js'
@@ -291,6 +295,16 @@ jobs:
           wranglerVersion: "4.45.4"
           command: deploy --config wrangler-collection-alerts.toml
 
+      - name: Deploy Dashboards
+        if: steps.filter.outputs.dashboards == 'true' || steps.filter.outputs.workflow == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-dashboards.toml
+
       # ===========================================
       # cloudflare-workers/ Workers (JavaScript)
       # ===========================================
@@ -329,4 +343,7 @@ jobs:
           echo "- Check individual step logs above for deployment details"
           echo ""
           echo "🔍 View deployed workers at: https://dash.cloudflare.com"
-          echo "📈 Total workers managed: 13+ (11 TypeScript + 2 JavaScript)"
+          echo "📈 Total workers managed: 14 (12 TypeScript + 2 JavaScript)"
+          echo "   - 12 TypeScript workers (cloudflare-agents/)"
+          echo "   - 2 JavaScript workers (cloudflare-workers/)"
+          echo "   - Static dashboards worker included"
