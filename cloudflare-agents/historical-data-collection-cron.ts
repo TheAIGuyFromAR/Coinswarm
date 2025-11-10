@@ -217,7 +217,7 @@ class BinanceClient {
 
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    console.log('⏰ Starting multi-timeframe collection...');
+    console.log('⏰ Starting multi-timeframe collection... (v2.0)');
 
     // Initialize tables
     await env.DB.prepare(`
@@ -583,6 +583,97 @@ export default {
 
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    // Manual initialization endpoint (for testing/troubleshooting)
+    if (url.pathname === '/init' && request.method === 'POST') {
+      try {
+        console.log('🔧 Manual initialization triggered...');
+
+        // Create tables
+        await env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS collection_progress (
+            symbol TEXT PRIMARY KEY,
+            coin_id TEXT NOT NULL,
+            minutes_collected INTEGER DEFAULT 0,
+            days_collected INTEGER DEFAULT 0,
+            hours_collected INTEGER DEFAULT 0,
+            total_minutes INTEGER NOT NULL,
+            total_days INTEGER NOT NULL,
+            total_hours INTEGER NOT NULL,
+            daily_status TEXT DEFAULT 'pending',
+            minute_status TEXT DEFAULT 'pending',
+            hourly_status TEXT DEFAULT 'pending',
+            error_count INTEGER DEFAULT 0,
+            last_error TEXT,
+            last_minute_timestamp INTEGER,
+            last_run INTEGER
+          )
+        `).run();
+
+        await env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS price_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            symbol TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            timeframe TEXT NOT NULL,
+            open REAL NOT NULL,
+            high REAL NOT NULL,
+            low REAL NOT NULL,
+            close REAL NOT NULL,
+            volume REAL DEFAULT 0,
+            source TEXT NOT NULL,
+            created_at INTEGER DEFAULT (strftime('%s', 'now')),
+            UNIQUE(symbol, timestamp, timeframe, source)
+          )
+        `).run();
+
+        // Seed tokens
+        const totalMinutes = 365 * 24 * 60 * YEARS_TO_COLLECT;
+        const totalDays = 365 * YEARS_TO_COLLECT;
+        const totalHours = 365 * 24 * YEARS_TO_COLLECT;
+
+        let insertedCount = 0;
+
+        for (const token of TOKENS) {
+          const result = await env.DB.prepare(`
+            INSERT OR IGNORE INTO collection_progress (
+              symbol, coin_id,
+              total_minutes, total_days, total_hours,
+              daily_status, minute_status, hourly_status
+            )
+            VALUES (?, ?, ?, ?, ?, 'pending', 'pending', 'pending')
+          `).bind(token.symbol, token.coinId, totalMinutes, totalDays, totalHours).run();
+
+          if (result.meta.changes > 0) {
+            insertedCount++;
+          }
+        }
+
+        const count = await env.DB.prepare(`
+          SELECT COUNT(*) as count FROM collection_progress
+        `).first();
+
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Database initialized successfully',
+          tokensInserted: insertedCount,
+          totalInDatabase: count?.count || 0,
+          expectedTotal: TOKENS.length
+        }, null, 2), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+      } catch (error) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        }, null, 2), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
 
     if (url.pathname === '/status') {
       const progress = await env.DB.prepare(`
