@@ -1,4 +1,4 @@
-name: Deploy Evolution System (All Workers)
+name: Deploy All Cloudflare Workers
 
 on:
   push:
@@ -8,13 +8,15 @@ on:
       - master
     paths:
       - 'cloudflare-agents/**'
-      - '.github/workflows/deploy-evolution-agent.yml'
+      - 'cloudflare-workers/**'
+      - 'wrangler*.toml'
+      - '.github/workflows/deploy-cloudflare-workers.yml'
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy All Evolution Workers
+    name: Deploy Cloudflare Workers
 
     steps:
       - name: Checkout code
@@ -37,6 +39,7 @@ jobs:
         id: filter
         with:
           filters: |
+            # cloudflare-agents/ workers (TypeScript)
             evolution:
               - 'cloudflare-agents/evolution-agent-simple.ts'
               - 'cloudflare-agents/wrangler.toml'
@@ -70,11 +73,24 @@ jobs:
             collection-alerts:
               - 'cloudflare-agents/collection-alerts-agent.ts'
               - 'cloudflare-agents/wrangler-collection-alerts.toml'
+            # cloudflare-workers/ workers (JavaScript)
+            comprehensive-data:
+              - 'cloudflare-workers/comprehensive-data-worker.js'
+              - 'wrangler.toml'
+            data-backfill:
+              - 'cloudflare-workers/data-backfill-worker.js'
+              - 'wrangler-data-ingestion.toml'
+            # Schema changes
             schemas:
               - 'cloudflare-agents/**/*.sql'
               - 'cloudflare-d1-schema.sql'
+            # Workflow changes - redeploy everything
             workflow:
-              - '.github/workflows/deploy-evolution-agent.yml'
+              - '.github/workflows/deploy-cloudflare-workers.yml'
+
+      # ===========================================
+      # D1 Database Migrations (Schema Changes)
+      # ===========================================
 
       - name: Apply D1 Database Migrations
         if: steps.filter.outputs.schemas == 'true' || steps.filter.outputs.workflow == 'true'
@@ -130,6 +146,10 @@ jobs:
           workingDirectory: 'cloudflare-agents'
           wranglerVersion: "4.45.4"
           command: d1 execute coinswarm-evolution --remote --file=price-data-schema.sql
+
+      # ===========================================
+      # cloudflare-agents/ Workers (TypeScript)
+      # ===========================================
 
       - name: Deploy Evolution Agent
         if: steps.filter.outputs.evolution == 'true' || steps.filter.outputs.workflow == 'true'
@@ -271,27 +291,40 @@ jobs:
           wranglerVersion: "4.45.4"
           command: deploy --config wrangler-collection-alerts.toml
 
+      # ===========================================
+      # cloudflare-workers/ Workers (JavaScript)
+      # ===========================================
+
+      - name: Deploy Comprehensive Data Worker
+        if: steps.filter.outputs.comprehensive-data == 'true' || steps.filter.outputs.workflow == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: '.'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler.toml
+
+      - name: Deploy Data Backfill Worker
+        if: steps.filter.outputs.data-backfill == 'true' || steps.filter.outputs.workflow == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: '.'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler-data-ingestion.toml
+
+      # ===========================================
+      # Deployment Summary
+      # ===========================================
+
       - name: Deployment Complete
         run: |
-          echo "✅ All workers deployed successfully! (Latest deployment)"
-          echo "✅ D1 database migrations applied!"
+          echo "✅ Worker deployment workflow completed!"
           echo ""
-          echo "Deployed Workers:"
-          echo "1. Evolution Agent (main orchestrator) - RUNNING"
-          echo "2. News & Sentiment Agent (committee weighting) - RUNNING"
-          echo "3. Multi-Exchange Data Worker (Binance + Coinbase)"
-          echo "4. Solana DEX Worker (Jupiter, Raydium, Orca)"
-          echo "5. Sentiment Backfill Worker (historical data enrichment)"
+          echo "📊 Conditional Deployment Summary:"
+          echo "- Only workers with file changes were deployed"
+          echo "- Check individual step logs above for deployment details"
           echo ""
-          echo "Database Migrations Applied:"
-          echo "- Sentiment columns added to chaos_trades table"
-          echo "- Sentiment time-series tables created (keywords, headlines, derivatives)"
-          echo "- Ready for sentiment-enhanced pattern discovery"
-          echo ""
-          echo "Check your workers at: https://dash.cloudflare.com (login required)"
-          echo ""
-          echo "Optional: Start historical backfill to enrich 129,200 existing trades:"
-          echo "  curl -X POST https://coinswarm-sentiment-backfill.bamn86.workers.dev/backfill?batch=100"
-          echo ""
-          echo "Check backfill progress:"
-          echo "  curl https://coinswarm-sentiment-backfill.bamn86.workers.dev/status"
+          echo "🔍 View deployed workers at: https://dash.cloudflare.com"
