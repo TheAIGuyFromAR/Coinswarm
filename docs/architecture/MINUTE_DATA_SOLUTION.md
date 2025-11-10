@@ -1,0 +1,3 @@
+# Minute Data Solution
+
+...existing content from MINUTE_DATA_SOLUTION.md...

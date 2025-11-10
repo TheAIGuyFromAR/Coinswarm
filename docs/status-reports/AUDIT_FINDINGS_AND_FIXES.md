@@ -1,0 +1,3 @@
+# Audit Findings and Fixes
+
+...existing content from AUDIT_FINDINGS_AND_FIXES.md...

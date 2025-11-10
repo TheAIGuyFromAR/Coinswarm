@@ -1,0 +1,3 @@
+# Data Collection Ready
+
+...existing content from DATA_COLLECTION_READY.md...

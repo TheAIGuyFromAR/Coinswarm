@@ -1,0 +1,3 @@
+# Deploy Worker Instructions
+
+...existing content from DEPLOY_WORKER_INSTRUCTIONS.md...

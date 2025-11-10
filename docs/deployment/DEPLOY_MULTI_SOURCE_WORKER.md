@@ -1,0 +1,3 @@
+# Deploy Multi Source Worker
+
+...existing content from DEPLOY_MULTI_SOURCE_WORKER.md...

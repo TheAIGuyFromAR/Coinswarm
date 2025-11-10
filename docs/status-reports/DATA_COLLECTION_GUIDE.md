@@ -1,0 +1,3 @@
+# Data Collection Guide
+
+...existing content from DATA_COLLECTION_GUIDE.md...

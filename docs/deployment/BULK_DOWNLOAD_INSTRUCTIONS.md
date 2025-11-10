@@ -1,0 +1,3 @@
+# Bulk Download Instructions
+
+...existing content from BULK_DOWNLOAD_INSTRUCTIONS.md...

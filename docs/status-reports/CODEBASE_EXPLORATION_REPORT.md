@@ -1,0 +1,3 @@
+# Codebase Exploration Report
+
+...existing content from CODEBASE_EXPLORATION_REPORT.md...

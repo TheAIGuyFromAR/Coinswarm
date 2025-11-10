@@ -3,13 +3,6 @@
 ## What We Built
 
 ### Complete Self-Learning Trading System
-- **7 AI Agents** that vote on trades (trend, risk, arbitrage, analysis, learning, research, hedge)
-- **Backtesting Engine** runs at >15M× real-time speed
-- **Sentiment Analysis** from multiple free sources (news, social, market fear/greed)
-- **Macro Data** integration (interest rates, inflation, economic indicators)
-- **Strategy Evolution** using genetic algorithms (winners survive, losers die)
-- **Continuous Learning** 24/7 backtesting to keep improving
-- **Real Data** via Cloudflare Worker (bypasses network restrictions)
 
 ## Current Status
 
@@ -74,10 +67,6 @@ python demo_real_data.py
 ```
 
 **What this does:**
-- Fetches 30 days of real BTC/ETH/SOL price data
-- Fetches sentiment data (Fear & Greed + news)
-- Runs all 7 agents through historical data
-- Shows performance: return %, win rate, Sharpe ratio, trades
 
 **Expected output:**
 ```
@@ -98,15 +87,8 @@ python validate_strategy.py --windows 10 --days 30
 ```
 
 **What this does:**
-- Picks 10 random 30-day periods over last 3 months
-- Runs backtest on each period
-- Reports average performance and consistency
 
 **Good results:**
-- Average return: >5%
-- Win rate: >52%
-- Sharpe ratio: >1.0
-- Consistent across windows (not lucky on one period)
 
 ### Step 5: Start Continuous Backtesting
 
@@ -117,11 +99,6 @@ python -m coinswarm.backtesting.continuous_backtester
 ```
 
 **What this does:**
-- Runs 4 parallel workers testing strategies
-- Genetic algorithm evolves winning strategies
-- Academic agent researches proven strategies from papers
-- Keeps CPU >50% utilized
-- ~10,000-30,000 backtests per day
 
 **Leave this running.** It continuously improves your strategies.
 
@@ -134,11 +111,6 @@ python dashboard.py
 ```
 
 **Shows:**
-- Current best strategies
-- Agent performance rankings
-- Recent backtest results
-- Strategy evolution progress
-- Top trades by profitability
 
 ### Step 7: Deploy to Production
 
@@ -188,48 +160,24 @@ Watch for 24-48 hours before going live.
 ### After Step 3 (First Backtest)
 
 **If returns are negative or Sharpe < 1.0:**
-- ⚠️  Don't go live yet
-- Adjust agent weights
-- Lower confidence threshold (more trades)
-- Test longer periods
-- Add more data sources (FRED, CryptoCompare)
 
 **If returns are positive and Sharpe > 1.0:**
-- ✅ Proceed to Step 4 (validate)
 
 ### After Step 4 (Validation)
 
 **If inconsistent results (high variance):**
-- ⚠️  Strategy may be overfitting
-- Test on longer periods (60-90 days)
-- Add more validation windows (20+)
-- Check if one agent dominates (reduce weight)
 
 **If consistent profits across windows:**
-- ✅ Proceed to Step 5 (continuous learning)
 
 ### After Step 5 (Continuous Learning)
 
 **After 24-48 hours of continuous backtesting:**
-- Review evolved strategies
-- Check if new strategies beat original
-- Look at strategy survival rates
-- Identify patterns in winning strategies
 
 **If evolved strategies perform better:**
-- ✅ Proceed to Step 7 (deploy to production)
 
 ### Before Step 8 (Live Trading)
 
 **Checklist:**
-- ✅ Backtests show consistent profits (>5% monthly)
-- ✅ Win rate >50%
-- ✅ Sharpe ratio >1.5
-- ✅ Tested on 20+ random windows
-- ✅ Continuous backtesting running for 48+ hours
-- ✅ Max drawdown acceptable (<20%)
-- ✅ Understand the risks
-- ✅ Starting with small capital you can afford to lose
 
 **Only proceed if ALL checkboxes are ✅**
 
@@ -285,51 +233,23 @@ You'll see if the strategy is profitable on recent data.
 Genetic algorithm starts evolving better strategies.
 
 ### Within 1 Week
-- Hundreds of strategies tested
-- Best performers identified
-- Strategy weights optimized
-- Ready for production decision
 
 ### Production (Step 8)
-- Agents vote on every price tick
-- Trades execute automatically
-- Performance tracked in real-time
-- Strategies continue evolving
-- You monitor from dashboard
 
 ## Support
 
 **If backtest fails:**
-- Check Worker URL is set correctly
-- Verify Worker is deployed and responding
-- Check logs: `tail -f logs/backtest.log`
 
 **If no trades:**
-- Lower confidence threshold (default 0.6 → 0.5)
-- Check agent weights (ensure diversity)
-- Verify price data is loading
 
 **If poor performance:**
-- Add sentiment data (FRED, CryptoCompare keys)
-- Test longer periods
-- Adjust agent weights
-- Check if one agent dominates
 
 **If network errors:**
-- Verify Worker is deployed
-- Check WORKER_URL environment variable
-- Test Worker: `curl $WORKER_URL/fetch?symbol=BTCUSDT&timeframe=1h&days=1`
 
 ## Critical: Risk Management
 
 **Never invest more than you can afford to lose.**
 
-- Start with $100-1000 max
-- Use sandbox mode first (48+ hours)
-- Set stop losses (agents do this automatically)
-- Monitor daily for first week
-- Max position size: 10% of capital per trade
-- Max drawdown: Exit if down >20%
 
 **This is experimental trading software. Past performance ≠ future results.**
 

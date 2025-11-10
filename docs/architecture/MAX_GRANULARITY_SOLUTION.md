@@ -1,0 +1,3 @@
+# Max Granularity Solution
+
+...existing content from MAX_GRANULARITY_SOLUTION.md...

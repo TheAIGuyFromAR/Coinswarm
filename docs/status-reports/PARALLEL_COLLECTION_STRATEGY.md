@@ -1,0 +1,3 @@
+# Parallel Collection Strategy
+
+...existing content from PARALLEL_COLLECTION_STRATEGY.md...

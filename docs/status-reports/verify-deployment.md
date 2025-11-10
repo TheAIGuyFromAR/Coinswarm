@@ -1,0 +1,3 @@
+# Deployment Verification Checklist
+
+...existing content from verify-deployment.md...

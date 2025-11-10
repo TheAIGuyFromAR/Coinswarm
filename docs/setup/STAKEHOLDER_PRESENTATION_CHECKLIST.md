@@ -1,0 +1,3 @@
+# Stakeholder Presentation Checklist
+
+...existing content from STAKEHOLDER_PRESENTATION_CHECKLIST.md...

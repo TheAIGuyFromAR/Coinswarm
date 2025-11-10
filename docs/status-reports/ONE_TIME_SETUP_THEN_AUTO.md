@@ -1,0 +1,3 @@
+# One Time Setup Then Auto
+
+...existing content from ONE_TIME_SETUP_THEN_AUTO.md...

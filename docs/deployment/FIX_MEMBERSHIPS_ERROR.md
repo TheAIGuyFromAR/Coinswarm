@@ -1,0 +1,3 @@
+# Fix Memberships Error
+
+...existing content from FIX_MEMBERSHIPS_ERROR.md...

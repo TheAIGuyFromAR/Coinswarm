@@ -1,0 +1,3 @@
+# Multi-Agent Architecture
+
+...existing content from MULTI_AGENT_ARCHITECTURE.md...

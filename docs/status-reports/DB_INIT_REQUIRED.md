@@ -1,0 +1,3 @@
+# DB Init Required
+
+...existing content from DB_INIT_REQUIRED.md...

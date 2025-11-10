@@ -1,0 +1,3 @@
+# Deploy SCALED Evolution System - $5 Cloudflare Plan 🚀
+
+...existing content from DEPLOYMENT_SCALED_$5_PLAN.md...

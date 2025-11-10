@@ -1,0 +1,3 @@
+# Multi Timescale Strategy Guide
+
+...existing content from MULTI_TIMESCALE_STRATEGY_GUIDE.md...

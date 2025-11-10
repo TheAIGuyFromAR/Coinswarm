@@ -1,0 +1,3 @@
+# Network Enabled Setup
+
+...existing content from NETWORK_ENABLED_SETUP.md...

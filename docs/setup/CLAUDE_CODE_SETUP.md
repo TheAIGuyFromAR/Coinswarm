@@ -1,0 +1,3 @@
+# Claude Code Setup
+
+...existing content from CLAUDE_CODE_SETUP.md...

@@ -1,0 +1,3 @@
+# Automated Data Pipeline Setup
+
+...existing content from AUTOMATED_DATA_PIPELINE_SETUP.md...

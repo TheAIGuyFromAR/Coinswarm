@@ -1,0 +1,3 @@
+# Migration Guide
+
+...existing content from MIGRATION_GUIDE.md...

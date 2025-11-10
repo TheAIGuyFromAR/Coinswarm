@@ -1,0 +1,3 @@
+# CryptoCompare Data Expansion
+
+...existing content from CRYPTOCOMPARE_DATA_EXPANSION.md...

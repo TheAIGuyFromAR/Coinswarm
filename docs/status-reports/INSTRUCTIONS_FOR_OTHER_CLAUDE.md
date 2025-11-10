@@ -1,0 +1,3 @@
+# Instructions for Other Claude
+
+...existing content from INSTRUCTIONS_FOR_OTHER_CLAUDE.md...

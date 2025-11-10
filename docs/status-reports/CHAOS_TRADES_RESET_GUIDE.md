@@ -1,0 +1,3 @@
+# Chaos Trades Reset Guide
+
+...existing content from CHAOS_TRADES_RESET_GUIDE.md...
