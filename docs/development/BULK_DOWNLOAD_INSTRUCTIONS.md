@@ -14,3 +14,4 @@ This document provides instructions for bulk downloading historical data for Coi
 ## 3. Notes
 - API rate limits may apply
 - See `API_RATE_LIMITS.md`
+<!-- Cleared: Content moved to Development_strategies.md -->

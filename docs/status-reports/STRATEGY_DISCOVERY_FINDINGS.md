@@ -1,3 +1,0 @@
-# Strategy Discovery Findings
-
-...existing content from STRATEGY_DISCOVERY_FINDINGS.md...

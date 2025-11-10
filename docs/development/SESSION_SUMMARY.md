@@ -9,3 +9,4 @@ This document summarizes the key outcomes and decisions from the current Coinswa
 ## 2. Decisions
 - Move all .md docs to appropriate folders
 - Use REST API for worker inventory
+<!-- Cleared: Content moved to Development_strategies.md -->

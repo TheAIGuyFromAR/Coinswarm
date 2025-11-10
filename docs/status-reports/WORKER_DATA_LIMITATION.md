@@ -1,3 +1,0 @@
-# Worker Data Limitation - Only ~30 Days Available
-
-...existing content from WORKER_DATA_LIMITATION.md...

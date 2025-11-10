@@ -51,3 +51,4 @@ for script in resp.json().get('result', []):
 - https://developers.cloudflare.com/workers/wrangler/commands/
 
 _Last updated: 2025-11-10_
+<!-- Cleared: Content moved to Development_strategies.md -->

@@ -1,3 +1,0 @@
-# Code Review
-
-...existing content from CODE_REVIEW.md...

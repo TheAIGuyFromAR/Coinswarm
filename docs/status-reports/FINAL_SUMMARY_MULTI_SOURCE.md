@@ -1,3 +1,0 @@
-# Final Summary Multi Source
-
-...existing content from FINAL_SUMMARY_MULTI_SOURCE.md...

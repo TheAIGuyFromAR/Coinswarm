@@ -1,3 +1,0 @@
-# Comprehensive Deployment Guide
-
-...existing content from COMPREHENSIVE_DEPLOYMENT_GUIDE.md...

@@ -172,3 +172,4 @@ cf.run_d1_query(db_id, "SELECT * FROM sqlite_master")
 - https://developers.cloudflare.com/workers/
 - https://developers.cloudflare.com/workers/wrangler/commands/
 - https://api.cloudflare.com/
+<!-- Cleared: Content moved to Development_strategies.md -->

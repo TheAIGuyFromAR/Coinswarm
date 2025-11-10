@@ -1,3 +1,0 @@
-# Historical Data System Audit
-
-...existing content from HISTORICAL_DATA_SYSTEM_AUDIT.md...

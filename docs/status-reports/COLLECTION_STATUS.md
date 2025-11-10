@@ -1,3 +1,0 @@
-# Collection Status
-
-...existing content from COLLECTION_STATUS.md...

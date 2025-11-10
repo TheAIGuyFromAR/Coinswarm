@@ -12,3 +12,4 @@ This guide provides detailed instructions for deploying all components of the Co
 
 ## 3. Monitoring
 - Enable logging and alerts
+<!-- Cleared: Content moved to Development_strategies.md -->

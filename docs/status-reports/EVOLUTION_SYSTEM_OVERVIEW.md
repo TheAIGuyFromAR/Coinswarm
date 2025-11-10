@@ -1,3 +1,0 @@
-# Evolution System Overview
-
-...existing content from EVOLUTION_SYSTEM_OVERVIEW.md...

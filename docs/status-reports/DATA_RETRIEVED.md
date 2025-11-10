@@ -1,3 +1,0 @@
-# Data Retrieved
-
-...existing content from DATA_RETRIEVED.md...

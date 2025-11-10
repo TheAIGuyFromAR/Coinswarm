@@ -9,3 +9,4 @@ This document records the findings from strategy discovery and backtesting effor
 ## 2. Key Findings
 - Several high-Sharpe strategies identified
 - Mean reversion and trend-following both effective
+<!-- Cleared: Content moved to Development_strategies.md -->

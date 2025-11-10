@@ -13,3 +13,4 @@ This document provides a comprehensive review of the Coinswarm codebase, includi
 ## 3. Deployment
 - GitHub Actions workflow
 - Wrangler CLI usage
+<!-- Cleared: Content moved to Development_strategies.md -->

@@ -1,3 +1,0 @@
-# Session Progress Report
-
-...existing content from SESSION_PROGRESS_REPORT.md...

@@ -1,3 +1,0 @@
-# CryptoCompare Priority Endpoints
-
-...existing content from CRYPTOCOMPARE_PRIORITY_ENDPOINTS.md...

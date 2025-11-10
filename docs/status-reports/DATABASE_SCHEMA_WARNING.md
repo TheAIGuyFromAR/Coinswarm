@@ -1,3 +1,0 @@
-# Database Schema Warning
-
-...existing content from DATABASE_SCHEMA_WARNING.md...

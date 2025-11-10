@@ -1,3 +1,0 @@
-# Data Enrichment Architecture
-
-...existing content from DATA_ENRICHMENT_ARCHITECTURE.md...

@@ -99,3 +99,4 @@ This document summarizes the current state of deployed Cloudflare Workers in the
 ---
 
 _Last updated: 2025-11-10_
+<!-- Cleared: Content moved to Development_strategies.md -->

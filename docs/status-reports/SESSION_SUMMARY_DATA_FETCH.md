@@ -1,3 +1,0 @@
-# Session Summary Data Fetch
-
-...existing content from SESSION_SUMMARY_DATA_FETCH.md...
