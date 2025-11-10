@@ -5,6 +5,9 @@ name = "coinswarm-data-backfill"
 main = "cloudflare-workers/data-backfill-worker.js"
 compatibility_date = "2024-01-01"
 
+# Account ID - Set via environment variable CLOUDFLARE_ACCOUNT_ID or GitHub Secrets
+# account_id = "YOUR_ACCOUNT_ID_HERE"
+
 # Cron trigger: Run every minute for aggressive backfilling
 # Disable this once backfill is complete to save resources
 [triggers]

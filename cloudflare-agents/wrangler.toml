@@ -7,6 +7,9 @@ main = "evolution-agent-simple.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Account ID - Set via environment variable CLOUDFLARE_ACCOUNT_ID or GitHub Secrets
+# account_id = "YOUR_ACCOUNT_ID_HERE"
+
 # Durable Objects configuration
 # The EvolutionAgent maintains persistent state across invocations
 [durable_objects]

@@ -3,8 +3,7 @@ name: Deploy to Cloudflare Workers
 on:
   push:
     branches:
-      - claude/incomplete-description-011CUutLehm75rEefmt5WYQj
-      - claude/debug-cloudflare-historical-data-011CUqugUynEoovcsiVnoaPB
+      - claude/**  # All Claude branches
       - main
       - master
     paths:
