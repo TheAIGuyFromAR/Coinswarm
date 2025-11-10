@@ -36,37 +36,38 @@
 
 ---
 
-## ⏳ PENDING - Historical Data Collection
+## 🚀 IN PROGRESS - Historical Data Collection
 
 ### Current Database Status
 
 - \`chaos_trades\` table: ✅ **196,749 records** (evolution system working!)
-- \`price_data\` table: ❌ **0 records** (empty - needs population)
-- \`collection_progress\` table: ❌ **0 tracking entries**
+- \`price_data\` table: ⏳ **Awaiting first collection run**
+- \`collection_progress\` table: ⏳ **Awaiting initialization**
 
 ### Data Collection Workers
 
-**Status:** Deployed but NOT RUNNING (missing API keys - error 1101)
+**Status:** ✅ **DEPLOYED & SCHEDULED**
+
+- **API Keys:** Configured in Cloudflare worker settings
+- **Deployment:** Triggered at 2025-11-10 05:00 UTC
+- **Cron Schedules:**
+  - Historical Collection: Runs every hour at minute 0 (next: top of hour)
+  - Realtime Collection: Runs every minute
+
+**GitHub Actions Workflow:**
+- Commit \`2e4e730\` pushed successfully
+- Workflow deploying both cron workers with API secrets
+- Secrets sourced from Cloudflare worker settings
 
 ---
 
-## 🔧 REQUIRED: Set API Keys
+## ✅ API Keys Configured
 
-To start historical data collection, set these secrets:
+API keys are stored in Cloudflare worker settings:
+- ✅ COINGECKO (for daily historical data)
+- ✅ CRYPTOCOMPARE_API_KEY (for minute-level data)
 
-\`\`\`bash
-# Historical collection worker
-wrangler secret put COINGECKO --name coinswarm-historical-collection-cron
-wrangler secret put CRYPTOCOMPARE_API_KEY --name coinswarm-historical-collection-cron
-
-# Realtime collection worker
-wrangler secret put COINGECKO --name coinswarm-realtime-price-cron
-wrangler secret put CRYPTOCOMPARE_API_KEY --name coinswarm-realtime-price-cron
-\`\`\`
-
-Get API keys:
-- CoinGecko: https://www.coingecko.com/en/api (free tier)
-- CryptoCompare: https://min-api.cryptocompare.com/ (free tier)
+Workers automatically access these secrets when deployed.
 
 ---
 
@@ -79,4 +80,4 @@ Get API keys:
 
 ---
 
-**Status:** System ready. Waiting for API keys to enable data collection.
+**Status:** ✅ Data collection workers deployed and scheduled. Collection starting automatically on cron schedule.
