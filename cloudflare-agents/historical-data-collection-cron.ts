@@ -234,6 +234,15 @@ export default {
       `).run();
 
       await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS worker_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          timestamp INTEGER DEFAULT (unixepoch()),
+          level TEXT,
+          message TEXT
+        )
+      `).run();
+
+      await env.DB.prepare(`
         INSERT INTO cron_heartbeat (worker_name, message)
         VALUES (?, ?)
       `).bind('historical-collection', 'Cron executed successfully').run();
@@ -242,6 +251,19 @@ export default {
     } catch (error) {
       console.error('❌ Heartbeat failed:', error);
     }
+
+    // Helper to log to database
+    const dbLog = async (level: string, message: string) => {
+      try {
+        await env.DB.prepare(`
+          INSERT INTO worker_logs (level, message) VALUES (?, ?)
+        `).bind(level, message).run();
+      } catch (e) {
+        console.error('Failed to write log:', e);
+      }
+    };
+
+    await dbLog('INFO', 'Starting collection cycle');
 
     // Initialize tables
     await env.DB.prepare(`
@@ -298,13 +320,34 @@ export default {
     }
 
     // Run all three collectors in parallel (ONE iteration each to stay under subrequest limit)
-    await Promise.all([
-      this.runMinuteCollection(env),
-      this.runDailyCollection(env),
-      this.runHourlyCollection(env)
-    ]);
+    try {
+      await dbLog('INFO', 'Calling collectors...');
+      const results = await Promise.allSettled([
+        this.runMinuteCollection(env),
+        this.runDailyCollection(env),
+        this.runHourlyCollection(env)
+      ]);
 
-    console.log('✅ Collection cycle complete. Next run will continue from here.');
+      // Log results
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        const names = ['Minute', 'Daily', 'Hourly'];
+        if (result.status === 'rejected') {
+          await dbLog('ERROR', `${names[i]} collection FAILED: ${result.reason}`);
+          console.error(`❌ ${names[i]} collection FAILED:`, result.reason);
+        } else {
+          await dbLog('INFO', `${names[i]} collection completed`);
+          console.log(`✅ ${names[i]} collection completed`);
+        }
+      }
+
+      await dbLog('INFO', 'Collection cycle complete');
+      console.log('✅ Collection cycle complete. Next run will continue from here.');
+    } catch (error) {
+      await dbLog('FATAL', `Collection cycle failed: ${error}`);
+      console.error('❌ FATAL: Collection cycle failed:', error);
+      throw error;
+    }
   },
 
   /**
@@ -312,16 +355,34 @@ export default {
    * Uses CryptoCompare to fetch minute candles working backwards from now
    */
   async runMinuteCollection(env: Env) {
+    console.log('🔵 runMinuteCollection START');
+
     if (!env.CRYPTOCOMPARE_API_KEY) {
       console.warn('⚠️ CRYPTOCOMPARE_API_KEY not set, skipping minute collection');
       return;
     }
 
+    console.log('🔵 CryptoCompare API key found, creating client');
     const client = new CryptoCompareClient(env.CRYPTOCOMPARE_API_KEY);
 
     // Get next token for minute data collection (ONE token per cron run)
+    console.log('🔵 Querying for next token...');
     const token = await env.DB.prepare(`
-      SELECT * FROM collection_progress
+      SELECT
+        symbol, coin_id as coinId,
+        minutes_collected as minutesCollected,
+        days_collected as daysCollected,
+        hours_collected as hoursCollected,
+        total_minutes as totalMinutes,
+        total_days as totalDays,
+        total_hours as totalHours,
+        daily_status as dailyStatus,
+        minute_status as minuteStatus,
+        hourly_status as hourlyStatus,
+        error_count as errorCount,
+        last_error as lastError,
+        last_minute_timestamp as lastMinuteTimestamp
+      FROM collection_progress
       WHERE minute_status NOT IN ('completed', 'paused')
       ORDER BY minutes_collected ASC
       LIMIT 1
@@ -336,6 +397,8 @@ export default {
       `).run();
       return;
     }
+
+    console.log(`🔵 Processing token: ${token.symbol}`);
 
     try {
       const minutesToFetch = Math.min(MINUTES_PER_RUN, token.totalMinutes - token.minutesCollected);
@@ -353,7 +416,17 @@ export default {
         : Math.floor(Date.now() / 1000);
 
       console.log(`📊 Fetching ${minutesToFetch} minutes for ${token.symbol} (minute data)`);
+
+      // Log to database before API call
+      await env.DB.prepare(`INSERT INTO worker_logs (level, message) VALUES (?, ?)`).bind(
+        'DEBUG', `Minute: Fetching ${minutesToFetch} for ${token.symbol}, toTs=${toTs}`
+      ).run();
+
       const candles = await client.fetchHistoMinute(token.symbol, minutesToFetch, toTs);
+
+      await env.DB.prepare(`INSERT INTO worker_logs (level, message) VALUES (?, ?)`).bind(
+        'DEBUG', `Minute: Got ${candles.length} candles for ${token.symbol}`
+      ).run();
 
       if (candles.length === 0) {
         console.log(`⚠️ No minute data returned for ${token.symbol}`);
@@ -424,11 +497,27 @@ export default {
    * Uses CoinGecko for daily candles
    */
   async runDailyCollection(env: Env) {
+    console.log('🟢 runDailyCollection START');
+    console.log(`🟢 CoinGecko API key: ${env.COINGECKO ? 'SET' : 'NOT SET'}`);
     const coinGeckoClient = new CoinGeckoClient(env.COINGECKO);
 
     // Get next token for daily data (ONE token per cron run)
+    console.log('🟢 Querying for next token...');
     const token = await env.DB.prepare(`
-      SELECT * FROM collection_progress
+      SELECT
+        symbol, coin_id as coinId,
+        minutes_collected as minutesCollected,
+        days_collected as daysCollected,
+        hours_collected as hoursCollected,
+        total_minutes as totalMinutes,
+        total_days as totalDays,
+        total_hours as totalHours,
+        daily_status as dailyStatus,
+        minute_status as minuteStatus,
+        hourly_status as hourlyStatus,
+        error_count as errorCount,
+        last_error as lastError
+      FROM collection_progress
       WHERE daily_status NOT IN ('completed', 'paused')
       ORDER BY days_collected ASC
       LIMIT 1
@@ -438,6 +527,8 @@ export default {
       console.log('✅ All daily data collected!');
       return;
     }
+
+    console.log(`🟢 Processing token: ${token.symbol}`);
 
     try {
       const daysToFetch = Math.min(DAYS_PER_RUN, token.totalDays - token.daysCollected);
@@ -450,7 +541,16 @@ export default {
       }
 
       console.log(`📅 Fetching ${daysToFetch} days for ${token.symbol} (daily data)`);
+
+      await env.DB.prepare(`INSERT INTO worker_logs (level, message) VALUES (?, ?)`).bind(
+        'DEBUG', `Daily: Fetching ${daysToFetch} days for ${token.symbol} (${token.coinId})`
+      ).run();
+
       const candles = await coinGeckoClient.fetchOHLC(token.coinId, daysToFetch);
+
+      await env.DB.prepare(`INSERT INTO worker_logs (level, message) VALUES (?, ?)`).bind(
+        'DEBUG', `Daily: Got ${candles.length} candles for ${token.symbol}`
+      ).run();
 
       for (const candle of candles) {
         await env.DB.prepare(`
@@ -501,11 +601,26 @@ export default {
    * Uses Binance.US for fast, reliable hourly klines
    */
   async runHourlyCollection(env: Env) {
+    console.log('🟠 runHourlyCollection START');
     const client = new BinanceClient();
 
     // Get next token for hourly data (ONE token per cron run)
+    console.log('🟠 Querying for next token...');
     const token = await env.DB.prepare(`
-      SELECT * FROM collection_progress
+      SELECT
+        symbol, coin_id as coinId,
+        minutes_collected as minutesCollected,
+        days_collected as daysCollected,
+        hours_collected as hoursCollected,
+        total_minutes as totalMinutes,
+        total_days as totalDays,
+        total_hours as totalHours,
+        daily_status as dailyStatus,
+        minute_status as minuteStatus,
+        hourly_status as hourlyStatus,
+        error_count as errorCount,
+        last_error as lastError
+      FROM collection_progress
       WHERE hourly_status NOT IN ('completed', 'paused')
       ORDER BY hours_collected ASC
       LIMIT 1
@@ -515,6 +630,8 @@ export default {
       console.log('✅ All hourly data collected!');
       return;
     }
+
+    console.log(`🟠 Processing token: ${token.symbol}`);
 
     try {
       const hoursToFetch = Math.min(HOURS_PER_RUN, token.totalHours - token.hoursCollected);
@@ -533,7 +650,15 @@ export default {
         ? Date.now()
         : Date.now() - (token.hoursCollected * 60 * 60 * 1000);
 
+      await env.DB.prepare(`INSERT INTO worker_logs (level, message) VALUES (?, ?)`).bind(
+        'DEBUG', `Hourly: Fetching ${hoursToFetch} hours for ${token.symbol}, endTime=${endTime}`
+      ).run();
+
       const candles = await client.fetchKlines(token.symbol, hoursToFetch, endTime);
+
+      await env.DB.prepare(`INSERT INTO worker_logs (level, message) VALUES (?, ?)`).bind(
+        'DEBUG', `Hourly: Got ${candles.length} candles for ${token.symbol}`
+      ).run();
 
       for (const candle of candles) {
         await env.DB.prepare(`
