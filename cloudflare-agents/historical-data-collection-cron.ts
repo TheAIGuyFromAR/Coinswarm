@@ -220,7 +220,28 @@ class BinanceClient {
 
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    console.log('⏰ Starting multi-timeframe collection... (v2.0)');
+    console.log('⏰ Starting multi-timeframe collection... (v3.0)');
+
+    // Write heartbeat to verify cron is executing
+    try {
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS cron_heartbeat (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          worker_name TEXT,
+          executed_at INTEGER DEFAULT (unixepoch()),
+          message TEXT
+        )
+      `).run();
+
+      await env.DB.prepare(`
+        INSERT INTO cron_heartbeat (worker_name, message)
+        VALUES (?, ?)
+      `).bind('historical-collection', 'Cron executed successfully').run();
+
+      console.log('✅ Heartbeat written');
+    } catch (error) {
+      console.error('❌ Heartbeat failed:', error);
+    }
 
     // Initialize tables
     await env.DB.prepare(`
@@ -276,30 +297,18 @@ export default {
       `).bind(token.symbol, token.coinId, totalMinutes, totalDays, totalHours).run();
     }
 
-    // Run all three collectors in parallel
-    ctx.waitUntil(Promise.all([
+    // Run all three collectors in parallel (ONE iteration each to stay under subrequest limit)
+    await Promise.all([
       this.runMinuteCollection(env),
       this.runDailyCollection(env),
       this.runHourlyCollection(env)
-    ]).then(async () => {
-      // After data collection, trigger technical indicators calculation
-      try {
-        console.log('📊 Triggering technical indicators calculation...');
-        const indicatorsUrl = 'https://coinswarm-technical-indicators.bamn86.workers.dev/calculate';
-        const response = await fetch(indicatorsUrl, { method: 'POST' });
-        if (response.ok) {
-          console.log('✅ Technical indicators triggered successfully');
-        } else {
-          console.warn(`⚠️ Technical indicators trigger failed: ${response.status}`);
-        }
-      } catch (error) {
-        console.error('❌ Failed to trigger technical indicators:', error);
-      }
-    }));
+    ]);
+
+    console.log('✅ Collection cycle complete. Next run will continue from here.');
   },
 
   /**
-   * Continuous minute-level data collection (runs forever)
+   * Minute-level data collection (processes ONE token per execution)
    * Uses CryptoCompare to fetch minute candles working backwards from now
    */
   async runMinuteCollection(env: Env) {
@@ -310,279 +319,265 @@ export default {
 
     const client = new CryptoCompareClient(env.CRYPTOCOMPARE_API_KEY);
 
-    while (true) {
-      // Get next token for minute data collection
-      const token = await env.DB.prepare(`
-        SELECT * FROM collection_progress
-        WHERE minute_status NOT IN ('completed', 'paused')
-        ORDER BY minutes_collected ASC
-        LIMIT 1
-      `).first<CollectionProgress>();
+    // Get next token for minute data collection (ONE token per cron run)
+    const token = await env.DB.prepare(`
+      SELECT * FROM collection_progress
+      WHERE minute_status NOT IN ('completed', 'paused')
+      ORDER BY minutes_collected ASC
+      LIMIT 1
+    `).first<CollectionProgress>();
 
-      if (!token) {
-        console.log('✅ All minute data collected! Restarting from beginning...');
-        // Reset all tokens to continue collecting forever
+    if (!token) {
+      console.log('✅ All minute data collected! Restarting from beginning...');
+      // Reset all tokens to continue collecting forever
+      await env.DB.prepare(`
+        UPDATE collection_progress
+        SET minute_status = 'pending', minutes_collected = 0, last_minute_timestamp = NULL
+      `).run();
+      return;
+    }
+
+    try {
+      const minutesToFetch = Math.min(MINUTES_PER_RUN, token.totalMinutes - token.minutesCollected);
+
+      if (minutesToFetch <= 0) {
         await env.DB.prepare(`
-          UPDATE collection_progress
-          SET minute_status = 'pending', minutes_collected = 0, last_minute_timestamp = NULL
-        `).run();
-        continue;
+          UPDATE collection_progress SET minute_status = 'completed' WHERE symbol = ?
+        `).bind(token.symbol).run();
+        return;
       }
 
-      try {
-        const minutesToFetch = Math.min(MINUTES_PER_RUN, token.totalMinutes - token.minutesCollected);
+      // Work backwards from the last timestamp we collected (or now if first run)
+      const toTs = token.lastMinuteTimestamp
+        ? token.lastMinuteTimestamp / 1000
+        : Math.floor(Date.now() / 1000);
 
-        if (minutesToFetch <= 0) {
-          await env.DB.prepare(`
-            UPDATE collection_progress SET minute_status = 'completed' WHERE symbol = ?
-          `).bind(token.symbol).run();
-          continue;
-        }
+      console.log(`📊 Fetching ${minutesToFetch} minutes for ${token.symbol} (minute data)`);
+      const candles = await client.fetchHistoMinute(token.symbol, minutesToFetch, toTs);
 
-        // Work backwards from the last timestamp we collected (or now if first run)
-        const toTs = token.lastMinuteTimestamp
-          ? token.lastMinuteTimestamp / 1000
-          : Math.floor(Date.now() / 1000);
-
-        console.log(`📊 Fetching ${minutesToFetch} minutes for ${token.symbol} (minute data)`);
-        const candles = await client.fetchHistoMinute(token.symbol, minutesToFetch, toTs);
-
-        if (candles.length === 0) {
-          console.log(`⚠️ No minute data returned for ${token.symbol}`);
-          await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
-          continue;
-        }
-
-        // Insert candles
-        for (const candle of candles) {
-          await env.DB.prepare(`
-            INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, volume_from, volume_to, source)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).bind(
-            token.symbol,
-            Math.floor(candle.timestamp / 1000),
-            '1m',
-            candle.open,
-            candle.high,
-            candle.low,
-            candle.close,
-            candle.volumeFrom,
-            candle.volumeTo,
-            'cryptocompare'
-          ).run();
-        }
-
-        // Update progress - track the oldest timestamp we've collected
-        const oldestTimestamp = Math.min(...candles.map(c => c.timestamp));
-        const newMinutes = token.minutesCollected + candles.length;
-
-        await env.DB.prepare(`
-          UPDATE collection_progress
-          SET minutes_collected = ?,
-              last_minute_timestamp = ?,
-              minute_status = ?,
-              error_count = 0,
-              last_error = NULL
-          WHERE symbol = ?
-        `).bind(
-          newMinutes,
-          oldestTimestamp,
-          newMinutes >= token.totalMinutes ? 'completed' : 'pending',
-          token.symbol
-        ).run();
-
-        console.log(`✅ ${token.symbol}: ${newMinutes}/${token.totalMinutes} minutes (${Math.round(newMinutes/token.totalMinutes*100)}%)`);
-
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        const newErrorCount = (token.errorCount || 0) + 1;
-
-        await env.DB.prepare(`
-          UPDATE collection_progress
-          SET minute_status = ?, error_count = ?, last_error = ?
-          WHERE symbol = ?
-        `).bind(
-          newErrorCount >= 3 ? 'paused' : 'pending',
-          newErrorCount,
-          errorMsg.substring(0, 500),
-          token.symbol
-        ).run();
-
-        console.error(`❌ ${token.symbol} minute error (${newErrorCount}/3): ${errorMsg}`);
+      if (candles.length === 0) {
+        console.log(`⚠️ No minute data returned for ${token.symbol}`);
+        return;
       }
 
-      // Rate limiting
-      await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
+      // Insert candles
+      for (const candle of candles) {
+        await env.DB.prepare(`
+          INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, volume_from, volume_to, source)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          token.symbol,
+          Math.floor(candle.timestamp / 1000),
+          '1m',
+          candle.open,
+          candle.high,
+          candle.low,
+          candle.close,
+          candle.volumeFrom,
+          candle.volumeTo,
+          'cryptocompare'
+        ).run();
+      }
+
+      // Update progress - track the oldest timestamp we've collected
+      const oldestTimestamp = Math.min(...candles.map(c => c.timestamp));
+      const newMinutes = token.minutesCollected + candles.length;
+
+      await env.DB.prepare(`
+        UPDATE collection_progress
+        SET minutes_collected = ?,
+            last_minute_timestamp = ?,
+            minute_status = ?,
+            error_count = 0,
+            last_error = NULL
+        WHERE symbol = ?
+      `).bind(
+        newMinutes,
+        oldestTimestamp,
+        newMinutes >= token.totalMinutes ? 'completed' : 'pending',
+        token.symbol
+      ).run();
+
+      console.log(`✅ ${token.symbol}: ${newMinutes}/${token.totalMinutes} minutes (${Math.round(newMinutes/token.totalMinutes*100)}%)`);
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const newErrorCount = (token.errorCount || 0) + 1;
+
+      await env.DB.prepare(`
+        UPDATE collection_progress
+        SET minute_status = ?, error_count = ?, last_error = ?
+        WHERE symbol = ?
+      `).bind(
+        newErrorCount >= 3 ? 'paused' : 'pending',
+        newErrorCount,
+        errorMsg.substring(0, 500),
+        token.symbol
+      ).run();
+
+      console.error(`❌ ${token.symbol} minute error (${newErrorCount}/3): ${errorMsg}`);
     }
   },
 
   /**
-   * Daily data collection (until 5 years complete)
+   * Daily data collection (processes ONE token per execution)
    * Uses CoinGecko for daily candles
    */
   async runDailyCollection(env: Env) {
     const coinGeckoClient = new CoinGeckoClient(env.COINGECKO);
 
-    while (true) {
-      // Get next token for daily data
-      const token = await env.DB.prepare(`
-        SELECT * FROM collection_progress
-        WHERE daily_status NOT IN ('completed', 'paused')
-        ORDER BY days_collected ASC
-        LIMIT 1
-      `).first<CollectionProgress>();
+    // Get next token for daily data (ONE token per cron run)
+    const token = await env.DB.prepare(`
+      SELECT * FROM collection_progress
+      WHERE daily_status NOT IN ('completed', 'paused')
+      ORDER BY days_collected ASC
+      LIMIT 1
+    `).first<CollectionProgress>();
 
-      if (!token) {
-        console.log('✅ All daily data collected!');
+    if (!token) {
+      console.log('✅ All daily data collected!');
+      return;
+    }
+
+    try {
+      const daysToFetch = Math.min(DAYS_PER_RUN, token.totalDays - token.daysCollected);
+
+      if (daysToFetch <= 0) {
+        await env.DB.prepare(`
+          UPDATE collection_progress SET daily_status = 'completed' WHERE symbol = ?
+        `).bind(token.symbol).run();
         return;
       }
 
-      try {
-        const daysToFetch = Math.min(DAYS_PER_RUN, token.totalDays - token.daysCollected);
+      console.log(`📅 Fetching ${daysToFetch} days for ${token.symbol} (daily data)`);
+      const candles = await coinGeckoClient.fetchOHLC(token.coinId, daysToFetch);
 
-        if (daysToFetch <= 0) {
-          await env.DB.prepare(`
-            UPDATE collection_progress SET daily_status = 'completed' WHERE symbol = ?
-          `).bind(token.symbol).run();
-          continue;
-        }
-
-        console.log(`📅 Fetching ${daysToFetch} days for ${token.symbol} (daily data)`);
-        const candles = await coinGeckoClient.fetchOHLC(token.coinId, daysToFetch);
-
-        for (const candle of candles) {
-          await env.DB.prepare(`
-            INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, source)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          `).bind(
-            token.symbol,
-            Math.floor(candle.timestamp / 1000),
-            '1d',
-            candle.open,
-            candle.high,
-            candle.low,
-            candle.close,
-            'coingecko'
-          ).run();
-        }
-
-        const newDays = token.daysCollected + daysToFetch;
+      for (const candle of candles) {
         await env.DB.prepare(`
-          UPDATE collection_progress
-          SET days_collected = ?, daily_status = ?, error_count = 0, last_error = NULL
-          WHERE symbol = ?
-        `).bind(newDays, newDays >= token.totalDays ? 'completed' : 'pending', token.symbol).run();
-
-        console.log(`✅ ${token.symbol}: ${newDays}/${token.totalDays} days (${Math.round(newDays/token.totalDays*100)}%)`);
-
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        const newErrorCount = (token.errorCount || 0) + 1;
-
-        await env.DB.prepare(`
-          UPDATE collection_progress
-          SET daily_status = ?, error_count = ?, last_error = ?
-          WHERE symbol = ?
+          INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, source)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
-          newErrorCount >= 3 ? 'paused' : 'pending',
-          newErrorCount,
-          errorMsg.substring(0, 500),
-          token.symbol
+          token.symbol,
+          Math.floor(candle.timestamp / 1000),
+          '1d',
+          candle.open,
+          candle.high,
+          candle.low,
+          candle.close,
+          'coingecko'
         ).run();
-
-        console.error(`❌ ${token.symbol} daily error (${newErrorCount}/3): ${errorMsg}`);
       }
 
-      // Rate limiting
-      await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
+      const newDays = token.daysCollected + daysToFetch;
+      await env.DB.prepare(`
+        UPDATE collection_progress
+        SET days_collected = ?, daily_status = ?, error_count = 0, last_error = NULL
+        WHERE symbol = ?
+      `).bind(newDays, newDays >= token.totalDays ? 'completed' : 'pending', token.symbol).run();
+
+      console.log(`✅ ${token.symbol}: ${newDays}/${token.totalDays} days (${Math.round(newDays/token.totalDays*100)}%)`);
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const newErrorCount = (token.errorCount || 0) + 1;
+
+      await env.DB.prepare(`
+        UPDATE collection_progress
+        SET daily_status = ?, error_count = ?, last_error = ?
+        WHERE symbol = ?
+      `).bind(
+        newErrorCount >= 3 ? 'paused' : 'pending',
+        newErrorCount,
+        errorMsg.substring(0, 500),
+        token.symbol
+      ).run();
+
+      console.error(`❌ ${token.symbol} daily error (${newErrorCount}/3): ${errorMsg}`);
     }
   },
 
   /**
-   * Hourly data collection (runs in parallel with daily)
+   * Hourly data collection (processes ONE token per execution)
    * Uses Binance.US for fast, reliable hourly klines
    */
   async runHourlyCollection(env: Env) {
     const client = new BinanceClient();
-    while (true) {
-      const token = await env.DB.prepare(`
-        SELECT * FROM collection_progress
-        WHERE hourly_status NOT IN ('completed', 'paused')
-        ORDER BY hours_collected ASC
-        LIMIT 1
-      `).first<CollectionProgress>();
 
-      if (!token) {
-        console.log('✅ All hourly data collected!');
+    // Get next token for hourly data (ONE token per cron run)
+    const token = await env.DB.prepare(`
+      SELECT * FROM collection_progress
+      WHERE hourly_status NOT IN ('completed', 'paused')
+      ORDER BY hours_collected ASC
+      LIMIT 1
+    `).first<CollectionProgress>();
+
+    if (!token) {
+      console.log('✅ All hourly data collected!');
+      return;
+    }
+
+    try {
+      const hoursToFetch = Math.min(HOURS_PER_RUN, token.totalHours - token.hoursCollected);
+
+      if (hoursToFetch <= 0) {
+        await env.DB.prepare(`
+          UPDATE collection_progress SET hourly_status = 'completed' WHERE symbol = ?
+        `).bind(token.symbol).run();
         return;
       }
 
-      try {
-        const hoursToFetch = Math.min(HOURS_PER_RUN, token.totalHours - token.hoursCollected);
+      console.log(`⏰ Fetching ${hoursToFetch} hours for ${token.symbol} (hourly data)`);
 
-        if (hoursToFetch <= 0) {
-          await env.DB.prepare(`
-            UPDATE collection_progress SET hourly_status = 'completed' WHERE symbol = ?
-          `).bind(token.symbol).run();
-          continue;
-        }
+      // Calculate endTime for fetching backwards
+      const endTime = token.hoursCollected === 0
+        ? Date.now()
+        : Date.now() - (token.hoursCollected * 60 * 60 * 1000);
 
-        console.log(`⏰ Fetching ${hoursToFetch} hours for ${token.symbol} (hourly data)`);
+      const candles = await client.fetchKlines(token.symbol, hoursToFetch, endTime);
 
-        // Calculate endTime for fetching backwards
-        const endTime = token.hoursCollected === 0
-          ? Date.now()
-          : Date.now() - (token.hoursCollected * 60 * 60 * 1000);
-
-        const candles = await client.fetchKlines(token.symbol, hoursToFetch, endTime);
-
-        for (const candle of candles) {
-          await env.DB.prepare(`
-            INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, volume_from, volume_to, source)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).bind(
-            token.symbol,
-            Math.floor(candle.timestamp / 1000),
-            '1h',
-            candle.open,
-            candle.high,
-            candle.low,
-            candle.close,
-            candle.volume,
-            null, // Binance doesn't provide volume_to
-            'binance'
-          ).run();
-        }
-
-        const newHours = token.hoursCollected + candles.length;
+      for (const candle of candles) {
         await env.DB.prepare(`
-          UPDATE collection_progress
-          SET hours_collected = ?, hourly_status = ?, error_count = 0, last_error = NULL
-          WHERE symbol = ?
-        `).bind(newHours, newHours >= token.totalHours ? 'completed' : 'pending', token.symbol).run();
-
-        console.log(`✅ ${token.symbol}: ${newHours}/${token.totalHours} hours (${Math.round(newHours/token.totalHours*100)}%)`);
-
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        const newErrorCount = (token.errorCount || 0) + 1;
-
-        await env.DB.prepare(`
-          UPDATE collection_progress
-          SET hourly_status = ?, error_count = ?, last_error = ?
-          WHERE symbol = ?
+          INSERT OR IGNORE INTO price_data (symbol, timestamp, timeframe, open, high, low, close, volume_from, volume_to, source)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
-          newErrorCount >= 3 ? 'paused' : 'pending',
-          newErrorCount,
-          errorMsg.substring(0, 500),
-          token.symbol
+          token.symbol,
+          Math.floor(candle.timestamp / 1000),
+          '1h',
+          candle.open,
+          candle.high,
+          candle.low,
+          candle.close,
+          candle.volume,
+          null, // Binance doesn't provide volume_to
+          'binance'
         ).run();
-
-        console.error(`❌ ${token.symbol} hourly error (${newErrorCount}/3): ${errorMsg}`);
       }
 
-      // Binance.US rate limiting (much faster than CoinGecko/CryptoCompare)
-      await new Promise(resolve => setTimeout(resolve, BINANCE_RATE_LIMIT_MS));
+      const newHours = token.hoursCollected + candles.length;
+      await env.DB.prepare(`
+        UPDATE collection_progress
+        SET hours_collected = ?, hourly_status = ?, error_count = 0, last_error = NULL
+        WHERE symbol = ?
+      `).bind(newHours, newHours >= token.totalHours ? 'completed' : 'pending', token.symbol).run();
+
+      console.log(`✅ ${token.symbol}: ${newHours}/${token.totalHours} hours (${Math.round(newHours/token.totalHours*100)}%)`);
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const newErrorCount = (token.errorCount || 0) + 1;
+
+      await env.DB.prepare(`
+        UPDATE collection_progress
+        SET hourly_status = ?, error_count = ?, last_error = ?
+        WHERE symbol = ?
+      `).bind(
+        newErrorCount >= 3 ? 'paused' : 'pending',
+        newErrorCount,
+        errorMsg.substring(0, 500),
+        token.symbol
+      ).run();
+
+      console.error(`❌ ${token.symbol} hourly error (${newErrorCount}/3): ${errorMsg}`);
     }
   },
 
