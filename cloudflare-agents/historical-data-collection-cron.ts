@@ -7,6 +7,8 @@
  * 3. Binance.US: Hourly data until 5 years complete (fastest source)
  *
  * Rate limiting at 56.25% of max (75% then 25% slower = 56.25%)
+ *
+ * Requires secrets: COINGECKO, CRYPTOCOMPARE_API_KEY (deployed via GitHub Actions)
  */
 
 interface Env {
