@@ -879,13 +879,63 @@ export class EvolutionAgent implements DurableObject {
   }
 
   /**
+   * Validate that historical data exists before generating trades
+   * Returns true only if sufficient real historical data is available
+   */
+  private async validateHistoricalDataExists(): Promise<boolean> {
+    try {
+      if (!this.env.DB) {
+        this.log('❌ D1 database binding not found');
+        return false;
+      }
+
+      // Check if price_data table has any records
+      const result = await this.env.DB.prepare(
+        'SELECT COUNT(*) as count FROM price_data'
+      ).first<{ count: number }>();
+
+      const recordCount = result?.count || 0;
+      const minRequiredRecords = 1000; // Minimum records needed for meaningful chaos trading
+
+      if (recordCount === 0) {
+        this.log('🚫 CHAOS TRADING BLOCKED: No historical data in price_data table');
+        this.log('📊 Historical data collection must run first before chaos trading can begin');
+        this.log('💡 The data collection cron workers will populate this automatically');
+        return false;
+      }
+
+      if (recordCount < minRequiredRecords) {
+        this.log(`⚠️  CHAOS TRADING PAUSED: Only ${recordCount} historical records (need ${minRequiredRecords})`);
+        this.log('📊 Waiting for more historical data to accumulate...');
+        return false;
+      }
+
+      this.log(`✅ Historical data validation passed: ${recordCount.toLocaleString()} records available`);
+      return true;
+
+    } catch (error) {
+      this.log(`❌ Failed to validate historical data: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  }
+
+  /**
    * Generate historical trades with realistic price movements
    * - Random entry times over past 30 days
    * - Random hold durations (1 min to 24 hours)
    * - Trend-based price movements with volatility
+   *
+   * IMPORTANT: Only generates trades if REAL historical data exists in the database
    */
   async generateHistoricalTrades(count: number): Promise<number> {
     this.log(`Generating ${count} chaos trades using REAL historical data...`);
+
+    // CRITICAL: Validate that historical data exists before proceeding
+    const hasHistoricalData = await this.validateHistoricalDataExists();
+    if (!hasHistoricalData) {
+      this.log('🛑 Chaos trading skipped - waiting for historical data collection to run');
+      return 0; // Return 0 trades generated, don't throw error
+    }
 
     // Fetch current sentiment data (optional, for pattern discovery)
     const sentimentData = await this.fetchSentimentData();
