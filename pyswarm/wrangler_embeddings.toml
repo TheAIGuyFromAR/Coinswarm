@@ -42,10 +42,23 @@ index_name = "pyswarm-time-periods"
 #      --metric=cosine \
 #      --description="Time period embeddings for similarity search (optimized for speed)"
 #
-# 2. Deploy the worker:
+# 2. Create metadata indexes (BEFORE inserting vectors!):
+#    wrangler vectorize create-metadata-index pyswarm-time-periods \
+#      --property-name=timestamp \
+#      --type=number
+#
+#    wrangler vectorize create-metadata-index pyswarm-time-periods \
+#      --property-name=sentiment_score \
+#      --type=number
+#
+#    wrangler vectorize create-metadata-index pyswarm-time-periods \
+#      --property-name=market_phase \
+#      --type=string
+#
+# 3. Deploy the worker:
 #    wrangler deploy --config pyswarm/wrangler_embeddings.toml
 #
-# 3. Test the worker:
+# 4. Test the worker:
 #    curl https://pyswarm-embeddings.YOUR_SUBDOMAIN.workers.dev/health
 #
 # ============================================================================
