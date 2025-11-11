@@ -12,7 +12,7 @@ database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
 
 # Cron trigger - runs 24/7 every hour (75% of monthly rate limit)
 [triggers]
-crons = ["0 * * * *"]  # Every hour at minute 0 - runs 24/7
+crons = ["0 * * * *"]  # Every hour at minute 0
 
 # Environment variables
 [vars]
