@@ -1,0 +1,3 @@
+# Automated Data Pipeline Setup
+<!-- Cleared: Content moved to Development_strategies.md -->
+...existing content from AUTOMATED_DATA_PIPELINE_SETUP.md...

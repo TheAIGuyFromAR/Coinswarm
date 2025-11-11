@@ -1,0 +1,11 @@
+[project]
+name = "coinswarm-historical-worker"
+version = "0.1.0"
+description = "Cloudflare Worker for ingesting historical crypto data into D1"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx"
+]
+
+[dependency-groups]
+dev = ["workers-py"]

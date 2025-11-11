@@ -1,0 +1,3 @@
+# Cloudflare Token Permissions
+
+...existing content from CLOUDFLARE_TOKEN_PERMISSIONS.md...

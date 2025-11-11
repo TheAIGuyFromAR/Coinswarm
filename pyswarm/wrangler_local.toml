@@ -1,0 +1,15 @@
+# Wrangler configuration for local D1 testing (Python worker)
+
+name = "coinswarm-local-pyswarm"
+main = "pyswarm/worker.py"
+compatibility_date = "2025-11-10"
+
+# D1 Database binding for local development
+[[d1_databases]]
+binding = "DB"
+name = "history"
+database_id = ""
+
+# Environment variables
+[vars]
+# Add any local environment variables here

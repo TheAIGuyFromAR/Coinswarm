@@ -1,0 +1,3 @@
+# Network Limitations Summary
+
+...existing content from NETWORK_LIMITATIONS_SUMMARY.md...

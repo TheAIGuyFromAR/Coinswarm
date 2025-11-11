@@ -1,0 +1,3 @@
+# Detailed Issues by File
+
+...existing content from DETAILED_ISSUES_BY_FILE.md...
