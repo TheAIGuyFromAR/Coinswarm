@@ -4,10 +4,10 @@
 
 ## TL;DR
 
-- **What**: Find historical time periods similar to current market conditions in 2-5ms
+- **What**: Find historical time periods similar to current market conditions in 30-60ms
 - **Why**: Help AI agents identify patterns by matching current setups to past scenarios
 - **How**: Embed market snapshots (news + sentiment + technicals) into 384-dim vectors, store in Vectorize, query by similarity
-- **Speed**: 2-5ms per query, returns timestamps + full metadata instantly
+- **Speed**: 30-60ms per query (median ~40ms), returns timestamps + full metadata in one operation
 - **Cost**: ~$1-5/month for typical usage
 
 ## The Problem This Solves
@@ -185,10 +185,11 @@ Vectorize → Get similar vectors + metadata + timestamps
 
 ### Performance Numbers
 
-**Query Latency**:
-- p50: **2-3ms** ✨
-- p95: 5-8ms
-- p99: 10-15ms
+**Query Latency** (based on Cloudflare benchmarks):
+- p50 (median): **30-40ms** ✨
+- p95: 50-80ms (estimated)
+- p99: 80-120ms (estimated)
+- Note: With warm cache, 384 dims (faster than Cloudflare's 768-1536 dim benchmarks)
 
 **Throughput**:
 - **1000+ queries/second** per worker

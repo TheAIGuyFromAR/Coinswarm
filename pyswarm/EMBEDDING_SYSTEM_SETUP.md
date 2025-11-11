@@ -5,9 +5,10 @@
 This system provides **ultra-fast temporal similarity search** for finding historical market periods similar to current conditions. Optimized for **speed over perfect accuracy**.
 
 ### Performance Targets
-- **Query Speed**: 2-5ms per similarity search
-- **Throughput**: 1000+ queries/second
+- **Query Speed**: 30-60ms per similarity search (median ~40ms)
+- **Throughput**: 20-30 queries/second per worker (Cloudflare benchmark: 300 concurrent)
 - **Cost**: ~$1-5/month for typical usage
+- **Comparison**: 5-10x faster than D1 queries + similarity calculations
 
 ## Architecture
 
@@ -154,10 +155,12 @@ asyncio.run(find_similar())
 
 ### Performance Benchmarks
 
-**Query Latency** (single similarity search):
-- p50: 2-3ms
-- p95: 5-8ms
-- p99: 10-15ms
+**Query Latency** (single similarity search, based on Cloudflare official benchmarks):
+- p50 (median): 30-40ms (warm cache)
+- p95: 50-80ms (estimated)
+- p99: 80-120ms (estimated)
+- Cold cache: 50-150ms
+- Note: 384 dims may be faster than Cloudflare's 768-1536 dim benchmarks
 
 **Throughput**:
 - 1000+ queries/second per worker
