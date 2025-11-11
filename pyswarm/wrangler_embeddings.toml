@@ -1,0 +1,121 @@
+# Wrangler configuration for Embedding Worker
+# Provides AI embeddings generation and Vectorize storage for time period similarity search
+
+name = "pyswarm-embeddings"
+main = "embedding_worker.ts"
+compatibility_date = "2024-11-01"
+
+[vars]
+ENVIRONMENT = "production"
+
+# Workers AI binding for generating embeddings
+# Provides access to embedding models like bge-large-en-v1.5
+[ai]
+binding = "AI"
+
+# Vectorize binding for vector storage and similarity search
+# Note: You need to create the index first with:
+# wrangler vectorize create pyswarm-time-periods --dimensions=384 --metric=cosine
+# Using 384 dimensions (bge-small-en) for SPEED - 3x faster queries than 1024-dim
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "pyswarm-time-periods"
+
+# Optional D1 binding if you want to store metadata alongside vectors
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "coinswarm-evolution"
+# database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
+
+# Routes (uncomment to bind to custom domain)
+# routes = [
+#   { pattern = "embeddings.coinswarm.com/*", zone_name = "coinswarm.com" }
+# ]
+
+# ============================================================================
+# SETUP INSTRUCTIONS
+# ============================================================================
+#
+# 1. Create the Vectorize index (one-time setup):
+#    wrangler vectorize create pyswarm-time-periods \
+#      --dimensions=384 \
+#      --metric=cosine \
+#      --description="Time period embeddings for similarity search (optimized for speed)"
+#
+# 2. Deploy the worker:
+#    wrangler deploy --config pyswarm/wrangler_embeddings.toml
+#
+# 3. Test the worker:
+#    curl https://pyswarm-embeddings.YOUR_SUBDOMAIN.workers.dev/health
+#
+# ============================================================================
+# API ENDPOINTS
+# ============================================================================
+#
+# GET  /health               - Health check
+# GET  /models               - List available embedding models
+# POST /embed                - Generate embeddings
+# POST /embed/snapshot       - Embed time period snapshot
+# POST /search/similar       - Find similar time periods
+#
+# ============================================================================
+# USAGE EXAMPLES
+# ============================================================================
+#
+# Generate single embedding:
+# curl -X POST https://pyswarm-embeddings.YOUR_SUBDOMAIN.workers.dev/embed \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "text": "Bitcoin price surges on institutional buying",
+#     "model": "bge-large-en"
+#   }'
+#
+# Embed time period snapshot:
+# curl -X POST https://pyswarm-embeddings.YOUR_SUBDOMAIN.workers.dev/embed/snapshot \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "timestamp": 1705320000,
+#     "news_summary": "Bitcoin ETF approval drives market rally",
+#     "sentiment_score": 0.75,
+#     "technical_setup": "Bullish momentum with RSI at 65",
+#     "social_summary": "Extremely positive social sentiment",
+#     "market_conditions": "Strong uptrend with high volume",
+#     "store_in_vectorize": true
+#   }'
+#
+# Find similar periods:
+# curl -X POST https://pyswarm-embeddings.YOUR_SUBDOMAIN.workers.dev/search/similar \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "current_snapshot": {
+#       "timestamp": 1731359999,
+#       "news_summary": "Market consolidating after recent gains",
+#       "sentiment_score": 0.45,
+#       "technical_setup": "Bullish divergence on daily chart"
+#     },
+#     "top_k": 5,
+#     "min_similarity": 0.75,
+#     "exclude_recent_days": 30
+#   }'
+#
+# ============================================================================
+# COST ESTIMATION (Cloudflare Workers Paid Plan)
+# ============================================================================
+#
+# Workers AI Embedding Generation:
+# - Free tier: 10,000 neurons per day
+# - Paid: $0.011 per 1,000 neurons
+# - bge-large-en-v1.5 = ~1,000 neurons per request
+# - ~10,000 embeddings/month = ~$0.11/month
+#
+# Vectorize Storage:
+# - Included: 5M queried vector dimensions/month, 10M stored dimensions
+# - 1024-dim vectors: ~9,700 vectors in free tier
+# - Additional: $0.040 per 1M queried dimensions
+#
+# Workers Requests:
+# - Free tier: 100,000 requests/day
+# - Paid: $0.50 per 1M requests beyond free tier
+#
+# Estimated total cost for moderate usage: ~$1-5/month
+#
