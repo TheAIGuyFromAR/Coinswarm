@@ -98,7 +98,7 @@ Documentation = "https://github.com/TheAIGuyFromAR/Coinswarm/tree/main/docs"
 Repository = "https://github.com/TheAIGuyFromAR/Coinswarm"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["pyswarm"]
 
 [tool.setuptools.package-data]
 coinswarm = ["py.typed"]
@@ -153,10 +153,10 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-ra -q --strict-markers --cov=src/coinswarm --cov-report=term-missing"
-testpaths = ["tests"]
+addopts = "-ra -q --strict-markers --cov=pyswarm/coinswarm --cov-report=term-missing"
+testpaths = ["pyswarm/tests"]
 asyncio_mode = "auto"
-pythonpath = ["src"]
+pythonpath = ["pyswarm"]
 markers = [
     "unit: Unit tests (fast, isolated components)",
     "integration: Integration tests (multi-component)",
@@ -166,8 +166,8 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["src/coinswarm"]
-omit = ["tests/*", "**/__init__.py"]
+source = ["pyswarm/coinswarm"]
+omit = ["pyswarm/tests/*", "**/__init__.py"]
 
 [tool.coverage.report]
 exclude_lines = [
