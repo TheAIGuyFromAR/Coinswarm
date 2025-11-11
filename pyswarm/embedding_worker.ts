@@ -73,9 +73,10 @@ const MODELS = {
   }
 };
 
-// Using bge-small-en for SPEED (384 dims vs 1024 dims)
-// 3x faster queries, 3x cheaper, still good semantic understanding
-const DEFAULT_MODEL = "bge-small-en";
+// Using bge-base-en for BALANCED performance (768 dims)
+// Better semantic understanding than small (384), faster than large (1024)
+// Query time: ~50-70ms (perfect for low-frequency, high-accuracy searches)
+const DEFAULT_MODEL = "bge-base-en";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
