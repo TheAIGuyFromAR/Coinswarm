@@ -8,43 +8,39 @@ compatibility_date = "2024-01-01"
 crons = ["*/15 * * * *"]
 
 # D1 Database binding
-[[d1_databases]]
-binding = "DB"
-database_name = "coinswarm-db"
-database_id = "YOUR_D1_DATABASE_ID"  # Replace with your D1 database ID
 
-# Queue producer binding
+# Producer Worker
+name = "historical-data-queue-producer"
+main = "historical-data-queue-producer.ts"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB_PRODUCER"
+database_name = "coinswarm-db"
+database_id = "b37495a5-d7dc-4104-afab-4a9805eb5461"
+
 [[queues.producers]]
 queue = "historical-data-queue"
 binding = "HISTORICAL_DATA_QUEUE"
 
-# API keys for data sources
 [vars]
 COINGECKO = "YOUR_COINGECKO_KEY"
 CRYPTOCOMPARE_API_KEY = "YOUR_CRYPTOCOMPARE_KEY"
 
----
-
-#:schema node_modules/wrangler/config-schema.json
-name = "historical-data-queue-consumer"
-main = "historical-data-queue-consumer.ts"
-compatibility_date = "2024-01-01"
-
-# D1 Database binding
+# Consumer Worker
 [[d1_databases]]
-binding = "DB"
+binding = "DB_CONSUMER"
 database_name = "coinswarm-db"
-database_id = "YOUR_D1_DATABASE_ID"  # Same database
+database_id = "b37495a5-d7dc-4104-afab-4a9805eb5461"
 
-# Queue consumer configuration
 [[queues.consumers]]
 queue = "historical-data-queue"
-max_batch_size = 100           # Process 100 messages at once
-max_batch_timeout = 5          # Wait max 5 seconds for batch
-max_retries = 3                # Retry failed batches 3 times
-dead_letter_queue = "historical-data-dlq"  # Failed messages go here
-max_concurrency = 5            # Run 5 consumer instances in parallel
+max_batch_size = 100
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "historical-data-dlq"
+max_concurrency = 5
 
-# Limits
 [limits]
-cpu_ms = 30000  # 30 seconds CPU time (for large batches)
+cpu_ms = 30000
+

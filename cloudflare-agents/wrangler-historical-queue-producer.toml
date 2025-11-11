@@ -1,0 +1,16 @@
+name = "historical-data-queue-producer"
+main = "historical-data-queue-producer.ts"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB_PRODUCER"
+database_name = "pyswarm-cccagg"
+database_id = "b37495a5-d7dc-4104-afab-4a9805eb5461"
+
+[[queues.producers]]
+queue = "historical-data-queue"
+binding = "HISTORICAL_DATA_QUEUE"
+
+[vars]
+COINGECKO = "YOUR_COINGECKO_KEY"
+CRYPTOCOMPARE_API_KEY = "YOUR_CRYPTOCOMPARE_KEY"
