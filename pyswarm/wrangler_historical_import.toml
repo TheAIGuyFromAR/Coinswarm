@@ -2,9 +2,9 @@ name = "coinswarm-historical-import"
 main = "Data_Import/historical_worker.py"
 compatibility_date = "2025-11-10"
 
-compatibility_flags = ["python_workers"]
+compatibility_flags = ["python_workers", "python_dedicated_snapshots"]
 
 [[d1_databases]]
 binding = "DB"
-name = "history"
+database_name = "history"
 database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"

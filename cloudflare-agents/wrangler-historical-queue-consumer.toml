@@ -1,0 +1,19 @@
+name = "historical-data-queue-consumer"
+main = "historical-data-queue-consumer.ts"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB_CONSUMER"
+database_name = "pyswarm-cccagg"
+database_id = "b37495a5-d7dc-4104-afab-4a9805eb5461"
+
+[[queues.consumers]]
+queue = "historical-data-queue"
+max_batch_size = 100
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "historical-data-dlq"
+max_concurrency = 5
+
+[limits]
+cpu_ms = 30000
