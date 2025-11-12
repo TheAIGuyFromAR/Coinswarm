@@ -22,11 +22,13 @@ interface Env {
 interface HistoricalDataPoint {
   symbol: string;
   timestamp: number;
+  timeframe: string; // '1m', '1h', '1d'
   open: number;
   high: number;
   low: number;
   close: number;
-  volume: number;
+  volumeFrom: number; // Base currency volume
+  volumeTo: number;   // Quote currency volume
   source: 'binance' | 'coingecko' | 'cryptocompare';
 }
 
@@ -38,8 +40,15 @@ export default {
     const dataPoints: HistoricalDataPoint[] = [];
 
     // Extract all data points from messages
+    // Note: Python worker sends arrays of 10 points per message
     for (const message of batch.messages) {
-      dataPoints.push(message.body);
+      const body = message.body;
+      // Handle both single points and arrays of points
+      if (Array.isArray(body)) {
+        dataPoints.push(...body);
+      } else {
+        dataPoints.push(body);
+      }
     }
 
     // Deduplicate by symbol+timestamp (prevent duplicate key errors)
@@ -109,20 +118,22 @@ async function batchInsertToD1(dataPoints: HistoricalDataPoint[], db: D1Database
     for (const batch of batches) {
       const statements = batch.map(point => {
         // Use INSERT OR IGNORE to skip duplicates gracefully
+        // Write to price_data table (where your 200MB data lives!)
         return db.prepare(`
-          INSERT OR IGNORE INTO historical_prices (
-            symbol, timestamp, open, high, low, close, volume, source, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT OR IGNORE INTO price_data (
+            symbol, timestamp, timeframe, open, high, low, close, volume_from, volume_to, source
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           point.symbol,
           point.timestamp,
+          point.timeframe,
           point.open,
           point.high,
           point.low,
           point.close,
-          point.volume,
-          point.source,
-          Date.now()
+          point.volumeFrom,
+          point.volumeTo,
+          point.source
         );
       });
 
@@ -136,8 +147,9 @@ async function batchInsertToD1(dataPoints: HistoricalDataPoint[], db: D1Database
 }
 
 /**
- * Deduplicate data points by symbol+timestamp
+ * Deduplicate data points by symbol+timestamp+timeframe
  * Keeps the most recent source priority: cryptocompare > binance > coingecko
+ * Note: D1 UNIQUE constraint is on (symbol, timestamp, timeframe, source)
  */
 function deduplicateDataPoints(points: HistoricalDataPoint[]): HistoricalDataPoint[] {
   const sourcePriority = { cryptocompare: 3, binance: 2, coingecko: 1 };
@@ -145,7 +157,7 @@ function deduplicateDataPoints(points: HistoricalDataPoint[]): HistoricalDataPoi
   const map = new Map<string, HistoricalDataPoint>();
 
   for (const point of points) {
-    const key = `${point.symbol}-${point.timestamp}`;
+    const key = `${point.symbol}-${point.timestamp}-${point.timeframe}`;
     const existing = map.get(key);
 
     // Keep higher priority source

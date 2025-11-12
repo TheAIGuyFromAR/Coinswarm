@@ -3,15 +3,15 @@ name = "historical-data-queue-producer"
 main = "historical-data-queue-producer.ts"
 compatibility_date = "2024-01-01"
 
-# Run every 15 minutes
+# Run every 30 minutes (optimized to stay within queue limits)
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["*/30 * * * *"]
 
 # D1 Database binding
 [[d1_databases]]
 binding = "DB"
-database_name = "coinswarm-db"
-database_id = "YOUR_D1_DATABASE_ID"  # Replace with your D1 database ID
+database_name = "coinswarm-evolution"
+database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
 
 # Queue producer binding
 [[queues.producers]]
@@ -33,8 +33,8 @@ compatibility_date = "2024-01-01"
 # D1 Database binding
 [[d1_databases]]
 binding = "DB"
-database_name = "coinswarm-db"
-database_id = "YOUR_D1_DATABASE_ID"  # Same database
+database_name = "coinswarm-evolution"
+database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
 
 # Queue consumer configuration
 [[queues.consumers]]

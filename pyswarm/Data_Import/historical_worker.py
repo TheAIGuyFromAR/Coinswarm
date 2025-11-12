@@ -59,29 +59,42 @@ def build_insert_sql(symbol, candle, timeframe, source):
     )
 
 async def insert_candles_to_d1(env, symbol, candles, timeframe, source):
+    """
+    Queue candles for batch processing instead of direct D1 writes.
+    Batches of 10 candles per message to optimize queue operations.
+    """
     if not candles:
         return
-    # Build bulk insert
-    sql = (
-        "INSERT OR IGNORE INTO price_data "
-        "(symbol, timestamp, timeframe, open, high, low, close, volume_from, volume_to, source) VALUES "
-        + ", ".join(["(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"] * len(candles))
-    )
-    params = []
-    for candle in candles:
-        params.extend([
-            symbol,
-            candle["time"],
-            timeframe,
-            candle["open"],
-            candle["high"],
-            candle["low"],
-            candle["close"],
-            candle.get("volumefrom", 0),
-            candle.get("volumeto", 0),
-            source
-        ])
-    await env.DB.prepare(sql).bind(*params).run()
+
+    # Batch candles into groups of 10 for efficient queueing
+    batch_size = 10
+    messages = []
+
+    for i in range(0, len(candles), batch_size):
+        batch = candles[i:i+batch_size]
+
+        # Prepare batch of data points for queue
+        data_points = []
+        for candle in batch:
+            data_points.append({
+                "symbol": symbol,
+                "timestamp": candle["time"],
+                "timeframe": timeframe,
+                "open": float(candle["open"]),
+                "high": float(candle["high"]),
+                "low": float(candle["low"]),
+                "close": float(candle["close"]),
+                "volumeFrom": float(candle.get("volumefrom", 0)),
+                "volumeTo": float(candle.get("volumeto", 0)),
+                "source": source
+            })
+
+        messages.append({"body": data_points})
+
+    # Send all batches to queue
+    if messages:
+        await env.HISTORICAL_QUEUE.sendBatch(messages)
+        print(f"Queued {len(candles)} candles for {symbol} in {len(messages)} batches")
 
 
 def fetch_ohlcv_cryptocompare(

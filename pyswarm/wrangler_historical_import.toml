@@ -8,3 +8,7 @@ compatibility_flags = ["python_workers"]
 binding = "DB"
 name = "history"
 database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
+
+[[queues.producers]]
+queue = "historical-data-queue"
+binding = "HISTORICAL_QUEUE"
