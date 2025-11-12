@@ -15,9 +15,9 @@ binding = "AI"
 
 # Vectorize binding for vector storage and similarity search
 # Note: You need to create the index first with:
-# wrangler vectorize create pyswarm-time-periods --dimensions=768 --metric=cosine
-# Using 768 dimensions (bge-base-en) for BALANCED accuracy + speed
-# Query time: ~50-70ms (better semantic understanding than 384-dim)
+# wrangler vectorize create pyswarm-time-periods --dimensions=1024 --metric=cosine
+# Using 1024 dimensions (bge-large-en) for MAXIMUM accuracy on low-frequency queries
+# Query time: ~60-90ms (best semantic understanding for daily trading decisions)
 [[vectorize]]
 binding = "VECTORIZE"
 index_name = "pyswarm-time-periods"
@@ -39,9 +39,9 @@ index_name = "pyswarm-time-periods"
 #
 # 1. Create the Vectorize index (one-time setup):
 #    wrangler vectorize create pyswarm-time-periods \
-#      --dimensions=768 \
+#      --dimensions=1024 \
 #      --metric=cosine \
-#      --description="Time period embeddings for similarity search (balanced accuracy + speed)"
+#      --description="Time period embeddings for similarity search (maximum accuracy)"
 #
 # 2. Create metadata indexes (BEFORE inserting vectors!):
 #    wrangler vectorize create-metadata-index pyswarm-time-periods \

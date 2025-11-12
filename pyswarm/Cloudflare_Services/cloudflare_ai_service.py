@@ -56,14 +56,14 @@ class CloudflareAIService:
         }
     }
 
-    def __init__(self, ai_binding=None, model: str = "bge-base-en"):
+    def __init__(self, ai_binding=None, model: str = "bge-large-en"):
         """
         Initialize with optional AI binding from Cloudflare Python Workers.
 
         Args:
             ai_binding: The AI binding object, e.g. bindings["AI"]
                        If None, will need to use HTTP proxy method
-            model: Model key from MODELS dict (default: "bge-base-en" for balanced performance)
+            model: Model key from MODELS dict (default: "bge-large-en" for maximum accuracy)
         """
         self.ai = ai_binding
         self.model_key = model

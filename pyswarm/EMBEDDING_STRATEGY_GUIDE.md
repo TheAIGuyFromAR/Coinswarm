@@ -1,5 +1,7 @@
 # Enhanced Embedding Strategy for Time Period Similarity Search
 
+**Model Choice**: Using **bge-large-en-v1.5 (1024 dims)** for maximum accuracy on low-frequency queries. See MODEL_SELECTION_GUIDE.md for rationale. For high-frequency agent memory, use bge-base-en or bge-small-en instead.
+
 ## Recommended Approach: Smart Daily Aggregation
 
 ### Core Concept

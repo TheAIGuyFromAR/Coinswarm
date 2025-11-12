@@ -397,7 +397,7 @@ class HistoricalVectorizeBackfill:
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{self.embedding_url}/embed",
-                json={"text": text, "model": "bge-small-en"}
+                json={"text": text, "model": "bge-large-en"}
             ) as resp:
                 result = await resp.json()
                 return result["embeddings"][0]

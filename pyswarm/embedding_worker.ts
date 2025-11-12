@@ -73,10 +73,11 @@ const MODELS = {
   }
 };
 
-// Using bge-base-en for BALANCED performance (768 dims)
-// Better semantic understanding than small (384), faster than large (1024)
-// Query time: ~50-70ms (perfect for low-frequency, high-accuracy searches)
-const DEFAULT_MODEL = "bge-base-en";
+// Using bge-large-en for MAXIMUM ACCURACY (1024 dims)
+// Best semantic understanding for complex market narratives
+// Query time: ~60-90ms (perfect for low-frequency queries where accuracy matters most)
+// Note: For high-frequency agent memory, consider bge-base-en or bge-small-en
+const DEFAULT_MODEL = "bge-large-en";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
