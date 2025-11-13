@@ -25,3 +25,4 @@ cpu_ms = 30000  # 30 seconds CPU time (for large batches)
 # Observability - Enable logs for monitoring
 [observability]
 enabled = true
+head_sampling_rate = 1  # Log 100% of requests (1 = 100%, 0.5 = 50%, etc)
