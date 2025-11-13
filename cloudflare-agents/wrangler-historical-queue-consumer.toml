@@ -21,3 +21,7 @@ max_concurrency = 5            # Run 5 consumer instances in parallel
 # Limits
 [limits]
 cpu_ms = 30000  # 30 seconds CPU time (for large batches)
+
+# Observability - Enable logs for monitoring
+[observability]
+enabled = true

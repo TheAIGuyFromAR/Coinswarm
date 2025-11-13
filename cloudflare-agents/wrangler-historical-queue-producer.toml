@@ -22,3 +22,7 @@ binding = "HISTORICAL_DATA_QUEUE"
 [vars]
 COINGECKO = "YOUR_COINGECKO_KEY"
 CRYPTOCOMPARE_API_KEY = "YOUR_CRYPTOCOMPARE_KEY"
+
+# Observability - Enable logs for monitoring
+[observability]
+enabled = true
