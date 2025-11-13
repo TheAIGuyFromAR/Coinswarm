@@ -14,15 +14,15 @@ No credentials needed!
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from random import random, uniform
+from random import uniform
 
-from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
-from coinswarm.backtesting.continuous_backtester import ContinuousBacktester
+from coinswarm.agents.risk_agent import RiskManagementAgent
 from coinswarm.agents.strategy_learning_agent import Strategy
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine
+from coinswarm.backtesting.continuous_backtester import ContinuousBacktester
+from coinswarm.data_ingest.base import DataPoint
 
 logging.basicConfig(
     level=logging.INFO,
@@ -313,7 +313,7 @@ async def demo_continuous_backtester():
     if results:
         best_strategy, best_result = results[0]
         print(f"🏆 BEST STRATEGY: {best_strategy.name}")
-        print(f"   Would be promoted to production!")
+        print("   Would be promoted to production!")
         print()
 
 

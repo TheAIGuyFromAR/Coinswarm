@@ -20,15 +20,14 @@ Result: Self-improving system that gets better over time.
 """
 
 import logging
-import numpy as np
-from typing import Dict, Optional, List
 from datetime import datetime
 
-from coinswarm.memory.simple_memory import SimpleMemory, Episode
-from coinswarm.memory.state_builder import StateBuilder
-from coinswarm.agents.trade_analysis_agent import TradeAnalysisAgent
-from coinswarm.agents.strategy_learning_agent import StrategyLearningAgent
+import numpy as np
 from coinswarm.agents.committee import AgentCommittee
+from coinswarm.agents.strategy_learning_agent import StrategyLearningAgent
+from coinswarm.agents.trade_analysis_agent import TradeAnalysisAgent
+from coinswarm.memory.simple_memory import SimpleMemory
+from coinswarm.memory.state_builder import StateBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +64,7 @@ class LearningLoop:
         self.committee = committee
 
         # Open positions (track for outcome analysis)
-        self.open_positions: Dict[str, Dict] = {}
+        self.open_positions: dict[str, dict] = {}
 
         # Statistics
         self.stats = {
@@ -85,8 +84,8 @@ class LearningLoop:
         price: float,
         size: float,
         decision: "CommitteeDecision",
-        market_data: Dict,
-        portfolio_state: Dict
+        market_data: dict,
+        portfolio_state: dict
     ) -> str:
         """
         Called when a trade is opened.
@@ -143,7 +142,7 @@ class LearningLoop:
         trade_id: str,
         exit_price: float,
         exit_reason: str = "manual"
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Called when a position is closed.
 
@@ -237,7 +236,7 @@ class LearningLoop:
         # === STEP 2: ANALYZE TRADE ===
 
         # Use TradeAnalysisAgent to analyze outcome
-        outcome = self.trade_analyzer.analyze_completed_trade(
+        self.trade_analyzer.analyze_completed_trade(
             trade={
                 "id": trade_id,
                 "symbol": trade["symbol"],
@@ -300,7 +299,7 @@ class LearningLoop:
 
         return episode_id
 
-    def _detect_regime(self, market_data: Dict) -> str:
+    def _detect_regime(self, market_data: dict) -> str:
         """
         Detect market regime from market data.
 
@@ -331,7 +330,7 @@ class LearningLoop:
         # Default: ranging
         return "ranging"
 
-    def _classify_trade_type(self, agent_votes: Dict[str, Dict]) -> str:
+    def _classify_trade_type(self, agent_votes: dict[str, dict]) -> str:
         """
         Classify trade type based on which agents voted for it.
 
@@ -362,7 +361,7 @@ class LearningLoop:
         self,
         symbol: str,
         current_state: np.ndarray
-    ) -> Dict:
+    ) -> dict:
         """
         Use memory to suggest best action for current state.
 
@@ -407,7 +406,7 @@ class LearningLoop:
             "similar_episodes": len(similar)
         }
 
-    def get_statistics(self) -> Dict:
+    def get_statistics(self) -> dict:
         """Get learning loop statistics"""
         return {
             **self.stats,

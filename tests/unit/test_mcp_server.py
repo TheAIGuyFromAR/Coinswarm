@@ -4,9 +4,9 @@ Unit tests for Coinbase MCP Server
 Tests resource listing, reading, tool execution, and error handling.
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
+import pytest
 from coinswarm.mcp_server.server import CoinbaseMCPServer
 
 
@@ -16,7 +16,7 @@ class TestMCPResourceListing:
     @pytest.mark.asyncio
     async def test_list_resources_returns_all_resources(self):
         """Test that list_resources returns all 4 expected resources"""
-        server = CoinbaseMCPServer()
+        CoinbaseMCPServer()
 
         # The list_resources handler is registered during __init__
         # We need to access it through the server's registered handlers
@@ -139,7 +139,7 @@ class TestMCPResourceReading:
                 }
             ]
 
-            server = CoinbaseMCPServer()
+            CoinbaseMCPServer()
 
             # Note: We can't directly test the handler as it's registered internally
             # This test verifies the mock setup is correct
@@ -163,7 +163,7 @@ class TestMCPResourceReading:
                 }
             ]
 
-            server = CoinbaseMCPServer()
+            CoinbaseMCPServer()
             assert mock_client.list_products is not None
 
     @pytest.mark.asyncio
@@ -184,7 +184,7 @@ class TestMCPResourceReading:
                 }
             ]
 
-            server = CoinbaseMCPServer()
+            CoinbaseMCPServer()
             assert mock_client.list_orders is not None
 
     @pytest.mark.asyncio
@@ -205,7 +205,7 @@ class TestMCPResourceReading:
                 }
             ]
 
-            server = CoinbaseMCPServer()
+            CoinbaseMCPServer()
             assert mock_client.list_fills is not None
 
 
@@ -215,7 +215,7 @@ class TestMCPToolListing:
     @pytest.mark.asyncio
     async def test_list_tools_returns_all_tools(self):
         """Test that list_tools returns all 6 expected tools"""
-        server = CoinbaseMCPServer()
+        CoinbaseMCPServer()
 
         # Expected 6 tools
         expected_tools = [
@@ -283,7 +283,7 @@ class TestMCPToolExecution:
                 "volume_24h": "1000.0"
             }
 
-            server = CoinbaseMCPServer()
+            CoinbaseMCPServer()
             assert mock_client.get_product_ticker is not None
 
     @pytest.mark.asyncio
@@ -301,7 +301,7 @@ class TestMCPToolExecution:
                 "status": "FILLED"
             }
 
-            server = CoinbaseMCPServer()
+            CoinbaseMCPServer()
             assert mock_client.create_market_order is not None
 
     @pytest.mark.asyncio
@@ -317,7 +317,7 @@ class TestMCPToolExecution:
                 "status": "CANCELLED"
             }
 
-            server = CoinbaseMCPServer()
+            CoinbaseMCPServer()
             assert mock_client.cancel_order is not None
 
 
@@ -382,5 +382,5 @@ class TestMCPErrorHandling:
             # Mock an API error
             mock_client.list_accounts.side_effect = Exception("API Error")
 
-            server = CoinbaseMCPServer()
+            CoinbaseMCPServer()
             assert mock_client.list_accounts.side_effect is not None

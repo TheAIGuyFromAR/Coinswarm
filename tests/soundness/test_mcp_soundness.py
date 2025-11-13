@@ -4,10 +4,9 @@ Soundness tests for MCP Server
 Tests determinism, latency, and reliability of MCP server operations.
 """
 
-import pytest
 import time
-from unittest.mock import AsyncMock, patch
 
+import pytest
 from coinswarm.mcp_server.server import CoinbaseMCPServer
 
 
@@ -17,7 +16,7 @@ class TestMCPDeterminism:
     @pytest.mark.asyncio
     async def test_resource_listing_deterministic(self):
         """Test that list_resources returns same results on repeated calls"""
-        server = CoinbaseMCPServer()
+        CoinbaseMCPServer()
 
         # Expected 4 resources
         expected_uris = [
@@ -36,7 +35,7 @@ class TestMCPDeterminism:
     @pytest.mark.asyncio
     async def test_tool_listing_deterministic(self):
         """Test that list_tools returns same results on repeated calls"""
-        server = CoinbaseMCPServer()
+        CoinbaseMCPServer()
 
         expected_tools = [
             "get_market_data",
@@ -56,7 +55,7 @@ class TestMCPDeterminism:
     @pytest.mark.asyncio
     async def test_order_validation_deterministic(self):
         """Test that order validation produces consistent results"""
-        server = CoinbaseMCPServer()
+        CoinbaseMCPServer()
 
         # Same order parameters should always validate the same way
         order_params = {
@@ -99,7 +98,7 @@ class TestMCPLatency:
     @pytest.mark.asyncio
     async def test_resource_listing_latency(self):
         """Test that list_resources completes within acceptable time"""
-        server = CoinbaseMCPServer()
+        CoinbaseMCPServer()
 
         start = time.perf_counter()
         # Resource listing should be fast (metadata only)
@@ -112,7 +111,7 @@ class TestMCPLatency:
     @pytest.mark.asyncio
     async def test_tool_listing_latency(self):
         """Test that list_tools completes within acceptable time"""
-        server = CoinbaseMCPServer()
+        CoinbaseMCPServer()
 
         start = time.perf_counter()
         # Tool listing should be fast (metadata only)
@@ -173,7 +172,7 @@ class TestMCPLatency:
     @pytest.mark.asyncio
     async def test_order_validation_latency(self):
         """Test that order validation is fast"""
-        server = CoinbaseMCPServer()
+        CoinbaseMCPServer()
 
         order_data = {
             "product_id": "BTC-USD",
@@ -206,8 +205,8 @@ class TestMCPLatency:
         for uri in uris:
             # Parse URI
             parts = uri.split("/")
-            resource_type = parts[2] if len(parts) > 2 else None
-            resource_id = parts[3] if len(parts) > 3 else None
+            parts[2] if len(parts) > 2 else None
+            parts[3] if len(parts) > 3 else None
         duration = time.perf_counter() - start
 
         # Parsing 200 URIs should be < 10ms

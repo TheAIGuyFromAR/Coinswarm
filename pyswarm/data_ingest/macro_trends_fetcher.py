@@ -18,11 +18,10 @@ Indicators:
 - 10Y Treasury Yield
 """
 
-import logging
 import asyncio
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+import logging
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 try:
     import httpx
@@ -30,7 +29,6 @@ except ImportError:
     import requests as httpx
 
 from coinswarm.data_ingest.base import DataPoint
-
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +50,7 @@ class MacroTrendsFetcher:
     https://fred.stlouisfed.org/docs/api/api_key.html
     """
 
-    def __init__(self, fred_api_key: Optional[str] = None):
+    def __init__(self, fred_api_key: str | None = None):
         self.fred_api_key = fred_api_key
         self.fred_url = "https://api.stlouisfed.org/fred/series/observations"
 
@@ -94,7 +92,7 @@ class MacroTrendsFetcher:
         self,
         start_date: datetime,
         end_date: datetime
-    ) -> Dict[str, List[MacroIndicator]]:
+    ) -> dict[str, list[MacroIndicator]]:
         """
         Fetch all macro indicators for date range.
 
@@ -128,7 +126,7 @@ class MacroTrendsFetcher:
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        for series_id, data in zip(self.indicators.keys(), results):
+        for series_id, data in zip(self.indicators.keys(), results, strict=False):
             if isinstance(data, Exception):
                 logger.warning(f"✗ {series_id}: {data}")
             else:
@@ -142,7 +140,7 @@ class MacroTrendsFetcher:
         series_id: str,
         start_date: datetime,
         end_date: datetime
-    ) -> List[MacroIndicator]:
+    ) -> list[MacroIndicator]:
         """
         Fetch a single indicator from FRED.
 
@@ -194,8 +192,8 @@ class MacroTrendsFetcher:
 
     def convert_to_datapoints(
         self,
-        macro_data: Dict[str, List[MacroIndicator]]
-    ) -> List[DataPoint]:
+        macro_data: dict[str, list[MacroIndicator]]
+    ) -> list[DataPoint]:
         """
         Convert macro indicators to DataPoint objects.
 
@@ -203,9 +201,9 @@ class MacroTrendsFetcher:
         """
 
         # Group by date
-        by_date: Dict[datetime, Dict] = {}
+        by_date: dict[datetime, dict] = {}
 
-        for series_id, indicators in macro_data.items():
+        for _series_id, indicators in macro_data.items():
             for indicator in indicators:
                 date = indicator.timestamp.date()
 
@@ -231,7 +229,7 @@ class MacroTrendsFetcher:
 
         return data_points
 
-    async def get_current_rates(self) -> Dict[str, float]:
+    async def get_current_rates(self) -> dict[str, float]:
         """
         Get current values for all indicators.
 
@@ -245,7 +243,7 @@ class MacroTrendsFetcher:
 
         current_values = {}
 
-        for series_id, indicators in all_data.items():
+        for _series_id, indicators in all_data.items():
             if indicators:
                 # Get most recent value
                 latest = indicators[-1]
@@ -256,7 +254,7 @@ class MacroTrendsFetcher:
 
 # Alternative free sources (no API key needed)
 
-async def fetch_sp500_yahoo(start_date: datetime, end_date: datetime) -> List[MacroIndicator]:
+async def fetch_sp500_yahoo(start_date: datetime, end_date: datetime) -> list[MacroIndicator]:
     """
     Fetch S&P 500 from Yahoo Finance.
 

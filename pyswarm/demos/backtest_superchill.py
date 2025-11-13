@@ -18,14 +18,13 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import List, Dict, Optional
 
-from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.trend_agent import TrendFollowingAgent
 from coinswarm.agents.arbitrage_agent import ArbitrageAgent
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine
+from coinswarm.data_ingest.base import DataPoint
 
 logging.basicConfig(
     level=logging.INFO,
@@ -65,8 +64,8 @@ class SuperchillRiskAgent(BaseAgent):
     async def analyze(
         self,
         tick: DataPoint,
-        position: Optional[Dict],
-        market_context: Dict
+        position: dict | None,
+        market_context: dict
     ) -> AgentVote:
         """Analyze risk with superchill thresholds"""
 
@@ -142,12 +141,12 @@ class SuperchillRiskAgent(BaseAgent):
         return variance ** 0.5
 
 
-def load_historical_data(filepath: str) -> List[DataPoint]:
+def load_historical_data(filepath: str) -> list[DataPoint]:
     """Load historical data from JSON file"""
 
     logger.info(f"Loading data from {filepath}...")
 
-    with open(filepath, 'r') as f:
+    with open(filepath) as f:
         data = json.load(f)
 
     if not data.get('success'):
@@ -201,7 +200,7 @@ async def run_backtest():
         SuperchillRiskAgent(name="SuperchillRisk", weight=1.0)
     ]
 
-    logger.info(f"\n🤖 Agents:")
+    logger.info("\n🤖 Agents:")
     for agent in agents:
         logger.info(f"   - {agent.name} (weight: {agent.weight})")
 
@@ -223,7 +222,7 @@ async def run_backtest():
         max_positions=1
     )
 
-    logger.info(f"\n💰 Backtest Config:")
+    logger.info("\n💰 Backtest Config:")
     logger.info(f"   Initial Capital: ${config.initial_capital:,.2f}")
     logger.info(f"   Commission: {config.commission:.2%}")
     logger.info(f"   Slippage: {config.slippage:.2%}")
@@ -232,7 +231,7 @@ async def run_backtest():
     engine = BacktestEngine(config=config)
 
     # Run backtest
-    logger.info(f"\n🚀 Running backtest...")
+    logger.info("\n🚀 Running backtest...")
     logger.info("-" * 80)
 
     # Historical data must be a dict mapping symbol → data points
@@ -245,13 +244,13 @@ async def run_backtest():
     logger.info("BACKTEST RESULTS")
     logger.info("=" * 80)
 
-    logger.info(f"\n💵 Performance:")
+    logger.info("\n💵 Performance:")
     logger.info(f"   Initial Capital:  ${results.initial_capital:,.2f}")
     logger.info(f"   Final Capital:    ${results.final_capital:,.2f}")
     logger.info(f"   Total Return:     {results.total_return_pct:.2f}%")
     logger.info(f"   Total PnL:        ${results.total_pnl:,.2f}")
 
-    logger.info(f"\n📈 Trade Statistics:")
+    logger.info("\n📈 Trade Statistics:")
     logger.info(f"   Total Trades:     {results.total_trades}")
     logger.info(f"   Winning Trades:   {results.winning_trades}")
     logger.info(f"   Losing Trades:    {results.losing_trades}")
@@ -262,7 +261,7 @@ async def run_backtest():
         logger.info(f"   Avg Loss:         ${results.avg_loss:,.2f}")
         logger.info(f"   Profit Factor:    {results.profit_factor:.2f}")
 
-    logger.info(f"\n📊 Risk Metrics:")
+    logger.info("\n📊 Risk Metrics:")
     logger.info(f"   Max Drawdown:     {results.max_drawdown_pct:.2f}%")
     logger.info(f"   Sharpe Ratio:     {results.sharpe_ratio:.3f}")
     logger.info(f"   Sortino Ratio:    {results.sortino_ratio:.3f}")
@@ -271,7 +270,7 @@ async def run_backtest():
     logger.info("\n" + "=" * 80)
 
     if results.total_trades > 0:
-        logger.info(f"\n📝 Sample Trades (first 5):")
+        logger.info("\n📝 Sample Trades (first 5):")
         for i, trade in enumerate(results.trades[:5]):
             logger.info(f"   {i+1}. {trade.action} {trade.symbol} @ ${trade.entry_price:,.2f} "
                        f"→ ${trade.exit_price or 0:,.2f} - PnL: ${trade.pnl:,.2f} ({trade.pnl_pct:+.2f}%)")

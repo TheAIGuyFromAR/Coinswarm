@@ -5,11 +5,11 @@ This agent specializes in risk assessment and has veto power.
 It NEVER initiates trades - only vetoes dangerous ones.
 """
 
-import pytest
 from datetime import datetime
+
+import pytest
 from coinswarm.agents.risk_agent import RiskManagementAgent
 from coinswarm.data_ingest.base import DataPoint
-
 
 # ============================================================================
 # Fixtures
@@ -363,7 +363,7 @@ async def test_handles_missing_drawdown(risk_agent, sample_tick):
 async def test_veto_on_flash_crash_down(risk_agent):
     """Test agent vetoes on sudden price drop (flash crash)"""
     # Add 10 stable prices around $50k
-    for i in range(10):
+    for _i in range(10):
         tick = DataPoint(
             symbol="BTC-USDC",
             timestamp=datetime.now(),
@@ -388,7 +388,7 @@ async def test_veto_on_flash_crash_down(risk_agent):
 async def test_veto_on_flash_crash_up(risk_agent):
     """Test agent vetoes on sudden price spike (flash pump)"""
     # Add 10 stable prices around $50k
-    for i in range(10):
+    for _i in range(10):
         tick = DataPoint(
             symbol="BTC-USDC",
             timestamp=datetime.now(),
@@ -431,7 +431,7 @@ async def test_no_veto_on_gradual_movement(risk_agent):
 async def test_flash_crash_not_checked_with_insufficient_data(risk_agent):
     """Test flash crash check skipped when less than 10 prices"""
     # Add only 5 prices
-    for i in range(5):
+    for _i in range(5):
         tick = DataPoint(
             symbol="BTC-USDC",
             timestamp=datetime.now(),

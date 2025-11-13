@@ -21,11 +21,10 @@ This script fetches data and saves to CSV for offline testing.
 """
 
 import asyncio
-import json
-from datetime import datetime, timedelta
 import logging
-from pathlib import Path
 import sys
+from datetime import datetime, timedelta
+from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -35,8 +34,6 @@ try:
 except ImportError:
     print("Using standalone implementation (no dependencies needed)")
     # Standalone HTTP client
-    import urllib.request
-    import urllib.parse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -120,7 +117,7 @@ async def fetch_binance_data(
             if actual_years < 2.0:
                 logger.warning(f"  ⚠️  Only {actual_years:.1f} years - need 2+ for robust validation!")
             else:
-                logger.info(f"  ✅ Sufficient data for validation")
+                logger.info("  ✅ Sufficient data for validation")
 
             return df
         else:
@@ -223,7 +220,7 @@ async def main():
     logger.info("MULTI-PAIR HISTORICAL DATA FETCHER")
     logger.info("="*80)
     logger.info(f"Fetching {len(PAIRS)} trading pairs")
-    logger.info(f"Target: 3 years (1095 days) of 1h candles")
+    logger.info("Target: 3 years (1095 days) of 1h candles")
     logger.info(f"Data directory: {DATA_DIR}")
     logger.info("="*80 + "\n")
 

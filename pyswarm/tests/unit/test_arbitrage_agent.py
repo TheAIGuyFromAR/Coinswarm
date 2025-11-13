@@ -8,14 +8,11 @@ ArbitrageAgent detects triangular arbitrage opportunities like:
 CrossExchangeArbitrageAgent is currently a stub (not yet implemented).
 """
 
-import pytest
 from datetime import datetime
-from coinswarm.agents.arbitrage_agent import (
-    ArbitrageAgent,
-    CrossExchangeArbitrageAgent
-)
-from coinswarm.data_ingest.base import DataPoint
 
+import pytest
+from coinswarm.agents.arbitrage_agent import ArbitrageAgent, CrossExchangeArbitrageAgent
+from coinswarm.data_ingest.base import DataPoint
 
 # ============================================================================
 # Fixtures
@@ -654,7 +651,7 @@ def test_calculation_exception_handling(arb_agent):
     }
 
     # Should return None instead of crashing
-    result = arb_agent._calculate_triangular_arbitrage(
+    arb_agent._calculate_triangular_arbitrage(
         start="BTC-USDC",
         leg1="BTC-SOL",
         leg2="SOL-USDC",

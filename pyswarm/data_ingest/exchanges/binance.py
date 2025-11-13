@@ -5,13 +5,12 @@ Implements real-time and historical data ingestion from Binance.
 """
 
 import json
-from datetime import datetime, timedelta
-from typing import Any, AsyncIterator, Dict, List, Optional
+from collections.abc import AsyncIterator
+from datetime import datetime
+from typing import Any
 
-import aiohttp
 import ccxt.async_support as ccxt
 import websockets
-
 from coinswarm.data_ingest.base import (
     DataPoint,
     ExchangeDataSource,
@@ -29,7 +28,7 @@ class BinanceIngestor(ExchangeDataSource):
     - WebSocket for real-time trades, order book, klines
     """
 
-    def __init__(self, api_key: Optional[str] = None, api_secret: Optional[str] = None):
+    def __init__(self, api_key: str | None = None, api_secret: str | None = None):
         super().__init__("binance")
 
         # Initialize CCXT client for REST API
@@ -49,7 +48,7 @@ class BinanceIngestor(ExchangeDataSource):
         end: datetime,
         timeframe: str = "1m",
         **kwargs,
-    ) -> List[DataPoint]:
+    ) -> list[DataPoint]:
         """
         Fetch historical OHLCV data from Binance.
 
@@ -117,8 +116,8 @@ class BinanceIngestor(ExchangeDataSource):
 
     async def stream_realtime(
         self,
-        symbols: List[str],
-        stream_types: List[StreamType] = [StreamType.TRADE],
+        symbols: list[str],
+        stream_types: list[StreamType] = None,
         **kwargs,
     ) -> AsyncIterator[DataPoint]:
         """
@@ -132,6 +131,8 @@ class BinanceIngestor(ExchangeDataSource):
             DataPoint objects as they arrive
         """
         # Convert symbols to Binance format and lowercase
+        if stream_types is None:
+            stream_types = [StreamType.TRADE]
         binance_symbols = [s.replace("-", "").lower() for s in symbols]
 
         # Build stream subscriptions
@@ -177,7 +178,7 @@ class BinanceIngestor(ExchangeDataSource):
             self.logger.error("websocket_error", error=str(e))
             raise
 
-    async def get_products(self) -> List[Dict[str, Any]]:
+    async def get_products(self) -> list[dict[str, Any]]:
         """Get list of tradable products from Binance"""
         try:
             markets = await self.exchange.load_markets()
@@ -195,7 +196,7 @@ class BinanceIngestor(ExchangeDataSource):
             self.logger.error("get_products_error", error=str(e))
             raise
 
-    async def get_funding_rates(self, symbol: str) -> Optional[float]:
+    async def get_funding_rates(self, symbol: str) -> float | None:
         """
         Get current funding rate for a perpetual futures contract.
 
@@ -221,7 +222,7 @@ class BinanceIngestor(ExchangeDataSource):
 
     async def get_orderbook(
         self, symbol: str, depth: int = 20
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get current order book snapshot.
 
@@ -279,7 +280,7 @@ class BinanceIngestor(ExchangeDataSource):
     # Helper Methods
     # ========================================================================
 
-    def _parse_trade(self, data: Dict[str, Any], symbols: List[str]) -> DataPoint:
+    def _parse_trade(self, data: dict[str, Any], symbols: list[str]) -> DataPoint:
         """Parse trade data from WebSocket"""
         raw_symbol = data["s"]  # e.g., "BTCUSDT"
         symbol = self._normalize_symbol_from_binance(raw_symbol, symbols)
@@ -300,7 +301,7 @@ class BinanceIngestor(ExchangeDataSource):
             version="v1",
         )
 
-    def _parse_orderbook(self, data: Dict[str, Any], symbols: List[str]) -> DataPoint:
+    def _parse_orderbook(self, data: dict[str, Any], symbols: list[str]) -> DataPoint:
         """Parse order book data from WebSocket"""
         raw_symbol = data["s"]
         symbol = self._normalize_symbol_from_binance(raw_symbol, symbols)
@@ -328,7 +329,7 @@ class BinanceIngestor(ExchangeDataSource):
             version="v1",
         )
 
-    def _parse_ticker(self, data: Dict[str, Any], symbols: List[str]) -> DataPoint:
+    def _parse_ticker(self, data: dict[str, Any], symbols: list[str]) -> DataPoint:
         """Parse ticker data from WebSocket"""
         raw_symbol = data["s"]
         symbol = self._normalize_symbol_from_binance(raw_symbol, symbols)
@@ -352,7 +353,7 @@ class BinanceIngestor(ExchangeDataSource):
             version="v1",
         )
 
-    def _parse_kline(self, data: Dict[str, Any], symbols: List[str]) -> DataPoint:
+    def _parse_kline(self, data: dict[str, Any], symbols: list[str]) -> DataPoint:
         """Parse kline (candlestick) data from WebSocket"""
         raw_symbol = data["s"]
         symbol = self._normalize_symbol_from_binance(raw_symbol, symbols)
@@ -376,7 +377,7 @@ class BinanceIngestor(ExchangeDataSource):
         )
 
     def _normalize_symbol_from_binance(
-        self, raw_symbol: str, known_symbols: List[str]
+        self, raw_symbol: str, known_symbols: list[str]
     ) -> str:
         """
         Normalize Binance symbol to standard format.

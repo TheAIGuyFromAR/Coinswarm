@@ -6,12 +6,10 @@ Worker aggregates data from multiple sources (Kraken, Coinbase, etc.)
 """
 
 import logging
-import httpx
 from datetime import datetime
-from typing import List, Optional
 
+import httpx
 from coinswarm.data_ingest.base import DataPoint
-
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +41,7 @@ class CoinswarmWorkerClient:
         symbol: str,
         days: int = 30,
         aggregate: bool = True
-    ) -> List[DataPoint]:
+    ) -> list[DataPoint]:
         """
         Fetch historical price data from Worker.
 
@@ -120,7 +118,7 @@ class CoinswarmWorkerClient:
 
     async def fetch_multiple_symbols(
         self,
-        symbols: List[str],
+        symbols: list[str],
         days: int = 30
     ) -> dict:
         """

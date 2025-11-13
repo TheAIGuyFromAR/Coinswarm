@@ -18,21 +18,19 @@ Cost: $0/mo (under free tier)
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
 from collections import OrderedDict
 from dataclasses import dataclass
+from datetime import datetime
 
 from aiohttp import web
-from coinswarm.mcp_server.server import CoinbaseMCPServer
-from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.committee import AgentCommittee
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
-from coinswarm.agents.research_agent import ResearchAgent
-from azure.cosmos.aio import CosmosClient
 from azure.cosmos import PartitionKey
-
+from azure.cosmos.aio import CosmosClient
+from coinswarm.agents.committee import AgentCommittee
+from coinswarm.agents.research_agent import ResearchAgent
+from coinswarm.agents.risk_agent import RiskManagementAgent
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.data_ingest.base import DataPoint
+from coinswarm.mcp_server.server import CoinbaseMCPServer
 
 # Configure structured logging
 logger = logging.getLogger(__name__)
@@ -45,7 +43,7 @@ class TradeSignal:
     symbol: str
     confidence: float  # 0.0-1.0
     size: float
-    price: Optional[float] = None
+    price: float | None = None
     reason: str = ""
 
 
@@ -56,7 +54,7 @@ class LRUCache:
         self.cache = OrderedDict()
         self.maxsize = maxsize
 
-    def get(self, key: str) -> Optional[any]:
+    def get(self, key: str) -> any | None:
         """Get value, move to end (most recent)"""
         if key not in self.cache:
             return None
@@ -76,11 +74,11 @@ class MarketDataCache:
     """In-memory cache for market data (0ms latency)"""
 
     def __init__(self):
-        self.ticks: Dict[str, DataPoint] = {}  # Latest tick per symbol
-        self.orderbooks: Dict[str, dict] = {}  # Latest orderbook per symbol
-        self.candles: Dict[str, List[dict]] = {}  # Recent candles per symbol
-        self.positions: Dict[str, dict] = {}  # Current positions
-        self.orders: Dict[str, dict] = {}  # Active orders
+        self.ticks: dict[str, DataPoint] = {}  # Latest tick per symbol
+        self.orderbooks: dict[str, dict] = {}  # Latest orderbook per symbol
+        self.candles: dict[str, list[dict]] = {}  # Recent candles per symbol
+        self.positions: dict[str, dict] = {}  # Current positions
+        self.orders: dict[str, dict] = {}  # Active orders
 
         # Pattern cache (ML inference results)
         self.patterns = LRUCache(maxsize=1000)
@@ -93,7 +91,7 @@ class MarketDataCache:
         """Update latest tick (0ms)"""
         self.ticks[symbol] = tick
 
-    def get_tick(self, symbol: str) -> Optional[DataPoint]:
+    def get_tick(self, symbol: str) -> DataPoint | None:
         """Get latest tick (0ms)"""
         tick = self.ticks.get(symbol)
         if tick:
@@ -106,7 +104,7 @@ class MarketDataCache:
         """Update position (0ms)"""
         self.positions[symbol] = position
 
-    def get_position(self, symbol: str) -> Optional[dict]:
+    def get_position(self, symbol: str) -> dict | None:
         """Get current position (0ms)"""
         return self.positions.get(symbol)
 
@@ -135,7 +133,7 @@ class SingleUserTradingBot:
         cosmos_endpoint: str,
         cosmos_key: str,
         cosmos_database: str = "coinswarm",
-        symbols: List[str] = None,
+        symbols: list[str] = None,
         watchdog_timeout: int = 60
     ):
         """Initialize single-user bot with agent swarm"""
@@ -240,12 +238,6 @@ class SingleUserTradingBot:
         """
 
         # Subscribe to ticker channel for all symbols
-        channels = [
-            {
-                "name": "ticker",
-                "product_ids": self.symbols
-            }
-        ]
 
         # This is a placeholder - actual WebSocket implementation
         # would use websockets library to connect to Coinbase
@@ -275,7 +267,7 @@ class SingleUserTradingBot:
                 self.stats["errors"] += 1
                 await asyncio.sleep(1)
 
-    async def _fetch_latest_tick(self, symbol: str) -> Optional[DataPoint]:
+    async def _fetch_latest_tick(self, symbol: str) -> DataPoint | None:
         """Fetch latest tick from MCP (placeholder for WebSocket)"""
         try:
             # This would be replaced with WebSocket in production
@@ -336,8 +328,8 @@ class SingleUserTradingBot:
         self,
         symbol: str,
         tick: DataPoint,
-        position: Optional[dict]
-    ) -> Optional[TradeSignal]:
+        position: dict | None
+    ) -> TradeSignal | None:
         """
         Run agent swarm and get committee vote.
 

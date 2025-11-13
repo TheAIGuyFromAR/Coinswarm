@@ -12,19 +12,18 @@ Usage:
     python find_10x_nominal_strategies.py --test-days 180 --target-count 10
 """
 
-import asyncio
 import argparse
+import asyncio
 import json
 import random
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from typing import List, Dict
-from dataclasses import dataclass, asdict
 
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
 from coinswarm.agents.arbitrage_agent import ArbitrageAgent
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
+from coinswarm.agents.risk_agent import RiskManagementAgent
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine
 from coinswarm.data_ingest.base import DataPoint
 
 
@@ -266,13 +265,13 @@ async def hunt_10x_strategies(
     print("="*90 + "\n")
 
     print(f"Target: Find {target_count} strategies with:")
-    print(f"  • 10x nominal returns (1000%+ absolute)")
-    print(f"  • 10x HODL (beat buy-and-hold by 10x)")
-    print(f"  • Sharpe > 2.0")
-    print(f"  • Max DD < 40%")
-    print(f"  • At least 10 trades\n")
+    print("  • 10x nominal returns (1000%+ absolute)")
+    print("  • 10x HODL (beat buy-and-hold by 10x)")
+    print("  • Sharpe > 2.0")
+    print("  • Max DD < 40%")
+    print("  • At least 10 trades\n")
 
-    print(f"Search Configuration:")
+    print("Search Configuration:")
     print(f"  Symbol: {symbol}")
     print(f"  Test Period: {test_days} days")
     print(f"  Population: {population_size}")
@@ -291,8 +290,8 @@ async def hunt_10x_strategies(
     ]
 
     # Track discoveries
-    found_10x_both: List[StrategyResult] = []
-    found_5x_both: List[StrategyResult] = []
+    found_10x_both: list[StrategyResult] = []
+    found_5x_both: list[StrategyResult] = []
     all_time_best_nominal: StrategyResult = None
     all_time_best_vs_hodl: StrategyResult = None
 
@@ -303,7 +302,7 @@ async def hunt_10x_strategies(
         print(f"{'='*90}")
 
         # Test population
-        results: List[StrategyResult] = []
+        results: list[StrategyResult] = []
 
         for i, config in enumerate(population):
             result = await test_aggressive_strategy(
@@ -347,7 +346,7 @@ async def hunt_10x_strategies(
 
         # Show top 3 this generation
         results.sort(key=lambda r: r.nominal_multiple * r.vs_hodl_multiple, reverse=True)
-        print(f"\n  Top 3 This Generation:")
+        print("\n  Top 3 This Generation:")
         for i, r in enumerate(results[:3]):
             print(f"    {i+1}. Nominal: {r.nominal_multiple:.2f}x, vs HODL: {r.vs_hodl_multiple:.2f}x, "
                   f"Return: {r.return_pct:+.1%}, Trades: {r.total_trades}")
@@ -459,18 +458,18 @@ async def hunt_10x_strategies(
 
     elif found_5x_both:
         print(f"\n⚠️  No 10x BOTH strategies found, but found {len(found_5x_both)} with 5x BOTH")
-        print(f"   Consider: Lower targets, increase volatility, or run more generations")
+        print("   Consider: Lower targets, increase volatility, or run more generations")
 
     else:
-        print(f"\n❌ No strategies met criteria")
-        print(f"\n   Best Achieved:")
+        print("\n❌ No strategies met criteria")
+        print("\n   Best Achieved:")
         print(f"     Nominal: {all_time_best_nominal.nominal_multiple:.2f}x")
         print(f"     vs HODL: {all_time_best_vs_hodl.vs_hodl_multiple:.2f}x")
-        print(f"\n   Suggestions:")
+        print("\n   Suggestions:")
         print(f"     • Increase volatility multiplier (currently {volatility_multiplier}x)")
-        print(f"     • Lower confidence thresholds more")
-        print(f"     • Increase population size")
-        print(f"     • Run more generations")
+        print("     • Lower confidence thresholds more")
+        print("     • Increase population size")
+        print("     • Run more generations")
 
     print(f"\n{'='*90}\n")
 

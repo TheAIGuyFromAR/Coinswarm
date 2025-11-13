@@ -20,15 +20,15 @@ Evolutionary approach:
 Inspired by 17000% return swarm in tradfi.
 """
 
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
-from coinswarm.agents.committee import AgentCommittee, CommitteeDecision
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
-from coinswarm.agents.research_agent import ResearchAgent, NewsSource, NewsSentiment
-from coinswarm.agents.trade_analysis_agent import TradeAnalysisAgent, TradeOutcome
-from coinswarm.agents.strategy_learning_agent import StrategyLearningAgent, Strategy
 from coinswarm.agents.academic_research_agent import AcademicResearchAgent, ResearchStrategy
-from coinswarm.agents.hedge_agent import HedgeAgent, RiskParameters, HedgeRecommendation
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
+from coinswarm.agents.committee import AgentCommittee, CommitteeDecision
+from coinswarm.agents.hedge_agent import HedgeAgent, HedgeRecommendation, RiskParameters
+from coinswarm.agents.research_agent import NewsSentiment, NewsSource, ResearchAgent
+from coinswarm.agents.risk_agent import RiskManagementAgent
+from coinswarm.agents.strategy_learning_agent import Strategy, StrategyLearningAgent
+from coinswarm.agents.trade_analysis_agent import TradeAnalysisAgent, TradeOutcome
+from coinswarm.agents.trend_agent import TrendFollowingAgent
 
 __all__ = [
     "BaseAgent",

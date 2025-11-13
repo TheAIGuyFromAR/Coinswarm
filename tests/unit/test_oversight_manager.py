@@ -12,14 +12,12 @@ OversightManager responsibilities:
 - Emergency circuit breakers
 """
 
+
 import pytest
-from datetime import datetime, timedelta
-from decimal import Decimal
 
 # TODO: Uncomment when OversightManager is implemented
 # from coinswarm.safety.oversight_manager import OversightManager
 # from coinswarm.agents.committee import CommitteeDecision
-from coinswarm.core.config import settings
 
 
 class TestOversightManager:

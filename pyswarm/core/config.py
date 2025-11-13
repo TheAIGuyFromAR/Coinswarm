@@ -6,6 +6,7 @@ Loads from environment variables with .env file support.
 """
 
 from typing import Literal
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 

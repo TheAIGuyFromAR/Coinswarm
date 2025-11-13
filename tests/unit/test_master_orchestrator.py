@@ -11,16 +11,15 @@ MasterOrchestrator responsibilities:
 - Integrate with Oversight Manager for risk checks
 """
 
+from unittest.mock import AsyncMock, Mock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, Mock
-from decimal import Decimal
 
 # TODO: Uncomment when MasterOrchestrator is implemented
 # from coinswarm.orchestrator.master_orchestrator import MasterOrchestrator, TradeDecision
 # from coinswarm.agents.committee import AgentCommittee, CommitteeDecision
 # from coinswarm.safety.oversight_manager import OversightManager
 from coinswarm.data_ingest.base import DataPoint
-
 
 # QUESTION FOR USER: Should MasterOrchestrator be a separate module or part of agents?
 # Option 1: src/coinswarm/orchestrator/master_orchestrator.py (new module)

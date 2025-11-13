@@ -34,17 +34,17 @@ jobs:
 
       - name: Run ruff linter
         run: |
-          ruff check src/ tests/ --output-format=github
+          ruff check pyswarm/ tests/ --output-format=github
         continue-on-error: false
 
       - name: Run mypy type checker
         run: |
-          mypy src/ --show-error-codes
+          mypy pyswarm/ --show-error-codes
         continue-on-error: false
 
       - name: Check code formatting (black)
         run: |
-          black --check src/ tests/
+          black --check pyswarm/ tests/
         continue-on-error: false
 
   # ==========================================================================
@@ -74,7 +74,7 @@ jobs:
         run: |
           pytest tests/unit/ \
             -v \
-            --cov=src/coinswarm \
+            --cov=pyswarm \
             --cov-report=xml \
             --cov-report=term-missing \
             --junitxml=junit/unit-test-results.xml

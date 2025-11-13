@@ -12,8 +12,9 @@ This will:
 4. Confirm it's working
 """
 
-import sys
 import asyncio
+import sys
+
 import httpx
 
 
@@ -21,7 +22,7 @@ async def test_worker(worker_url):
     """Test the Cloudflare Worker"""
 
     print(f"\n{'='*70}")
-    print(f"Testing Cloudflare Worker")
+    print("Testing Cloudflare Worker")
     print(f"{'='*70}\n")
 
     worker_url = worker_url.rstrip('/')
@@ -34,7 +35,7 @@ async def test_worker(worker_url):
             response.raise_for_status()
             data = response.json()
 
-            print(f"✓ Worker is online!")
+            print("✓ Worker is online!")
             print(f"  Status: {data.get('status')}")
             print(f"  Endpoints: {data.get('endpoints')}")
             print()

@@ -6,10 +6,9 @@ Fetches historical and live data from Binance using ccxt library.
 Public API (no credentials needed for historical data)
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import List, Optional
-import asyncio
 
 try:
     import ccxt.async_support as ccxt
@@ -17,7 +16,6 @@ except ImportError:
     import ccxt
 
 from coinswarm.data_ingest.base import DataPoint
-
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +44,10 @@ class BinanceIngestor:
         self,
         symbol: str,
         timeframe: str = "1m",
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 1000
-    ) -> List[DataPoint]:
+    ) -> list[DataPoint]:
         """
         Fetch OHLCV data for a date range.
 

@@ -12,19 +12,17 @@ Usage:
 import asyncio
 import json
 import random
-from datetime import datetime, timedelta
-from typing import List
 
-from coinswarm.data_ingest.coinswarm_worker_client import CoinswarmWorkerClient
-from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
 from coinswarm.agents.arbitrage_agent import ArbitrageAgent
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
+from coinswarm.agents.risk_agent import RiskManagementAgent
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine
+from coinswarm.data_ingest.base import DataPoint
+from coinswarm.data_ingest.coinswarm_worker_client import CoinswarmWorkerClient
 
 
-async def fetch_real_data(symbol: str, days: int) -> List[DataPoint]:
+async def fetch_real_data(symbol: str, days: int) -> list[DataPoint]:
     """
     Fetch real historical data from Cloudflare Worker
 
@@ -45,7 +43,7 @@ async def fetch_real_data(symbol: str, days: int) -> List[DataPoint]:
             return None
 
     # For larger requests, fetch in 30-day chunks
-    print(f"   Fetching in 30-day chunks to avoid Worker timeout...")
+    print("   Fetching in 30-day chunks to avoid Worker timeout...")
     chunk_size = 30
     all_data = []
 
@@ -77,7 +75,7 @@ async def fetch_real_data(symbol: str, days: int) -> List[DataPoint]:
     return None
 
 
-def create_1month_windows(data: List[DataPoint], window_days: int = 30) -> List[tuple]:
+def create_1month_windows(data: list[DataPoint], window_days: int = 30) -> list[tuple]:
     """
     Create random 1-month windows from the dataset
 
@@ -102,7 +100,7 @@ def create_1month_windows(data: List[DataPoint], window_days: int = 30) -> List[
 
 
 async def test_window(
-    data: List[DataPoint],
+    data: list[DataPoint],
     start_idx: int,
     end_idx: int,
     config: dict,
@@ -184,12 +182,12 @@ async def main():
     print("="*90 + "\n")
 
     # Load best strategy
-    with open("discovered_strategies_BTCUSDC_20251106_002943.json", 'r') as f:
+    with open("discovered_strategies_BTCUSDC_20251106_002943.json") as f:
         data = json.load(f)
 
     strategy = data['strategies'][2]  # Rank 3 (best)
 
-    print(f"Strategy Configuration:")
+    print("Strategy Configuration:")
     print(f"  Trend Weight: {strategy['config']['trend_weight']:.3f}")
     print(f"  Risk Weight: {strategy['config']['risk_weight']:.3f}")
     print(f"  Arbitrage Weight: {strategy['config']['arbitrage_weight']:.3f}")
@@ -210,8 +208,8 @@ async def main():
         return
 
     # Create 1-month windows with random start dates
-    print(f"\n" + "="*90)
-    print(f"PHASE 2: Testing on random 1-month windows")
+    print("\n" + "="*90)
+    print("PHASE 2: Testing on random 1-month windows")
     print("="*90 + "\n")
 
     windows = create_1month_windows(real_data, window_days=30)
@@ -244,8 +242,8 @@ async def main():
         print("No results to analyze!")
         return
 
-    print(f"\n" + "="*90)
-    print(f"RESULTS SUMMARY - WHAT WORKED AND WHAT LOST")
+    print("\n" + "="*90)
+    print("RESULTS SUMMARY - WHAT WORKED AND WHAT LOST")
     print("="*90 + "\n")
 
     # Separate winners and losers
@@ -259,7 +257,7 @@ async def main():
     # What worked?
     if beat_hodl:
         print(f"{'='*90}")
-        print(f"✅ WHAT WORKED (Strategies that beat HODL)")
+        print("✅ WHAT WORKED (Strategies that beat HODL)")
         print(f"{'='*90}\n")
 
         for i, r in enumerate(beat_hodl):
@@ -284,7 +282,7 @@ async def main():
     # What lost?
     if lost_to_hodl:
         print(f"\n{'='*90}")
-        print(f"❌ WHAT LOST (Strategies that underperformed HODL)")
+        print("❌ WHAT LOST (Strategies that underperformed HODL)")
         print(f"{'='*90}\n")
 
         for i, r in enumerate(lost_to_hodl):
@@ -308,7 +306,7 @@ async def main():
 
     # Overall patterns
     print(f"\n{'='*90}")
-    print(f"OVERALL PATTERNS")
+    print("OVERALL PATTERNS")
     print(f"{'='*90}\n")
 
     total_strategy_return = sum(r['strategy_return'] for r in results)
@@ -322,34 +320,34 @@ async def main():
     if len(beat_hodl) > 0:
         avg_win_rate = sum(r['win_rate'] for r in beat_hodl) / len(beat_hodl)
         avg_sharpe = sum(r['sharpe'] for r in beat_hodl) / len(beat_hodl)
-        print(f"\nWinning Windows Stats:")
+        print("\nWinning Windows Stats:")
         print(f"  Avg Win Rate: {avg_win_rate:.1%}")
         print(f"  Avg Sharpe: {avg_sharpe:.2f}")
 
     # Final assessment
     beat_rate = len(beat_hodl) / len(results)
     print(f"\n{'='*90}")
-    print(f"ASSESSMENT")
+    print("ASSESSMENT")
     print(f"{'='*90}\n")
 
     if beat_rate >= 0.6:
         print(f"✅ ROBUST: Strategy beats HODL in {beat_rate:.0%} of real data tests")
-        print(f"   Ready for paper trading validation")
+        print("   Ready for paper trading validation")
     elif beat_rate >= 0.4:
         print(f"⚠️  MODERATE: Strategy beats HODL in {beat_rate:.0%} of tests")
-        print(f"   Needs more data and tuning")
+        print("   Needs more data and tuning")
     else:
         print(f"❌ WEAK: Strategy only beats HODL in {beat_rate:.0%} of tests")
-        print(f"   May be overfit to specific conditions")
+        print("   May be overfit to specific conditions")
 
     print(f"\n{'='*90}")
-    print(f"NEXT STEPS")
+    print("NEXT STEPS")
     print(f"{'='*90}\n")
     print(f"1. ✅ Tested on {len(results)} random 1-month windows from real data")
-    print(f"2. ⏳ Expand dataset to 6 months (need more Worker calls)")
-    print(f"3. ⏳ Then expand to 1 year")
-    print(f"4. ⏳ Eventually reach 2 years of historical data")
-    print(f"5. ⏳ Test across different market cycles\n")
+    print("2. ⏳ Expand dataset to 6 months (need more Worker calls)")
+    print("3. ⏳ Then expand to 1 year")
+    print("4. ⏳ Eventually reach 2 years of historical data")
+    print("5. ⏳ Test across different market cycles\n")
 
 
 if __name__ == "__main__":

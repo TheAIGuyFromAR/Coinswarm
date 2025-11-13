@@ -9,12 +9,12 @@ P0 Requirement: Get 6+ months of data
 """
 
 import asyncio
-import httpx
 import json
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import List, Dict
 import time
+from datetime import datetime
+from pathlib import Path
+
+import httpx
 
 
 class BinancePaginatedFetcher:
@@ -31,7 +31,7 @@ class BinancePaginatedFetcher:
         symbol: str,
         interval: str,
         days: int
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Fetch data with pagination to get 6+ months
 
@@ -82,7 +82,7 @@ class BinancePaginatedFetcher:
                     candles = response.json()
 
                     if not candles or len(candles) == 0:
-                        print(f"  ℹ️  No more candles available")
+                        print("  ℹ️  No more candles available")
                         break
 
                     # Convert to our format
@@ -106,7 +106,7 @@ class BinancePaginatedFetcher:
 
                     # Stop if we've reached current time
                     if last_candle_time >= now_ms - (3600 * 1000):
-                        print(f"  ✅ Reached current time")
+                        print("  ✅ Reached current time")
                         break
 
                     # Rate limit: 50ms delay (Binance allows ~1200 req/min)
@@ -124,7 +124,7 @@ class BinancePaginatedFetcher:
         symbol: str,
         days: int,
         force_refresh: bool = False
-    ) -> Dict:
+    ) -> dict:
         """
         Fetch historical data
 
@@ -201,7 +201,7 @@ class BinancePaginatedFetcher:
         print(f"Candles:      {len(candles)}/{expected_candles} ({coverage_pct:.1f}% coverage)")
         print(f"Price:        ${first_price:,.2f} → ${last_price:,.2f}")
         print(f"Change:       {result['priceChange']}")
-        print(f"Source:       Binance (paginated)")
+        print("Source:       Binance (paginated)")
         print(f"{'='*70}\n")
 
         return result

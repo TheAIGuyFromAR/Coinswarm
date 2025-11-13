@@ -14,11 +14,9 @@ Implements the 7 categories of EDD soundness validation:
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
-import pytest
-
 
 # ============================================================================
 # Result Classes
@@ -31,7 +29,7 @@ class SoundnessResult:
 
     passed: bool
     message: str
-    metrics: Dict[str, Any]
+    metrics: dict[str, Any]
     tolerance_used: float
 
 
@@ -103,7 +101,7 @@ class DeterminismTest(ABC):
 
     def _compare_results(
         self, result1: Any, result2: Any, tolerance: float
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Compare two results for equality"""
         if isinstance(result1, (int, str, bool)):
             if result1 == result2:
@@ -119,7 +117,7 @@ class DeterminismTest(ABC):
             if len(result1) != len(result2):
                 return False, f"Length mismatch: {len(result1)} vs {len(result2)}"
 
-            for i, (r1, r2) in enumerate(zip(result1, result2)):
+            for i, (r1, r2) in enumerate(zip(result1, result2, strict=False)):
                 passed, msg = self._compare_results(r1, r2, tolerance)
                 if not passed:
                     return False, f"Element {i}: {msg}"
@@ -163,7 +161,7 @@ class StatisticalSanityTest(ABC):
 
     def __init__(
         self,
-        sharpe_range: Tuple[float, float] = (0.5, 3.0),
+        sharpe_range: tuple[float, float] = (0.5, 3.0),
         max_drawdown: float = 0.20,
         max_turnover: float = 100.0,
         min_trades: int = 10,
@@ -218,7 +216,7 @@ class StatisticalSanityTest(ABC):
 
     def _check_sharpe(
         self, metrics: BacktestMetrics, tolerance: float
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Check Sharpe ratio is within realistic bounds"""
         min_sharpe, max_sharpe = self.sharpe_range
 
@@ -232,7 +230,7 @@ class StatisticalSanityTest(ABC):
 
     def _check_drawdown(
         self, metrics: BacktestMetrics, tolerance: float
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Check max drawdown is acceptable"""
         if metrics.max_drawdown <= self.max_drawdown + tolerance:
             return True, f"Max drawdown {metrics.max_drawdown:.2%} is acceptable"
@@ -244,7 +242,7 @@ class StatisticalSanityTest(ABC):
 
     def _check_turnover(
         self, metrics: BacktestMetrics, tolerance: float
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Check turnover is not excessive"""
         if metrics.turnover <= self.max_turnover + tolerance:
             return True, f"Turnover {metrics.turnover:.1f} is reasonable"
@@ -254,7 +252,7 @@ class StatisticalSanityTest(ABC):
             f"Turnover {metrics.turnover:.1f} exceeds limit {self.max_turnover}",
         )
 
-    def _check_trade_count(self, metrics: BacktestMetrics) -> Tuple[bool, str]:
+    def _check_trade_count(self, metrics: BacktestMetrics) -> tuple[bool, str]:
         """Check sufficient trades for statistical validity"""
         if metrics.num_trades >= self.min_trades:
             return True, f"Sufficient trades ({metrics.num_trades})"
@@ -288,7 +286,7 @@ class SafetyInvariantTest(ABC):
         self.max_leverage = max_leverage
 
     @abstractmethod
-    def run_simulation(self) -> List[Dict[str, Any]]:
+    def run_simulation(self) -> list[dict[str, Any]]:
         """
         Run simulation and return list of trades/events.
 
@@ -486,7 +484,7 @@ class EconomicRealismTest(ABC):
     """
 
     @abstractmethod
-    def run_backtest_with_realism(self) -> Dict[str, Any]:
+    def run_backtest_with_realism(self) -> dict[str, Any]:
         """
         Run backtest with realistic conditions.
 
@@ -532,7 +530,7 @@ class EconomicRealismTest(ABC):
             tolerance_used=tolerance,
         )
 
-    def _check_costs_applied(self, results: Dict[str, Any]) -> Tuple[bool, str]:
+    def _check_costs_applied(self, results: dict[str, Any]) -> tuple[bool, str]:
         """Check that fees and slippage were applied"""
         if results.get("slippage_cost", 0) > 0 or results.get("fee_cost", 0) > 0:
             return True, "Transaction costs applied"
@@ -540,8 +538,8 @@ class EconomicRealismTest(ABC):
         return False, "No transaction costs applied (unrealistic)"
 
     def _check_fill_rate_realistic(
-        self, results: Dict[str, Any], tolerance: float
-    ) -> Tuple[bool, str]:
+        self, results: dict[str, Any], tolerance: float
+    ) -> tuple[bool, str]:
         """Check that fill rate is realistic (not 100%)"""
         fill_rate = results.get("fill_rate", 1.0)
 
@@ -551,8 +549,8 @@ class EconomicRealismTest(ABC):
         return False, f"Fill rate {fill_rate:.1%} is unrealistic"
 
     def _check_net_less_than_gross(
-        self, results: Dict[str, Any]
-    ) -> Tuple[bool, str]:
+        self, results: dict[str, Any]
+    ) -> tuple[bool, str]:
         """Check that net P&L < gross P&L (costs reduce profit)"""
         gross = results.get("gross_pnl", 0)
         net = results.get("net_pnl", 0)
@@ -576,7 +574,7 @@ class MemoryStabilityTest(ABC):
     """
 
     @abstractmethod
-    def run_memory_simulation(self, num_iterations: int) -> Dict[str, List[float]]:
+    def run_memory_simulation(self, num_iterations: int) -> dict[str, list[float]]:
         """
         Run memory system simulation.
 
@@ -625,8 +623,8 @@ class MemoryStabilityTest(ABC):
         )
 
     def _check_convergence(
-        self, statistics: List[float], tolerance: float
-    ) -> Tuple[bool, str]:
+        self, statistics: list[float], tolerance: float
+    ) -> tuple[bool, str]:
         """Check that statistics converge (low recent variance)"""
         if len(statistics) < 100:
             return True, "Insufficient data for convergence check"
@@ -640,8 +638,8 @@ class MemoryStabilityTest(ABC):
         return False, f"Statistics not converged (CV={cv:.3f} > {tolerance})"
 
     def _check_no_oscillation(
-        self, weights: List[float], tolerance: float
-    ) -> Tuple[bool, str]:
+        self, weights: list[float], tolerance: float
+    ) -> tuple[bool, str]:
         """Check that weights don't oscillate wildly"""
         if len(weights) < 20:
             return True, "Insufficient data for oscillation check"
@@ -670,7 +668,7 @@ class ConsensusIntegrityTest(ABC):
     @abstractmethod
     def run_consensus_protocol(
         self, num_managers: int, num_proposals: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Run consensus protocol simulation.
 

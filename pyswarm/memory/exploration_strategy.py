@@ -21,10 +21,9 @@ These patterns might never appear in academic research but could be real!
 
 import logging
 import random
-import numpy as np
-from typing import Dict, Optional, Tuple, List
 from datetime import datetime
 
+import numpy as np
 from coinswarm.agents.base_agent import AgentVote
 
 logger = logging.getLogger(__name__)
@@ -58,7 +57,7 @@ class ExplorationStrategy:
         epsilon_start: float = 0.3,  # Start with 30% random
         epsilon_end: float = 0.05,    # Decay to 5% random
         epsilon_decay: float = 0.9995, # Decay rate per trade
-        random_seed: Optional[int] = None
+        random_seed: int | None = None
     ):
         """
         Initialize exploration strategy.
@@ -112,7 +111,7 @@ class ExplorationStrategy:
 
     def get_random_action(
         self,
-        market_context: Dict
+        market_context: dict
     ) -> AgentVote:
         """
         Generate completely random action for exploration.
@@ -164,11 +163,11 @@ class ExplorationStrategy:
 
     def get_best_action(
         self,
-        learned_patterns: List[Dict],
-        academic_patterns: List[Dict],
-        evolved_patterns: List[Dict],
+        learned_patterns: list[dict],
+        academic_patterns: list[dict],
+        evolved_patterns: list[dict],
         current_state: np.ndarray
-    ) -> Tuple[AgentVote, str]:
+    ) -> tuple[AgentVote, str]:
         """
         Get best action by comparing all pattern types.
 
@@ -269,7 +268,7 @@ class ExplorationStrategy:
             f"{pattern_description}"
         )
 
-    def get_statistics(self) -> Dict:
+    def get_statistics(self) -> dict:
         """Get exploration statistics"""
         total = max(self.stats["total_decisions"], 1)
 
@@ -342,7 +341,7 @@ class PatternDiscovery:
         self.min_sharpe = min_sharpe
 
         # Random exploration results
-        self.random_episodes: List[Dict] = []
+        self.random_episodes: list[dict] = []
 
         logger.info(
             f"PatternDiscovery initialized: "
@@ -351,7 +350,7 @@ class PatternDiscovery:
 
     def add_random_episode(
         self,
-        episode: Dict,
+        episode: dict,
         reward: float
     ):
         """Add random exploration result"""
@@ -364,7 +363,7 @@ class PatternDiscovery:
         if len(self.random_episodes) % 50 == 0:
             self.discover_patterns()
 
-    def discover_patterns(self) -> List[Dict]:
+    def discover_patterns(self) -> list[dict]:
         """
         Attempt to discover statistically significant patterns.
 

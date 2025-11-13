@@ -8,10 +8,10 @@ Detects patterns ACROSS multiple trading pairs:
 - Divergence patterns
 """
 
-from .correlation_detector import CorrelationDetector
-from .cointegration_tester import CointegrationTester
-from .lead_lag_analyzer import LeadLagAnalyzer
 from .arbitrage_detector import ArbitrageDetector
+from .cointegration_tester import CointegrationTester
+from .correlation_detector import CorrelationDetector
+from .lead_lag_analyzer import LeadLagAnalyzer
 
 __all__ = [
     "CorrelationDetector",

@@ -4,9 +4,10 @@ Integration tests for PostgreSQL connectivity and operations
 Tests PostgreSQL connection, CRUD operations, and transactions.
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 
 class TestPostgresConnection:
@@ -318,7 +319,7 @@ class TestPostgresQueryOptimization:
 
             # Execute multiple times with different parameters
             results1 = await stmt.fetch(1.0)
-            results2 = await stmt.fetch(1.5)
+            await stmt.fetch(1.5)
 
             assert len(results1) > 0
             assert mock_stmt.fetch.call_count == 2

@@ -8,9 +8,9 @@ Detects correlation patterns across multiple pairs:
 - Correlation breaks (BTC and SOL diverging)
 """
 
-import numpy as np
-from typing import Dict, List, Optional
 from dataclasses import dataclass
+
+import numpy as np
 
 
 @dataclass
@@ -22,7 +22,7 @@ class CorrelationPattern:
     pattern_type: str  # "normal", "amplified", "dampened", "break"
     confidence: float  # 0 to 1
     description: str
-    trading_signal: Optional[str] = None
+    trading_signal: str | None = None
 
 
 class CorrelationDetector:
@@ -43,12 +43,12 @@ class CorrelationDetector:
             window_size: Number of candles for correlation calculation
         """
         self.window_size = window_size
-        self.correlation_history: Dict[tuple, List[float]] = {}
+        self.correlation_history: dict[tuple, list[float]] = {}
 
     def calculate_correlation_matrix(
         self,
-        price_data: Dict[str, np.ndarray]
-    ) -> Dict[tuple, float]:
+        price_data: dict[str, np.ndarray]
+    ) -> dict[tuple, float]:
         """
         Calculate correlation matrix across all pairs
 
@@ -90,8 +90,8 @@ class CorrelationDetector:
 
     def detect_correlation_patterns(
         self,
-        price_data: Dict[str, np.ndarray]
-    ) -> List[CorrelationPattern]:
+        price_data: dict[str, np.ndarray]
+    ) -> list[CorrelationPattern]:
         """
         Detect correlation-based trading patterns
 
@@ -171,8 +171,8 @@ class CorrelationDetector:
 
     def get_diversification_score(
         self,
-        held_pairs: List[str],
-        price_data: Dict[str, np.ndarray]
+        held_pairs: list[str],
+        price_data: dict[str, np.ndarray]
     ) -> float:
         """
         Calculate portfolio diversification score

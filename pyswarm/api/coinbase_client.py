@@ -12,15 +12,13 @@ import hashlib
 import hmac
 import json
 import time
-from typing import Any, Dict, List, Optional
-from decimal import Decimal
 from enum import Enum
+from typing import Any
 
 import aiohttp
 import structlog
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from coinswarm.core.config import settings
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = structlog.get_logger(__name__)
 
@@ -58,9 +56,9 @@ class CoinbaseAPIClient:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        api_secret: Optional[str] = None,
-        base_url: Optional[str] = None,
+        api_key: str | None = None,
+        api_secret: str | None = None,
+        base_url: str | None = None,
     ):
         """
         Initialize Coinbase API client.
@@ -77,7 +75,7 @@ class CoinbaseAPIClient:
         if not self.api_key or not self.api_secret:
             raise ValueError("Coinbase API key and secret must be provided")
 
-        self.session: Optional[aiohttp.ClientSession] = None
+        self.session: aiohttp.ClientSession | None = None
         self.logger = logger.bind(component="coinbase_client")
 
     async def __aenter__(self) -> "CoinbaseAPIClient":
@@ -110,7 +108,7 @@ class CoinbaseAPIClient:
         signature = hmac.new(secret_decoded, message.encode("utf-8"), hashlib.sha256)
         return base64.b64encode(signature.digest()).decode("utf-8")
 
-    def _build_headers(self, method: str, request_path: str, body: str = "") -> Dict[str, str]:
+    def _build_headers(self, method: str, request_path: str, body: str = "") -> dict[str, str]:
         """
         Build authenticated request headers.
 
@@ -141,9 +139,9 @@ class CoinbaseAPIClient:
         self,
         method: str,
         endpoint: str,
-        params: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        params: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Make authenticated API request with retry logic.
 
@@ -198,7 +196,7 @@ class CoinbaseAPIClient:
     # Account Endpoints
     # ========================================================================
 
-    async def list_accounts(self) -> List[Dict[str, Any]]:
+    async def list_accounts(self) -> list[dict[str, Any]]:
         """
         Get list of all trading accounts.
 
@@ -208,7 +206,7 @@ class CoinbaseAPIClient:
         response = await self._request("GET", "/api/v3/brokerage/accounts")
         return response.get("accounts", [])
 
-    async def get_account(self, account_id: str) -> Dict[str, Any]:
+    async def get_account(self, account_id: str) -> dict[str, Any]:
         """
         Get specific account details.
 
@@ -225,7 +223,7 @@ class CoinbaseAPIClient:
     # Product Endpoints
     # ========================================================================
 
-    async def list_products(self) -> List[Dict[str, Any]]:
+    async def list_products(self) -> list[dict[str, Any]]:
         """
         Get list of all available trading products.
 
@@ -235,7 +233,7 @@ class CoinbaseAPIClient:
         response = await self._request("GET", "/api/v3/brokerage/products")
         return response.get("products", [])
 
-    async def get_product(self, product_id: str) -> Dict[str, Any]:
+    async def get_product(self, product_id: str) -> dict[str, Any]:
         """
         Get specific product details.
 
@@ -248,7 +246,7 @@ class CoinbaseAPIClient:
         response = await self._request("GET", f"/api/v3/brokerage/products/{product_id}")
         return response
 
-    async def get_product_ticker(self, product_id: str) -> Dict[str, Any]:
+    async def get_product_ticker(self, product_id: str) -> dict[str, Any]:
         """
         Get current ticker for a product.
 
@@ -267,7 +265,7 @@ class CoinbaseAPIClient:
         start: int,
         end: int,
         granularity: str = "ONE_MINUTE",
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get historical candles for a product.
 
@@ -294,10 +292,10 @@ class CoinbaseAPIClient:
         self,
         product_id: str,
         side: OrderSide,
-        size: Optional[str] = None,
-        quote_size: Optional[str] = None,
-        client_order_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        size: str | None = None,
+        quote_size: str | None = None,
+        client_order_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         Create a market order.
 
@@ -314,7 +312,7 @@ class CoinbaseAPIClient:
         if not size and not quote_size:
             raise ValueError("Either size or quote_size must be specified")
 
-        order_config: Dict[str, Any] = {"market_market_ioc": {}}
+        order_config: dict[str, Any] = {"market_market_ioc": {}}
         if quote_size:
             order_config["market_market_ioc"]["quote_size"] = quote_size
         elif size:
@@ -339,8 +337,8 @@ class CoinbaseAPIClient:
         limit_price: str,
         time_in_force: TimeInForce = TimeInForce.GTC,
         post_only: bool = False,
-        client_order_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        client_order_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         Create a limit order.
 
@@ -375,7 +373,7 @@ class CoinbaseAPIClient:
 
         return await self._request("POST", "/api/v3/brokerage/orders", data=data)
 
-    async def cancel_order(self, order_id: str) -> Dict[str, Any]:
+    async def cancel_order(self, order_id: str) -> dict[str, Any]:
         """
         Cancel an order.
 
@@ -390,10 +388,10 @@ class CoinbaseAPIClient:
 
     async def list_orders(
         self,
-        product_id: Optional[str] = None,
-        order_status: Optional[List[str]] = None,
+        product_id: str | None = None,
+        order_status: list[str] | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         List orders with optional filters.
 
@@ -405,7 +403,7 @@ class CoinbaseAPIClient:
         Returns:
             List of order dictionaries
         """
-        params: Dict[str, Any] = {"limit": limit}
+        params: dict[str, Any] = {"limit": limit}
         if product_id:
             params["product_id"] = product_id
         if order_status:
@@ -414,7 +412,7 @@ class CoinbaseAPIClient:
         response = await self._request("GET", "/api/v3/brokerage/orders/historical/batch", params=params)
         return response.get("orders", [])
 
-    async def get_order(self, order_id: str) -> Dict[str, Any]:
+    async def get_order(self, order_id: str) -> dict[str, Any]:
         """
         Get specific order details.
 
@@ -433,10 +431,10 @@ class CoinbaseAPIClient:
 
     async def list_fills(
         self,
-        order_id: Optional[str] = None,
-        product_id: Optional[str] = None,
+        order_id: str | None = None,
+        product_id: str | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get list of fills (executed trades).
 
@@ -448,7 +446,7 @@ class CoinbaseAPIClient:
         Returns:
             List of fill dictionaries
         """
-        params: Dict[str, Any] = {"limit": limit}
+        params: dict[str, Any] = {"limit": limit}
         if order_id:
             params["order_id"] = order_id
         if product_id:

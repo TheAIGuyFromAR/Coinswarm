@@ -51,14 +51,13 @@ Academic Reference:
 """
 
 import logging
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
-from dataclasses import dataclass
-
-from coinswarm.memory.hierarchical_memory import Timescale, HierarchicalMemory
 from coinswarm.backtesting.random_window_validator import WindowResult
+from coinswarm.memory.hierarchical_memory import Timescale
 
 logger = logging.getLogger(__name__)
 
@@ -124,15 +123,15 @@ class MultiTimescaleResult:
     primary_timescale: Timescale
 
     # Results by timescale
-    results_by_timescale: Dict[Timescale, List[WindowResult]]
+    results_by_timescale: dict[Timescale, list[WindowResult]]
 
     # Aggregate performance
-    passed_timescales: List[Timescale]
-    failed_timescales: List[Timescale]
+    passed_timescales: list[Timescale]
+    failed_timescales: list[Timescale]
 
     # Best/worst
-    best_timescale: Optional[Timescale] = None
-    worst_timescale: Optional[Timescale] = None
+    best_timescale: Timescale | None = None
+    worst_timescale: Timescale | None = None
 
     # Cross-timescale consistency
     is_cross_timescale_robust: bool = False
@@ -194,16 +193,16 @@ class MultiTimescaleValidator:
         )
 
         # Results storage
-        self.validation_results: List[MultiTimescaleResult] = []
+        self.validation_results: list[MultiTimescaleResult] = []
 
     async def validate_strategy(
         self,
         strategy,
         strategy_name: str = "unnamed",
-        primary_timescale: Optional[Timescale] = None,
+        primary_timescale: Timescale | None = None,
         test_adjacent: bool = True,
         test_all_timescales: bool = False,
-        requirements: Optional[Dict[Timescale, TimescaleRequirement]] = None
+        requirements: dict[Timescale, TimescaleRequirement] | None = None
     ) -> MultiTimescaleResult:
         """
         Validate strategy across timescales.
@@ -293,8 +292,8 @@ class MultiTimescaleValidator:
 
     def _get_default_requirements(
         self,
-        timescales: List[Timescale]
-    ) -> Dict[Timescale, TimescaleRequirement]:
+        timescales: list[Timescale]
+    ) -> dict[Timescale, TimescaleRequirement]:
         """Get default requirements for each timescale"""
         requirements = {}
 
@@ -313,7 +312,7 @@ class MultiTimescaleValidator:
     def _generate_windows_for_timescale(
         self,
         timescale: Timescale
-    ) -> List[Tuple[datetime, datetime, int]]:
+    ) -> list[tuple[datetime, datetime, int]]:
         """
         Generate test windows appropriate for timescale.
 
@@ -356,7 +355,7 @@ class MultiTimescaleValidator:
         end = self.data.index[-1]
         total_seconds = (end - start).total_seconds()
 
-        for i in range(n_windows):
+        for _i in range(n_windows):
             # Random window length
             window_seconds = np.random.randint(min_length_seconds, max_length_seconds)
 
@@ -462,8 +461,8 @@ class MultiTimescaleValidator:
         self,
         strategy_name: str,
         primary_timescale: Timescale,
-        results_by_timescale: Dict[Timescale, List[WindowResult]],
-        requirements: Dict[Timescale, TimescaleRequirement]
+        results_by_timescale: dict[Timescale, list[WindowResult]],
+        requirements: dict[Timescale, TimescaleRequirement]
     ) -> MultiTimescaleResult:
         """Analyze performance across timescales"""
 

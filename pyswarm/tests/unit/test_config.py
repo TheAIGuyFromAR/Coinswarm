@@ -5,15 +5,14 @@ Tests configuration loading and validation.
 """
 
 import pytest
-from pydantic import ValidationError
-
 from coinswarm.core.config import (
-    Settings,
+    AgentSettings,
     CoinbaseSettings,
     RedisSettings,
+    Settings,
     TradingSettings,
-    AgentSettings,
 )
+from pydantic import ValidationError
 
 
 class TestCoinbaseSettings:

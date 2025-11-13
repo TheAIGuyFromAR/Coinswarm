@@ -19,12 +19,9 @@ Types of arbitrage:
 """
 
 import logging
-from typing import Dict, Optional, List, Tuple
-from datetime import datetime
 
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
 from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
-
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +53,7 @@ class ArbitrageAgent(BaseAgent):
         self.total_fee_pct = fee_pct * 3  # 3 legs = 3× fees
 
         # Price cache for arbitrage calculation
-        self.price_cache: Dict[str, float] = {}
+        self.price_cache: dict[str, float] = {}
 
         # Arbitrage opportunities found
         self.opportunities_found = 0
@@ -65,8 +62,8 @@ class ArbitrageAgent(BaseAgent):
     async def analyze(
         self,
         tick: DataPoint,
-        position: Optional[Dict],
-        market_context: Dict
+        position: dict | None,
+        market_context: dict
     ) -> AgentVote:
         """
         Analyze for arbitrage opportunities.
@@ -113,7 +110,7 @@ class ArbitrageAgent(BaseAgent):
             reason="No arbitrage opportunities found"
         )
 
-    def _find_best_arbitrage(self) -> Optional[Tuple[List[str], float, float]]:
+    def _find_best_arbitrage(self) -> tuple[list[str], float, float] | None:
         """
         Find best triangular arbitrage opportunity.
 
@@ -183,7 +180,7 @@ class ArbitrageAgent(BaseAgent):
         leg1: str,
         leg2: str,
         end: str
-    ) -> Optional[Tuple[List[str], float, float]]:
+    ) -> tuple[list[str], float, float] | None:
         """
         Calculate profit from triangular arbitrage.
 
@@ -235,7 +232,7 @@ class ArbitrageAgent(BaseAgent):
         leg2: str,
         leg3: str,
         end: str
-    ) -> Optional[Tuple[List[str], float, float]]:
+    ) -> tuple[list[str], float, float] | None:
         """
         Calculate profit from 4-leg arbitrage.
 
@@ -281,7 +278,7 @@ class ArbitrageAgent(BaseAgent):
             logger.debug(f"Error calculating complex arbitrage: {e}")
             return None
 
-    def get_arbitrage_stats(self) -> Dict:
+    def get_arbitrage_stats(self) -> dict:
         """Get arbitrage statistics"""
 
         return {
@@ -326,13 +323,13 @@ class CrossExchangeArbitrageAgent(BaseAgent):
         self.min_profit_pct = min_profit_pct
 
         # Track prices across exchanges
-        self.exchange_prices: Dict[str, Dict[str, float]] = {}
+        self.exchange_prices: dict[str, dict[str, float]] = {}
 
     async def analyze(
         self,
         tick: DataPoint,
-        position: Optional[Dict],
-        market_context: Dict
+        position: dict | None,
+        market_context: dict
     ) -> AgentVote:
         """
         Analyze cross-exchange arbitrage.

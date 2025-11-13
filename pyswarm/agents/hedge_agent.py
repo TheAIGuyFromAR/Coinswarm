@@ -20,13 +20,10 @@ Finance terms:
 """
 
 import logging
-from typing import Dict, Optional, List, Tuple
 from dataclasses import dataclass
-from datetime import datetime
 
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
 from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
-
 
 logger = logging.getLogger(__name__)
 
@@ -70,17 +67,17 @@ class HedgeAgent(BaseAgent):
         self,
         name: str = "HedgeManager",
         weight: float = 3.0,  # Very high weight (can veto trades)
-        risk_params: Optional[RiskParameters] = None
+        risk_params: RiskParameters | None = None
     ):
         super().__init__(name, weight)
 
         self.risk_params = risk_params or RiskParameters()
 
         # Track positions
-        self.positions: Dict[str, Dict] = {}
+        self.positions: dict[str, dict] = {}
 
         # Correlation matrix (for hedging)
-        self.correlations: Dict[Tuple[str, str], float] = {
+        self.correlations: dict[tuple[str, str], float] = {
             ("BTC-USD", "ETH-USD"): 0.85,  # BTC and ETH highly correlated
             ("BTC-USD", "SOL-USD"): 0.75,
             ("ETH-USD", "SOL-USD"): 0.80,
@@ -89,8 +86,8 @@ class HedgeAgent(BaseAgent):
     async def analyze(
         self,
         tick: DataPoint,
-        position: Optional[Dict],
-        market_context: Dict
+        position: dict | None,
+        market_context: dict
     ) -> AgentVote:
         """
         Analyze risk and recommend hedges or vetoes.
@@ -218,9 +215,9 @@ class HedgeAgent(BaseAgent):
     def _recommend_hedge(
         self,
         symbol: str,
-        position: Optional[Dict],
-        market_context: Dict
-    ) -> Optional[HedgeRecommendation]:
+        position: dict | None,
+        market_context: dict
+    ) -> HedgeRecommendation | None:
         """
         Recommend hedge for position if correlation risk is high.
 
@@ -250,7 +247,7 @@ class HedgeAgent(BaseAgent):
 
         return None
 
-    def check_stop_loss(self, symbol: str, current_price: float, position: Dict) -> bool:
+    def check_stop_loss(self, symbol: str, current_price: float, position: dict) -> bool:
         """
         Check if position should be stopped out.
 
@@ -285,7 +282,7 @@ class HedgeAgent(BaseAgent):
 
         return False
 
-    def check_take_profit(self, symbol: str, current_price: float, position: Dict) -> bool:
+    def check_take_profit(self, symbol: str, current_price: float, position: dict) -> bool:
         """
         Check if position should take profit.
 
@@ -320,7 +317,7 @@ class HedgeAgent(BaseAgent):
 
         return False
 
-    def calculate_risk_reward_ratio(self, entry_price: float, action: str) -> Dict:
+    def calculate_risk_reward_ratio(self, entry_price: float, action: str) -> dict:
         """
         Calculate risk/reward ratio for a trade.
 
@@ -352,7 +349,7 @@ class HedgeAgent(BaseAgent):
             "risk_reward_ratio": ratio
         }
 
-    def update_position(self, symbol: str, position: Dict):
+    def update_position(self, symbol: str, position: dict):
         """Update tracked position"""
         self.positions[symbol] = position
 
@@ -361,7 +358,7 @@ class HedgeAgent(BaseAgent):
         if symbol in self.positions:
             del self.positions[symbol]
 
-    def get_portfolio_risk(self) -> Dict:
+    def get_portfolio_risk(self) -> dict:
         """
         Calculate total portfolio risk.
 

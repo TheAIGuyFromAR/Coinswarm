@@ -12,12 +12,10 @@ Multiple specialized agents working together are better than any single agent.
 """
 
 import logging
-from typing import List, Dict, Optional
 from dataclasses import dataclass
 
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
 from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
-
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +26,9 @@ class CommitteeDecision:
     action: str  # "BUY", "SELL", "HOLD"
     confidence: float  # 0.0-1.0 (aggregated from all agents)
     size: float  # Position size
-    price: Optional[float] = None
+    price: float | None = None
     reason: str = ""  # Summary of all agent votes
-    votes: List[AgentVote] = None  # Individual agent votes
+    votes: list[AgentVote] = None  # Individual agent votes
     vetoed: bool = False  # If any agent vetoed
 
 
@@ -48,7 +46,7 @@ class AgentCommittee:
     This is inspired by the 17000% return swarm in tradfi.
     """
 
-    def __init__(self, agents: List[BaseAgent], confidence_threshold: float = 0.7):
+    def __init__(self, agents: list[BaseAgent], confidence_threshold: float = 0.7):
         """
         Initialize committee.
 
@@ -75,8 +73,8 @@ class AgentCommittee:
     async def vote(
         self,
         tick: DataPoint,
-        position: Optional[Dict] = None,
-        market_context: Optional[Dict] = None
+        position: dict | None = None,
+        market_context: dict | None = None
     ) -> CommitteeDecision:
         """
         Get votes from all agents and aggregate into final decision.
@@ -100,7 +98,7 @@ class AgentCommittee:
         self.stats["decisions_made"] += 1
 
         # Collect votes from all agents
-        votes: List[AgentVote] = []
+        votes: list[AgentVote] = []
 
         for agent in self.agents:
             try:
@@ -156,7 +154,7 @@ class AgentCommittee:
 
         return decision
 
-    def _aggregate_votes(self, votes: List[AgentVote], tick: DataPoint) -> CommitteeDecision:
+    def _aggregate_votes(self, votes: list[AgentVote], tick: DataPoint) -> CommitteeDecision:
         """
         Aggregate agent votes using weighted confidence.
 
@@ -186,7 +184,7 @@ class AgentCommittee:
         hold_votes = [v for v in votes if v.action == "HOLD"]
 
         # Calculate weighted confidence for each action
-        def weighted_confidence(action_votes: List[AgentVote]) -> float:
+        def weighted_confidence(action_votes: list[AgentVote]) -> float:
             if not action_votes:
                 return 0.0
 
@@ -274,7 +272,7 @@ class AgentCommittee:
                 f"Agent {agent.name}: accuracy={accuracy:.2%}, weight={agent.weight:.2f}"
             )
 
-    def update_trade_result(self, trade: Dict, profitable: bool):
+    def update_trade_result(self, trade: dict, profitable: bool):
         """
         Update all agents with trade result.
 
@@ -301,7 +299,7 @@ class AgentCommittee:
             return 0.5
         return self.stats["profitable_trades"] / total
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get committee statistics"""
         return {
             "decisions_made": self.stats["decisions_made"],

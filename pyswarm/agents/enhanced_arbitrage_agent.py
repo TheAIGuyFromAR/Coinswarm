@@ -13,13 +13,12 @@ ALL types of inefficiencies across multiple pairs.
 """
 
 import logging
-from typing import Dict, List, Optional
 from dataclasses import dataclass
-import numpy as np
 
+import numpy as np
 from coinswarm.patterns.arbitrage_detector import ArbitrageDetector
-from coinswarm.patterns.correlation_detector import CorrelationDetector
 from coinswarm.patterns.cointegration_tester import CointegrationTester
+from coinswarm.patterns.correlation_detector import CorrelationDetector
 from coinswarm.patterns.lead_lag_analyzer import LeadLagAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -29,11 +28,11 @@ logger = logging.getLogger(__name__)
 class TradingOpportunity:
     """Unified trading opportunity from any arbitrage type"""
     type: str  # Type of opportunity
-    pairs: List[str]  # Pairs involved
+    pairs: list[str]  # Pairs involved
     expected_profit: float  # Expected profit percentage
     confidence: float  # Confidence score 0-1
     risk: str  # "low", "medium", "high"
-    execution_plan: List[str]  # Step-by-step execution
+    execution_plan: list[str]  # Step-by-step execution
     description: str
 
 
@@ -80,8 +79,8 @@ class EnhancedArbitrageAgent:
 
     async def find_all_opportunities(
         self,
-        market_data: Dict[str, np.ndarray]
-    ) -> List[TradingOpportunity]:
+        market_data: dict[str, np.ndarray]
+    ) -> list[TradingOpportunity]:
         """
         Find ALL arbitrage opportunities across multiple pairs
 
@@ -123,8 +122,8 @@ class EnhancedArbitrageAgent:
 
     def _find_pure_arbitrage(
         self,
-        market_data: Dict[str, np.ndarray]
-    ) -> List[TradingOpportunity]:
+        market_data: dict[str, np.ndarray]
+    ) -> list[TradingOpportunity]:
         """Find pure arbitrage from price differences"""
 
         # Extract current prices
@@ -152,8 +151,8 @@ class EnhancedArbitrageAgent:
 
     def _find_spread_opportunities(
         self,
-        market_data: Dict[str, np.ndarray]
-    ) -> List[TradingOpportunity]:
+        market_data: dict[str, np.ndarray]
+    ) -> list[TradingOpportunity]:
         """Find spread trading opportunities from cointegration"""
 
         spread_opportunities = self.cointegration_tester.detect_spread_opportunities(market_data)
@@ -181,8 +180,8 @@ class EnhancedArbitrageAgent:
 
     def _find_correlation_opportunities(
         self,
-        market_data: Dict[str, np.ndarray]
-    ) -> List[TradingOpportunity]:
+        market_data: dict[str, np.ndarray]
+    ) -> list[TradingOpportunity]:
         """Find opportunities from correlation divergence"""
 
         corr_patterns = self.correlation_detector.detect_correlation_patterns(market_data)
@@ -207,8 +206,8 @@ class EnhancedArbitrageAgent:
 
     def _find_lead_lag_opportunities(
         self,
-        market_data: Dict[str, np.ndarray]
-    ) -> List[TradingOpportunity]:
+        market_data: dict[str, np.ndarray]
+    ) -> list[TradingOpportunity]:
         """Find opportunities from lead-lag relationships"""
 
         lead_lag_patterns = self.lead_lag_analyzer.detect_all_lead_lag_patterns(market_data)
@@ -235,10 +234,10 @@ class EnhancedArbitrageAgent:
 
     async def vote(
         self,
-        market_data: Dict[str, np.ndarray],
-        current_positions: Dict,
-        portfolio_state: Dict
-    ) -> Dict:
+        market_data: dict[str, np.ndarray],
+        current_positions: dict,
+        portfolio_state: dict
+    ) -> dict:
         """
         Agent voting method for committee
 
@@ -321,7 +320,7 @@ if __name__ == "__main__":
 
         # Test voting
         vote = await agent.vote(market_data, {}, {})
-        print(f"\nAgent Vote:")
+        print("\nAgent Vote:")
         print(f"  Action: {vote['action']}")
         print(f"  Confidence: {vote['confidence']:.0%}")
         print(f"  Reasoning: {vote['reasoning']}")

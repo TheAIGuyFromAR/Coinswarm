@@ -4,8 +4,9 @@ Integration tests for Redis connectivity and operations
 Tests Redis connection, key operations, and vector search preparation.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 import redis.asyncio as redis
 
 
@@ -222,7 +223,7 @@ class TestRedisConnectionPool:
     @pytest.mark.asyncio
     async def test_connection_pool_creation(self):
         """Test creating Redis connection pool"""
-        with patch('redis.asyncio.ConnectionPool') as mock_pool:
+        with patch('redis.asyncio.ConnectionPool'):
             pool = redis.ConnectionPool(
                 host='localhost',
                 port=6379,

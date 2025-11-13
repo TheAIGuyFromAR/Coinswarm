@@ -14,12 +14,12 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
-from coinswarm.data_ingest.historical_data_fetcher import HistoricalDataFetcher
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
 from coinswarm.agents.arbitrage_agent import ArbitrageAgent
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
+from coinswarm.agents.risk_agent import RiskManagementAgent
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine
+from coinswarm.data_ingest.historical_data_fetcher import HistoricalDataFetcher
 
 logging.basicConfig(
     level=logging.INFO,

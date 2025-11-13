@@ -13,20 +13,18 @@ Advantages:
 - Real-time trends data
 """
 
-import logging
 import asyncio
-from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+import logging
 import re
-from dataclasses import dataclass
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 try:
     import httpx
 except ImportError:
     import requests as httpx
 
-from coinswarm.data_ingest.base import DataPoint
 
 
 logger = logging.getLogger(__name__)
@@ -53,7 +51,7 @@ class GoogleSentimentFetcher:
     3. Google Custom Search API - FREE tier (100/day)
     """
 
-    def __init__(self, google_api_key: Optional[str] = None, search_engine_id: Optional[str] = None):
+    def __init__(self, google_api_key: str | None = None, search_engine_id: str | None = None):
         """
         Initialize Google sentiment fetcher.
 
@@ -96,7 +94,7 @@ class GoogleSentimentFetcher:
         self,
         symbol: str,
         hours_back: int = 24
-    ) -> List[GoogleNewsArticle]:
+    ) -> list[GoogleNewsArticle]:
         """
         Fetch recent news from Google News RSS.
 
@@ -182,7 +180,7 @@ class GoogleSentimentFetcher:
         self,
         symbol: str,
         days_back: int = 7
-    ) -> List[GoogleNewsArticle]:
+    ) -> list[GoogleNewsArticle]:
         """
         Fetch articles using Google Custom Search API.
 
@@ -215,7 +213,7 @@ class GoogleSentimentFetcher:
             async with httpx.AsyncClient() as client:
                 # Date range
                 end_date = datetime.now()
-                start_date = end_date - timedelta(days=days_back)
+                end_date - timedelta(days=days_back)
 
                 response = await client.get(
                     "https://www.googleapis.com/customsearch/v1",
@@ -269,7 +267,7 @@ class GoogleSentimentFetcher:
         self,
         symbol: str,
         days_back: int = 30
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Fetch Google Trends interest over time.
 
@@ -350,7 +348,7 @@ class GoogleSentimentFetcher:
         self,
         symbol: str,
         hours_back: int = 24
-    ) -> Dict:
+    ) -> dict:
         """
         Fetch comprehensive sentiment from all Google sources.
 
@@ -457,7 +455,7 @@ class GoogleSentimentFetcher:
         # Clamp to [-1, 1]
         return max(-1.0, min(1.0, sentiment))
 
-    def _parse_rfc822_date(self, date_str: str) -> Optional[datetime]:
+    def _parse_rfc822_date(self, date_str: str) -> datetime | None:
         """Parse RFC 822 date format (used in RSS)"""
 
         try:

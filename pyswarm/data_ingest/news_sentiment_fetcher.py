@@ -16,12 +16,10 @@ Recommendation: Start with Google News + Google Trends (no setup needed!)
 For backtesting, we cache historical sentiment scores aligned with price data.
 """
 
-import logging
 import asyncio
+import logging
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
-import json
-from dataclasses import dataclass, asdict
 from enum import Enum
 
 try:
@@ -30,8 +28,6 @@ except ImportError:
     import requests as httpx  # Fallback
 
 from coinswarm.data_ingest.base import DataPoint
-from coinswarm.data_ingest.google_sentiment_fetcher import GoogleSentimentFetcher
-
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +49,8 @@ class NewsArticle:
     title: str
     url: str
     sentiment: float  # -1.0 to +1.0
-    symbols: List[str]  # ["BTC", "ETH"]
-    categories: List[str]  # ["regulation", "adoption", "technical"]
+    symbols: list[str]  # ["BTC", "ETH"]
+    categories: list[str]  # ["regulation", "adoption", "technical"]
 
     def to_dict(self):
         return {
@@ -101,9 +97,9 @@ class NewsSentimentFetcher:
 
     def __init__(
         self,
-        cryptocompare_api_key: Optional[str] = None,
-        newsapi_key: Optional[str] = None,
-        reddit_credentials: Optional[Dict] = None
+        cryptocompare_api_key: str | None = None,
+        newsapi_key: str | None = None,
+        reddit_credentials: dict | None = None
     ):
         self.cryptocompare_api_key = cryptocompare_api_key
         self.newsapi_key = newsapi_key
@@ -121,7 +117,7 @@ class NewsSentimentFetcher:
         }
 
         # Cache for sentiment data
-        self.sentiment_cache: Dict[str, List[SentimentSnapshot]] = {}
+        self.sentiment_cache: dict[str, list[SentimentSnapshot]] = {}
 
     async def fetch_historical_sentiment(
         self,
@@ -129,7 +125,7 @@ class NewsSentimentFetcher:
         start_date: datetime,
         end_date: datetime,
         interval_hours: int = 24
-    ) -> List[SentimentSnapshot]:
+    ) -> list[SentimentSnapshot]:
         """
         Fetch historical sentiment data aligned with price data.
 
@@ -236,7 +232,7 @@ class NewsSentimentFetcher:
             bearish_count=bearish_count
         )
 
-    async def _fetch_fear_greed_index(self, timestamp: datetime) -> Dict:
+    async def _fetch_fear_greed_index(self, timestamp: datetime) -> dict:
         """
         Fetch Fear & Greed Index from Alternative.me
 
@@ -272,7 +268,7 @@ class NewsSentimentFetcher:
         self,
         symbol: str,
         timestamp: datetime
-    ) -> Dict:
+    ) -> dict:
         """
         Fetch news from CryptoCompare API.
 
@@ -332,7 +328,7 @@ class NewsSentimentFetcher:
             logger.warning(f"CryptoCompare news fetch failed: {e}")
             return {"articles": []}
 
-    async def _fetch_newsapi(self, symbol: str, timestamp: datetime) -> Dict:
+    async def _fetch_newsapi(self, symbol: str, timestamp: datetime) -> dict:
         """
         Fetch news from NewsAPI.org
 
@@ -400,7 +396,7 @@ class NewsSentimentFetcher:
             logger.warning(f"NewsAPI fetch failed: {e}")
             return {"articles": []}
 
-    async def _fetch_reddit_sentiment(self, symbol: str, timestamp: datetime) -> Dict:
+    async def _fetch_reddit_sentiment(self, symbol: str, timestamp: datetime) -> dict:
         """
         Fetch Reddit sentiment from r/CryptoCurrency, r/Bitcoin, etc.
 
@@ -456,7 +452,7 @@ class NewsSentimentFetcher:
         # Clamp to [-1, 1]
         return max(-1.0, min(1.0, sentiment))
 
-    def _calculate_news_sentiment(self, articles: List[NewsArticle]) -> float:
+    def _calculate_news_sentiment(self, articles: list[NewsArticle]) -> float:
         """Aggregate sentiment from news articles"""
 
         if not articles:
@@ -477,7 +473,7 @@ class NewsSentimentFetcher:
 
         return weighted_sum / total_weight if total_weight > 0 else 0.0
 
-    def _calculate_social_sentiment(self, mentions: List) -> float:
+    def _calculate_social_sentiment(self, mentions: list) -> float:
         """Aggregate sentiment from social media mentions"""
 
         # TODO: Implement when Reddit/Twitter are added
@@ -485,8 +481,8 @@ class NewsSentimentFetcher:
 
     def convert_to_datapoints(
         self,
-        snapshots: List[SentimentSnapshot]
-    ) -> List[DataPoint]:
+        snapshots: list[SentimentSnapshot]
+    ) -> list[DataPoint]:
         """
         Convert sentiment snapshots to DataPoint objects
         for integration with backtesting system.

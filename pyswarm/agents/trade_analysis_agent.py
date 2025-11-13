@@ -12,13 +12,11 @@ Key responsibilities:
 """
 
 import logging
-from typing import Dict, Optional, List
-from datetime import datetime, timedelta
 from dataclasses import dataclass
+from datetime import datetime
 
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
 from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
-
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +33,8 @@ class TradeOutcome:
     pnl_pct: float  # Profit/loss as percentage
     duration_seconds: float
     winning: bool
-    contributing_agents: List[str]  # Agents that voted for this trade
-    strategy_tags: List[str]  # Strategy patterns (e.g., "trend_uptrend", "news_positive")
+    contributing_agents: list[str]  # Agents that voted for this trade
+    strategy_tags: list[str]  # Strategy patterns (e.g., "trend_uptrend", "news_positive")
 
 
 class TradeAnalysisAgent(BaseAgent):
@@ -60,7 +58,7 @@ class TradeAnalysisAgent(BaseAgent):
         self.lookback_period = lookback_period
 
         # Trade history
-        self.trade_outcomes: List[TradeOutcome] = []
+        self.trade_outcomes: list[TradeOutcome] = []
 
         # Performance metrics
         self.metrics = {
@@ -81,8 +79,8 @@ class TradeAnalysisAgent(BaseAgent):
     async def analyze(
         self,
         tick: DataPoint,
-        position: Optional[Dict],
-        market_context: Dict
+        position: dict | None,
+        market_context: dict
     ) -> AgentVote:
         """
         Trade analyzer doesn't vote on new trades.
@@ -98,10 +96,10 @@ class TradeAnalysisAgent(BaseAgent):
 
     def analyze_completed_trade(
         self,
-        trade: Dict,
+        trade: dict,
         entry_price: float,
         exit_price: float,
-        committee_votes: List[Dict]
+        committee_votes: list[dict]
     ) -> TradeOutcome:
         """
         Analyze a completed trade.
@@ -176,7 +174,7 @@ class TradeAnalysisAgent(BaseAgent):
 
         return outcome
 
-    def _extract_strategy_tags(self, committee_votes: List[Dict]) -> List[str]:
+    def _extract_strategy_tags(self, committee_votes: list[dict]) -> list[str]:
         """
         Extract strategy tags from agent vote reasons.
 
@@ -270,7 +268,7 @@ class TradeAnalysisAgent(BaseAgent):
             if std_dev > 0:
                 self.metrics["sharpe_ratio"] = mean_return / std_dev
 
-    def get_agent_performance(self, agent_name: str) -> Dict:
+    def get_agent_performance(self, agent_name: str) -> dict:
         """
         Get performance metrics for a specific agent.
 
@@ -303,7 +301,7 @@ class TradeAnalysisAgent(BaseAgent):
             "total_pnl": sum(t.pnl for t in agent_trades)
         }
 
-    def get_strategy_performance(self, strategy_tag: str) -> Dict:
+    def get_strategy_performance(self, strategy_tag: str) -> dict:
         """
         Get performance metrics for a specific strategy pattern.
 
@@ -347,7 +345,7 @@ class TradeAnalysisAgent(BaseAgent):
             "weight": weight
         }
 
-    def get_all_strategy_weights(self) -> Dict[str, float]:
+    def get_all_strategy_weights(self) -> dict[str, float]:
         """
         Get weights for all discovered strategies.
 
@@ -374,6 +372,6 @@ class TradeAnalysisAgent(BaseAgent):
 
         return weights
 
-    def get_metrics(self) -> Dict:
+    def get_metrics(self) -> dict:
         """Get all performance metrics"""
         return self.metrics

@@ -14,12 +14,12 @@ P0 Requirement: Get 6+ months of data
 """
 
 import asyncio
-import httpx
 import json
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import List, Dict, Optional
 import time
+from datetime import datetime
+from pathlib import Path
+
+import httpx
 
 
 class MultiSourceHistoricalFetcher:
@@ -34,7 +34,7 @@ class MultiSourceHistoricalFetcher:
         self,
         symbol: str,
         days: int
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Fetch from CryptoCompare (free, 2000 hours per call)
         """
@@ -53,7 +53,7 @@ class MultiSourceHistoricalFetcher:
             if limit <= 0:
                 break
 
-            url = f"https://min-api.cryptocompare.com/data/v2/histohour"
+            url = "https://min-api.cryptocompare.com/data/v2/histohour"
             params = {
                 "fsym": symbol,
                 "tsym": "USD",
@@ -111,7 +111,7 @@ class MultiSourceHistoricalFetcher:
         self,
         symbol: str,
         days: int
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Fetch from CoinGecko (free, 365 days at a time)
         """
@@ -187,7 +187,7 @@ class MultiSourceHistoricalFetcher:
         print(f"  📈 Total from CoinGecko: {len(all_candles)} candles")
         return all_candles
 
-    def deduplicate_and_merge(self, candles: List[Dict]) -> List[Dict]:
+    def deduplicate_and_merge(self, candles: list[dict]) -> list[dict]:
         """Deduplicate candles by timestamp"""
         seen = {}
 
@@ -214,7 +214,7 @@ class MultiSourceHistoricalFetcher:
         symbol: str,
         days: int,
         force_refresh: bool = False
-    ) -> Dict:
+    ) -> dict:
         """
         Fetch historical data from multiple sources
 

@@ -19,15 +19,12 @@ Usage:
 """
 
 from coinswarm.backtesting.backtest_engine import (
-    BacktestEngine,
     BacktestConfig,
+    BacktestEngine,
+    BacktestResult,
     BacktestTrade,
-    BacktestResult
 )
-from coinswarm.backtesting.continuous_backtester import (
-    ContinuousBacktester,
-    BacktestTask
-)
+from coinswarm.backtesting.continuous_backtester import BacktestTask, ContinuousBacktester
 
 __all__ = [
     "BacktestEngine",

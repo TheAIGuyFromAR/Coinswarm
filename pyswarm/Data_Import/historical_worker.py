@@ -32,10 +32,9 @@ For each (symbol, exchange, timeframe):
 
 
 
-import urllib.request
-import urllib.parse
 import json
-from typing import Optional
+import urllib.parse
+import urllib.request
 
 CRYPTOCOMPARE_API_URL = "https://min-api.cryptocompare.com/data/v2/histoday"
 
@@ -104,7 +103,7 @@ def fetch_ohlcv_cryptocompare(
     limit: int = 2000,
     timeframe: str = "day",
     api_key: str = "",
-    toTs: 'Optional[int]' = None
+    toTs: 'int | None' = None
 ):
     """
     Fetch OHLCV data from CryptoCompare for any symbol pair, exchange, and timeframe.
@@ -130,8 +129,9 @@ def fetch_ohlcv_cryptocompare(
         full_url += f"&api_key={api_key}"
     # Use Cloudflare Workers fetch if in WORKER_MODE, else urllib for local
     try:
-        from workers import fetch as cf_fetch
         import asyncio
+
+        from workers import fetch as cf_fetch
         async def fetch_worker():
             resp = await cf_fetch(full_url)
             if resp.status != 200:
@@ -150,11 +150,11 @@ def fetch_ohlcv_cryptocompare(
         # Local mode: use urllib
         with urllib.request.urlopen(full_url) as resp:
             if resp.status != 200:
-                raise Exception(f"HTTP error: {resp.status}")
+                raise Exception(f"HTTP error: {resp.status}") from None
             data = json.loads(resp.read().decode())
             if "Data" not in data or "Data" not in data["Data"]:
                 print(f"Unexpected CryptoCompare response: {data}")
-                raise Exception(f"Unexpected CryptoCompare response: {data}")
+                raise Exception(f"Unexpected CryptoCompare response: {data}") from None
             return data["Data"]["Data"]
 
 async def paged_fetch_and_insert(env, symbol, fsym, tsym, exchange, timeframe, source, api_key, toTs=None):
@@ -241,7 +241,7 @@ if not WORKER_MODE:
         api_key = os.environ.get("CRYPTOCOMPARE_API_KEY", "")
         import asyncio
         async def main():
-            total_inserted = await paginated_fetch_and_insert(
+            total_inserted = await paged_fetch_and_insert(
                 env=None,  # Replace with actual DB env if running with D1
                 symbol="BTC-USDC", fsym="BTC", tsym="USDC", exchange="CCCAGG", timeframe="day", source="cryptocompare", api_key=api_key
             )

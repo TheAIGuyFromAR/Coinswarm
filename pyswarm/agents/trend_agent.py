@@ -11,11 +11,9 @@ Strategy:
 """
 
 import logging
-from typing import Dict, Optional
 
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
 from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
-
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +37,8 @@ class TrendFollowingAgent(BaseAgent):
     async def analyze(
         self,
         tick: DataPoint,
-        position: Optional[Dict],
-        market_context: Dict
+        position: dict | None,
+        market_context: dict
     ) -> AgentVote:
         """
         Analyze trend and return vote.
@@ -53,7 +51,7 @@ class TrendFollowingAgent(BaseAgent):
         """
 
         price = tick.data.get("price", 0)
-        volume = tick.data.get("volume", 0)
+        tick.data.get("volume", 0)
 
         # Update price history
         self.price_history.append(price)
@@ -185,7 +183,7 @@ class TrendFollowingAgent(BaseAgent):
     def _calculate_position_size(
         self,
         confidence: float,
-        position: Optional[Dict]
+        position: dict | None
     ) -> float:
         """
         Calculate position size based on confidence.

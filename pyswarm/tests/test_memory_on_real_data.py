@@ -23,22 +23,21 @@ Expected Results:
 """
 
 import asyncio
-import pandas as pd
-import numpy as np
 import logging
 from pathlib import Path
-from datetime import datetime
 
-from coinswarm.memory.hierarchical_memory import HierarchicalMemory, Timescale
-from coinswarm.memory.exploration_strategy import ExplorationStrategy, PatternDiscovery
-from coinswarm.memory.state_builder import StateBuilder
-from coinswarm.memory.learning_loop import LearningLoop
-from coinswarm.backtesting.random_window_validator import RandomWindowValidator
+import numpy as np
+import pandas as pd
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.agents.trend_agent import TrendFollowingAgent
 from coinswarm.agents.risk_agent import RiskManagementAgent
-from coinswarm.agents.trade_analysis_agent import TradeAnalysisAgent
 from coinswarm.agents.strategy_learning_agent import StrategyLearningAgent
+from coinswarm.agents.trade_analysis_agent import TradeAnalysisAgent
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.random_window_validator import RandomWindowValidator
+from coinswarm.memory.exploration_strategy import ExplorationStrategy, PatternDiscovery
+from coinswarm.memory.hierarchical_memory import HierarchicalMemory, Timescale
+from coinswarm.memory.learning_loop import LearningLoop
+from coinswarm.memory.state_builder import StateBuilder
 
 logging.basicConfig(
     level=logging.INFO,
@@ -104,7 +103,7 @@ async def test_swing_trading_strategy(symbol: str):
         epsilon_decay=0.9995
     )
 
-    pattern_discovery = PatternDiscovery(
+    PatternDiscovery(
         min_samples=50,
         significance_threshold=0.05,
         min_sharpe=1.0
@@ -160,7 +159,7 @@ async def test_swing_trading_strategy(symbol: str):
 
             pnls = []
 
-            for i in range(len(window_data)):
+            for _i in range(len(window_data)):
                 # Decide: explore or exploit?
                 should_explore = self.exploration.should_explore()
 
@@ -168,13 +167,12 @@ async def test_swing_trading_strategy(symbol: str):
                     # RANDOM EXPLORATION
                     # (Might discover novel patterns!)
                     action = np.random.choice(["BUY", "SELL", "HOLD"])
-                    confidence = np.random.uniform(0.6, 0.9)
+                    np.random.uniform(0.6, 0.9)
                 else:
                     # EXPLOIT: Use committee + memory
                     # TODO: Actually run committee voting
                     # For now, placeholder
                     action = "HOLD"
-                    confidence = 0.5
 
                 # Simulate trade outcome
                 if action in ["BUY", "SELL"]:
@@ -204,16 +202,16 @@ async def test_swing_trading_strategy(symbol: str):
     logger.info("VALIDATION RESULTS")
     logger.info("="*80)
 
-    logger.info(f"\nOverall:")
+    logger.info("\nOverall:")
     logger.info(f"  Passed: {results['passed_windows']}/{results['total_windows']} ({results['pass_rate']:.1%})")
     logger.info(f"  All windows passed: {'✅ YES' if results['all_windows_passed'] else '❌ NO'}")
 
-    logger.info(f"\nPerformance:")
+    logger.info("\nPerformance:")
     logger.info(f"  Sharpe: {results['avg_sharpe']:.2f} (median={results['median_sharpe']:.2f})")
     logger.info(f"  Win Rate: {results['avg_win_rate']:.1%} (median={results['median_win_rate']:.1%})")
     logger.info(f"  Max Drawdown: {results['max_drawdown']:.1%}")
 
-    logger.info(f"\nBy Regime:")
+    logger.info("\nBy Regime:")
     for regime, stats in results['regime_stats'].items():
         logger.info(
             f"  {regime.upper():10s}: "

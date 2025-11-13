@@ -1,5 +1,7 @@
 import os
+
 from dotenv import load_dotenv
+
 
 def load_env(env_path=None):
     """

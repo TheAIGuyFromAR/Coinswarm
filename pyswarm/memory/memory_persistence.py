@@ -28,15 +28,14 @@ Usage:
     episodes = await persistence.load_episodes(max_episodes=1000)
 """
 
-import logging
-import json
-import gzip
 import base64
-from typing import List, Dict, Optional
-from datetime import datetime, timedelta
-import urllib.request
-import urllib.parse
+import gzip
+import json
+import logging
 import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import datetime
 
 import numpy as np
 
@@ -105,7 +104,7 @@ class MemoryPersistence:
 
     async def backup_episodes(
         self,
-        episodes: Dict[str, "Episode"],  # Episode ID -> Episode
+        episodes: dict[str, "Episode"],  # Episode ID -> Episode
         force: bool = False
     ) -> bool:
         """
@@ -199,9 +198,9 @@ class MemoryPersistence:
     async def load_episodes(
         self,
         max_episodes: int = 1000,
-        symbol: Optional[str] = None,
-        since_timestamp: Optional[datetime] = None
-    ) -> List[Dict]:
+        symbol: str | None = None,
+        since_timestamp: datetime | None = None
+    ) -> list[dict]:
         """
         Load episodes from Cloudflare D1.
 
@@ -271,7 +270,7 @@ class MemoryPersistence:
         """Call after storing each new episode"""
         self.episodes_since_backup += 1
 
-    def _serialize_episode(self, episode) -> Dict:
+    def _serialize_episode(self, episode) -> dict:
         """
         Convert Episode object to JSON-serializable dict.
 
@@ -311,7 +310,7 @@ class MemoryPersistence:
         }
 
     @staticmethod
-    def deserialize_episode(episode_dict: Dict, episode_class):
+    def deserialize_episode(episode_dict: dict, episode_class):
         """
         Convert dict back to Episode object.
 

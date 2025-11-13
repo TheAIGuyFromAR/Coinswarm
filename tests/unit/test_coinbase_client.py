@@ -5,11 +5,9 @@ Tests authentication, signature generation, and core API methods.
 """
 
 import base64
-import hashlib
-import hmac
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
+import pytest
 from coinswarm.api.coinbase_client import (
     CoinbaseAPIClient,
     OrderSide,

@@ -12,20 +12,18 @@ Usage:
     python analyze_trades.py --config-file discovered_strategies_BTCUSDC_20251106_002943.json --rank 3
 """
 
-import asyncio
 import argparse
+import asyncio
 import json
 import logging
 import random
-from datetime import datetime, timedelta
-from typing import List, Dict, Optional
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
 from coinswarm.agents.arbitrage_agent import ArbitrageAgent
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
+from coinswarm.agents.risk_agent import RiskManagementAgent
+from coinswarm.agents.trend_agent import TrendFollowingAgent
 from coinswarm.data_ingest.base import DataPoint
 
 logging.basicConfig(level=logging.WARNING)
@@ -54,13 +52,13 @@ class TradeContext:
     arb_confidence: float
 
     # Outcome
-    exit_price: Optional[float] = None
-    pnl: Optional[float] = None
-    pnl_pct: Optional[float] = None
-    holding_hours: Optional[int] = None
+    exit_price: float | None = None
+    pnl: float | None = None
+    pnl_pct: float | None = None
+    holding_hours: int | None = None
 
 
-def generate_market_data(symbol: str, start_date: datetime, days: int, market_regime: str = "sideways") -> List[DataPoint]:
+def generate_market_data(symbol: str, start_date: datetime, days: int, market_regime: str = "sideways") -> list[DataPoint]:
     """Generate mock market data with regime"""
 
     data_points = []
@@ -118,7 +116,7 @@ def generate_market_data(symbol: str, start_date: datetime, days: int, market_re
     return data_points
 
 
-def calculate_market_stats(price_data: List[DataPoint], current_idx: int) -> Dict:
+def calculate_market_stats(price_data: list[DataPoint], current_idx: int) -> dict:
     """Calculate market statistics at a given point"""
 
     current_price = price_data[current_idx].data["close"]
@@ -152,14 +150,14 @@ def calculate_market_stats(price_data: List[DataPoint], current_idx: int) -> Dic
     }
 
 
-async def analyze_trades_detailed(config: Dict, symbol: str, test_days: int, seed: int = 42):
+async def analyze_trades_detailed(config: dict, symbol: str, test_days: int, seed: int = 42):
     """Run backtest with detailed trade analysis"""
 
     print(f"\n{'='*100}")
-    print(f"DETAILED TRADE ANALYSIS")
+    print("DETAILED TRADE ANALYSIS")
     print(f"{'='*100}\n")
 
-    print(f"Strategy Configuration:")
+    print("Strategy Configuration:")
     print(f"  Trend Weight: {config['trend_weight']:.3f}")
     print(f"  Risk Weight: {config['risk_weight']:.3f}")
     print(f"  Arbitrage Weight: {config['arbitrage_weight']:.3f}")
@@ -177,7 +175,7 @@ async def analyze_trades_detailed(config: Dict, symbol: str, test_days: int, see
     final_price = price_data[-1].data["close"]
     hodl_return = (final_price - initial_price) / initial_price
 
-    print(f"Market Setup:")
+    print("Market Setup:")
     print(f"  Regime: {regime}")
     print(f"  Duration: {test_days} days ({len(price_data)} hourly candles)")
     print(f"  Price: ${initial_price:.0f} → ${final_price:.0f} ({hodl_return:+.2%})")
@@ -191,7 +189,7 @@ async def analyze_trades_detailed(config: Dict, symbol: str, test_days: int, see
 
     # Manual replay to capture trade context
     print(f"{'='*100}")
-    print(f"SIMULATING TRADES WITH FULL CONTEXT")
+    print("SIMULATING TRADES WITH FULL CONTEXT")
     print(f"{'='*100}\n")
 
     capital = 100000.0
@@ -293,7 +291,7 @@ async def analyze_trades_detailed(config: Dict, symbol: str, test_days: int, see
 
     # Analysis
     print(f"\n{'='*100}")
-    print(f"TRADE SUMMARY")
+    print("TRADE SUMMARY")
     print(f"{'='*100}\n")
 
     print(f"Total Trades: {len(trades)}")
@@ -325,36 +323,36 @@ async def analyze_trades_detailed(config: Dict, symbol: str, test_days: int, see
             print(f"  PnL:    ${trade['pnl']:+,.2f} ({trade['pnl_pct']:+.2%})")
             print(f"  Held:   {trade['holding_hours']:.1f} hours ({trade['holding_hours']/24:.1f} days)")
 
-            print(f"\n  Entry Market Conditions:")
+            print("\n  Entry Market Conditions:")
             print(f"    1h change:  {trade['entry_market_stats']['price_change_1h']:+.2%}")
             print(f"    24h change: {trade['entry_market_stats']['price_change_24h']:+.2%}")
             print(f"    Volatility: {trade['entry_market_stats']['volatility_24h']:.2%}")
 
-            print(f"\n  Entry Agent Votes:")
+            print("\n  Entry Agent Votes:")
             print(f"    Trend:      {trade['entry_votes']['trend'][0]:6s} (conf: {trade['entry_votes']['trend'][1]:.2f})")
             print(f"    Risk:       {trade['entry_votes']['risk'][0]:6s} (conf: {trade['entry_votes']['risk'][1]:.2f})")
             print(f"    Arbitrage:  {trade['entry_votes']['arb'][0]:6s} (conf: {trade['entry_votes']['arb'][1]:.2f})")
 
-            print(f"\n  Exit Market Conditions:")
+            print("\n  Exit Market Conditions:")
             print(f"    1h change:  {trade['exit_market_stats']['price_change_1h']:+.2%}")
             print(f"    24h change: {trade['exit_market_stats']['price_change_24h']:+.2%}")
             print(f"    Volatility: {trade['exit_market_stats']['volatility_24h']:.2%}")
 
-            print(f"\n  Exit Agent Votes:")
+            print("\n  Exit Agent Votes:")
             print(f"    Trend:      {trade['exit_votes']['trend'][0]:6s} (conf: {trade['exit_votes']['trend'][1]:.2f})")
             print(f"    Risk:       {trade['exit_votes']['risk'][0]:6s} (conf: {trade['exit_votes']['risk'][1]:.2f})")
             print(f"    Arbitrage:  {trade['exit_votes']['arb'][0]:6s} (conf: {trade['exit_votes']['arb'][1]:.2f})")
 
             # What made this trade win?
             price_moved = trade['exit_price'] - trade['entry_price']
-            print(f"\n  💡 Why It Won:")
+            print("\n  💡 Why It Won:")
             print(f"     Price moved ${price_moved:+,.0f} ({trade['pnl_pct']:+.2%}) in {trade['holding_hours']:.1f} hours")
 
             if trade['entry_market_stats']['price_change_24h'] < 0 and trade['pnl_pct'] > 0:
                 print(f"     ✓ Bought during 24h decline ({trade['entry_market_stats']['price_change_24h']:+.2%}), caught bounce")
 
             if trade['holding_hours'] < 24:
-                print(f"     ✓ Quick profit - held < 1 day")
+                print("     ✓ Quick profit - held < 1 day")
 
             print()
 
@@ -371,29 +369,29 @@ async def analyze_trades_detailed(config: Dict, symbol: str, test_days: int, see
             print(f"  PnL:    ${trade['pnl']:+,.2f} ({trade['pnl_pct']:+.2%})")
             print(f"  Held:   {trade['holding_hours']:.1f} hours ({trade['holding_hours']/24:.1f} days)")
 
-            print(f"\n  Entry Market Conditions:")
+            print("\n  Entry Market Conditions:")
             print(f"    1h change:  {trade['entry_market_stats']['price_change_1h']:+.2%}")
             print(f"    24h change: {trade['entry_market_stats']['price_change_24h']:+.2%}")
             print(f"    Volatility: {trade['entry_market_stats']['volatility_24h']:.2%}")
 
-            print(f"\n  Entry Agent Votes:")
+            print("\n  Entry Agent Votes:")
             print(f"    Trend:      {trade['entry_votes']['trend'][0]:6s} (conf: {trade['entry_votes']['trend'][1]:.2f})")
             print(f"    Risk:       {trade['entry_votes']['risk'][0]:6s} (conf: {trade['entry_votes']['risk'][1]:.2f})")
             print(f"    Arbitrage:  {trade['entry_votes']['arb'][0]:6s} (conf: {trade['entry_votes']['arb'][1]:.2f})")
 
-            print(f"\n  Exit Market Conditions:")
+            print("\n  Exit Market Conditions:")
             print(f"    1h change:  {trade['exit_market_stats']['price_change_1h']:+.2%}")
             print(f"    24h change: {trade['exit_market_stats']['price_change_24h']:+.2%}")
             print(f"    Volatility: {trade['exit_market_stats']['volatility_24h']:.2%}")
 
-            print(f"\n  Exit Agent Votes:")
+            print("\n  Exit Agent Votes:")
             print(f"    Trend:      {trade['exit_votes']['trend'][0]:6s} (conf: {trade['exit_votes']['trend'][1]:.2f})")
             print(f"    Risk:       {trade['exit_votes']['risk'][0]:6s} (conf: {trade['exit_votes']['risk'][1]:.2f})")
             print(f"    Arbitrage:  {trade['exit_votes']['arb'][0]:6s} (conf: {trade['exit_votes']['arb'][1]:.2f})")
 
             # What made this trade lose?
             price_moved = trade['exit_price'] - trade['entry_price']
-            print(f"\n  💔 Why It Lost:")
+            print("\n  💔 Why It Lost:")
             print(f"     Price moved ${price_moved:+,.0f} ({trade['pnl_pct']:+.2%}) against position")
 
             if trade['entry_market_stats']['volatility_24h'] > 0.02:
@@ -410,7 +408,7 @@ async def analyze_trades_detailed(config: Dict, symbol: str, test_days: int, see
         print(f"VETOED TRADES ANALYSIS ({len(vetoes)} vetoes)")
         print(f"{'='*100}\n")
 
-        print(f"Sample of first 10 vetoes:\n")
+        print("Sample of first 10 vetoes:\n")
         for i, veto in enumerate(vetoes[:10]):
             print(f"Veto #{i+1}: {veto['timestamp'].strftime('%Y-%m-%d %H:%M')}")
             print(f"  Action: {veto['action']} @ ${veto['price']:.0f}")
@@ -420,26 +418,26 @@ async def analyze_trades_detailed(config: Dict, symbol: str, test_days: int, see
 
     # Pattern analysis
     print(f"\n{'='*100}")
-    print(f"PATTERN INSIGHTS")
+    print("PATTERN INSIGHTS")
     print(f"{'='*100}\n")
 
     if winning_trades:
         avg_win_pnl = sum(t["pnl_pct"] for t in winning_trades) / len(winning_trades)
         avg_win_hold = sum(t["holding_hours"] for t in winning_trades) / len(winning_trades)
-        print(f"Winning Trade Patterns:")
+        print("Winning Trade Patterns:")
         print(f"  Average gain: {avg_win_pnl:+.2%}")
         print(f"  Average hold time: {avg_win_hold:.1f} hours ({avg_win_hold/24:.1f} days)")
 
     if losing_trades:
         avg_loss_pnl = sum(t["pnl_pct"] for t in losing_trades) / len(losing_trades)
         avg_loss_hold = sum(t["holding_hours"] for t in losing_trades) / len(losing_trades)
-        print(f"\nLosing Trade Patterns:")
+        print("\nLosing Trade Patterns:")
         print(f"  Average loss: {avg_loss_pnl:+.2%}")
         print(f"  Average hold time: {avg_loss_hold:.1f} hours ({avg_loss_hold/24:.1f} days)")
 
-    print(f"\nVeto Effectiveness:")
+    print("\nVeto Effectiveness:")
     print(f"  {len(vetoes)} trades vetoed by risk management")
-    print(f"  This prevented potential losses during high volatility")
+    print("  This prevented potential losses during high volatility")
     print(f"  Veto rate: {len(vetoes) / (len(trades) + len(vetoes)):.1%} of all trade signals")
 
 
@@ -451,7 +449,7 @@ async def main():
 
     args = parser.parse_args()
 
-    with open(args.config_file, 'r') as f:
+    with open(args.config_file) as f:
         data = json.load(f)
 
     strategy = data['strategies'][args.rank - 1]

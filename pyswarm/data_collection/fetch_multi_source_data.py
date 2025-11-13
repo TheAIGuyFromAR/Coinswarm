@@ -14,13 +14,12 @@ No API keys needed for basic tier!
 """
 
 import json
-import urllib.request
-import urllib.parse
 import ssl
 import time
-from datetime import datetime, timedelta
+import urllib.parse
+import urllib.request
+from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional
 
 # SSL context for proxy
 ssl_context = ssl._create_unverified_context()
@@ -49,7 +48,7 @@ SYMBOLS = {
 }
 
 
-def fetch_from_coingecko(coin_id: str, days: int = 365) -> Optional[List[Dict]]:
+def fetch_from_coingecko(coin_id: str, days: int = 365) -> list[dict] | None:
     """
     Fetch from CoinGecko API (FREE, no key needed)
 
@@ -109,7 +108,7 @@ def fetch_from_coingecko(coin_id: str, days: int = 365) -> Optional[List[Dict]]:
 
     except urllib.error.HTTPError as e:
         if e.code == 429:
-            print(f"    ⚠️  CoinGecko rate limit (50/day), waiting 60s...")
+            print("    ⚠️  CoinGecko rate limit (50/day), waiting 60s...")
             time.sleep(60)
             return None
         else:
@@ -120,7 +119,7 @@ def fetch_from_coingecko(coin_id: str, days: int = 365) -> Optional[List[Dict]]:
         return None
 
 
-def fetch_from_cryptocompare(symbol: str, days: int = 730) -> Optional[List[Dict]]:
+def fetch_from_cryptocompare(symbol: str, days: int = 730) -> list[dict] | None:
     """
     Fetch from CryptoCompare API (FREE, no key needed for basic)
 
@@ -198,7 +197,7 @@ def fetch_from_cryptocompare(symbol: str, days: int = 730) -> Optional[List[Dict
 
         except urllib.error.HTTPError as e:
             if e.code == 429:
-                print(f"    ⚠️  CryptoCompare rate limit, waiting...")
+                print("    ⚠️  CryptoCompare rate limit, waiting...")
                 time.sleep(10)
             else:
                 print(f"    ❌ CryptoCompare HTTP error: {e.code}")
@@ -216,7 +215,7 @@ def fetch_from_cryptocompare(symbol: str, days: int = 730) -> Optional[List[Dict
     return None
 
 
-def fetch_historical_data(symbol: str, target_days: int = 730) -> Optional[List[Dict]]:
+def fetch_historical_data(symbol: str, target_days: int = 730) -> list[dict] | None:
     """
     Fetch historical data using multiple sources.
 
@@ -250,7 +249,7 @@ def fetch_historical_data(symbol: str, target_days: int = 730) -> Optional[List[
     # Source 2: CoinGecko (as backup/validation)
     # Only fetch if CryptoCompare failed or returned < 1 year
     if not cc_data or len(cc_data) < 365 * 24:
-        print(f"  CryptoCompare insufficient, trying CoinGecko...")
+        print("  CryptoCompare insufficient, trying CoinGecko...")
 
         # CoinGecko max 365 days per call, fetch multiple times
         days_per_call = 365
@@ -298,7 +297,7 @@ def fetch_historical_data(symbol: str, target_days: int = 730) -> Optional[List[
         print(f"  Price: ${first_price:,.2f} → ${last_price:,.2f} ({price_change:+.2f}%)")
 
         if actual_years >= 2.0:
-            print(f"  ✅ Sufficient data for robust validation!")
+            print("  ✅ Sufficient data for robust validation!")
         else:
             print(f"  ⚠️  Only {actual_years:.1f} years (target: 2+)")
 
@@ -315,7 +314,7 @@ def main():
     print("MULTI-SOURCE HISTORICAL DATA FETCHER")
     print("="*80)
     print(f"Fetching {len(SYMBOLS)} symbols from multiple free sources")
-    print(f"Target: 2+ years (730+ days) of hourly data")
+    print("Target: 2+ years (730+ days) of hourly data")
     print("")
     print("Sources:")
     print("  1. CryptoCompare (free, goes back years, 2000 hours/call)")
@@ -353,7 +352,7 @@ def main():
 
         # Rate limit between symbols
         if symbol != list(SYMBOLS.keys())[-1]:
-            print(f"\n⏳ Waiting 5s before next symbol (rate limit)...\n")
+            print("\n⏳ Waiting 5s before next symbol (rate limit)...\n")
             time.sleep(5)
 
     # Final summary
@@ -371,7 +370,7 @@ def main():
             print(f"{status} {symbol:8s}: {len(candles):6d} candles, {years:.1f} years")
 
     print("="*80)
-    print(f"\n✅ Multi-source data fetch complete!")
+    print("\n✅ Multi-source data fetch complete!")
     print(f"📁 Data saved to: {DATA_DIR}")
     print("\nNext: Run random window validation with:")
     print("  python test_memory_on_real_data.py")

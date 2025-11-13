@@ -5,8 +5,8 @@ Tests momentum calculation, MA crossover, RSI, and trading logic.
 """
 
 import pytest
-from coinswarm.agents.trend_agent import TrendFollowingAgent
 from coinswarm.agents.base_agent import AgentVote
+from coinswarm.agents.trend_agent import TrendFollowingAgent
 from coinswarm.data_ingest.base import DataPoint
 
 

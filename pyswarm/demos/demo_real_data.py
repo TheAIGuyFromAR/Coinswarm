@@ -16,14 +16,12 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
-from coinswarm.data_ingest.historical_data_fetcher import HistoricalDataFetcher
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
 from coinswarm.agents.arbitrage_agent import ArbitrageAgent
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
-from coinswarm.backtesting.continuous_backtester import ContinuousBacktester
-from coinswarm.agents.strategy_learning_agent import Strategy
+from coinswarm.agents.risk_agent import RiskManagementAgent
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine
+from coinswarm.data_ingest.historical_data_fetcher import HistoricalDataFetcher
 
 logging.basicConfig(
     level=logging.INFO,
@@ -286,13 +284,13 @@ async def main():
             return
 
         # Demo 2: Show random windows
-        windows = await demo_random_windows()
+        await demo_random_windows()
 
         # Demo 3: Single backtest with arbitrage
-        result = await demo_backtest_with_arbitrage(historical_data)
+        await demo_backtest_with_arbitrage(historical_data)
 
         # Demo 4: Multiple random windows
-        results = await demo_multiple_windows(historical_data)
+        await demo_multiple_windows(historical_data)
 
         # Final summary
         print("\n" + "="*70)

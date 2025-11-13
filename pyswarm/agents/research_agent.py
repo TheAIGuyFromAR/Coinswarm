@@ -16,13 +16,11 @@ Example: BTC news research spawns 20 crawlers:
 
 import asyncio
 import logging
-from typing import Dict, Optional, List
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
 from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
-
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +63,7 @@ class ResearchAgent(BaseAgent):
         self,
         name: str = "ResearchAgent",
         weight: float = 1.5,
-        sources: Optional[List[NewsSource]] = None
+        sources: list[NewsSource] | None = None
     ):
         super().__init__(name, weight)
 
@@ -73,10 +71,10 @@ class ResearchAgent(BaseAgent):
         self.sources = sources or self._default_sources()
 
         # Cache sentiment (avoid re-crawling same news)
-        self.sentiment_cache: Dict[str, List[NewsSentiment]] = {}
+        self.sentiment_cache: dict[str, list[NewsSentiment]] = {}
         self.cache_ttl = timedelta(minutes=5)  # Cache for 5 minutes
 
-    def _default_sources(self) -> List[NewsSource]:
+    def _default_sources(self) -> list[NewsSource]:
         """Default news sources for crypto"""
         return [
             # Major crypto news
@@ -105,8 +103,8 @@ class ResearchAgent(BaseAgent):
     async def analyze(
         self,
         tick: DataPoint,
-        position: Optional[Dict],
-        market_context: Dict
+        position: dict | None,
+        market_context: dict
     ) -> AgentVote:
         """
         Spawn parallel news crawlers and aggregate sentiment.
@@ -147,7 +145,7 @@ class ResearchAgent(BaseAgent):
 
         return vote
 
-    async def _spawn_crawlers(self, symbol: str) -> List[NewsSentiment]:
+    async def _spawn_crawlers(self, symbol: str) -> list[NewsSentiment]:
         """
         Spawn all news crawlers in parallel.
 
@@ -178,7 +176,7 @@ class ResearchAgent(BaseAgent):
         self,
         source: NewsSource,
         symbol: str
-    ) -> Optional[NewsSentiment]:
+    ) -> NewsSentiment | None:
         """
         Crawl a single news source.
 
@@ -222,7 +220,7 @@ class ResearchAgent(BaseAgent):
     def _aggregate_sentiment(
         self,
         symbol: str,
-        sentiments: List[NewsSentiment],
+        sentiments: list[NewsSentiment],
         tick: DataPoint
     ) -> AgentVote:
         """
@@ -291,7 +289,7 @@ class ResearchAgent(BaseAgent):
             reason=reason
         )
 
-    def _get_cached_sentiment(self, symbol: str) -> Optional[List[NewsSentiment]]:
+    def _get_cached_sentiment(self, symbol: str) -> list[NewsSentiment] | None:
         """Get cached sentiment if available and fresh"""
 
         if symbol not in self.sentiment_cache:

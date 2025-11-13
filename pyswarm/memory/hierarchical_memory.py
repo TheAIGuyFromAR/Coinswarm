@@ -39,14 +39,11 @@ Academic References:
 """
 
 import logging
-import numpy as np
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-import asyncio
 
-from coinswarm.memory.simple_memory import Episode, Pattern, SimpleMemory
+import numpy as np
+from coinswarm.memory.simple_memory import Episode, SimpleMemory
 
 logger = logging.getLogger(__name__)
 
@@ -236,7 +233,7 @@ class HierarchicalMemory:
 
     def __init__(
         self,
-        enabled_timescales: Optional[List[Timescale]] = None
+        enabled_timescales: list[Timescale] | None = None
     ):
         """
         Initialize hierarchical memory.
@@ -248,7 +245,7 @@ class HierarchicalMemory:
             enabled_timescales = list(Timescale)
 
         # Create memory store for each timescale
-        self.memories: Dict[Timescale, SimpleMemory] = {}
+        self.memories: dict[Timescale, SimpleMemory] = {}
 
         for timescale in enabled_timescales:
             config = TIMESCALE_CONFIGS[timescale]
@@ -262,7 +259,7 @@ class HierarchicalMemory:
         # Statistics
         self.stats = {
             "total_episodes_stored": 0,
-            "episodes_by_timescale": {ts: 0 for ts in enabled_timescales}
+            "episodes_by_timescale": dict.fromkeys(enabled_timescales, 0)
         }
 
         logger.info(
@@ -313,7 +310,7 @@ class HierarchicalMemory:
         k: int = 10,
         min_similarity: float = 0.7,
         cross_timescale: bool = False
-    ) -> List[Tuple[Episode, float, Timescale]]:
+    ) -> list[tuple[Episode, float, Timescale]]:
         """
         Recall similar episodes from memory.
 
@@ -373,7 +370,7 @@ class HierarchicalMemory:
         state: np.ndarray,
         timescale: Timescale,
         k: int = 10
-    ) -> Tuple[str, float, Dict]:
+    ) -> tuple[str, float, dict]:
         """
         Suggest best action for given state and timescale.
 
@@ -447,7 +444,7 @@ class HierarchicalMemory:
 
         return compressed
 
-    def _get_adjacent_timescales(self, timescale: Timescale) -> List[Timescale]:
+    def _get_adjacent_timescales(self, timescale: Timescale) -> list[Timescale]:
         """Get adjacent timescales (one level up and down)"""
         all_scales = list(Timescale)
         idx = all_scales.index(timescale)
@@ -460,7 +457,7 @@ class HierarchicalMemory:
 
         return adjacent
 
-    def get_statistics(self) -> Dict:
+    def get_statistics(self) -> dict:
         """Get memory statistics across all timescales"""
         stats = {
             "total_episodes": self.stats["total_episodes_stored"],

@@ -17,13 +17,11 @@ Key thresholds (configurable):
 - Daily loss limit: 5% (triggers emergency stop)
 """
 
+
 import pytest
-from datetime import datetime, timedelta
-from decimal import Decimal
 
 # TODO: Uncomment when CircuitBreaker is implemented
 # from coinswarm.safety.circuit_breaker import CircuitBreaker, CircuitBreakerState
-from coinswarm.core.config import settings
 
 
 class TestCircuitBreaker:

@@ -1,13 +1,12 @@
+# Configurable via env or CLI
+import argparse
+import json
 import os
 import sqlite3
 import time
-import json
-import urllib.request
 import urllib.parse
+import urllib.request
 
-
-# Configurable via env or CLI
-import argparse
 DB_PATH = os.environ.get("LOCAL_SQLITE_PATH", "historical_local.db")
 API_KEY = os.environ.get("CRYPTOCOMPARE_API_KEY", "")
 

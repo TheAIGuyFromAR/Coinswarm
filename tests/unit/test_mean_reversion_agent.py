@@ -27,14 +27,13 @@ Dangerous in:
 - High volatility
 """
 
-import pytest
 from datetime import datetime
-from decimal import Decimal
+
+import pytest
 
 # TODO: Uncomment when MeanReversionAgent is implemented
 # from coinswarm.agents.mean_reversion_agent import MeanReversionAgent
 from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.base_agent import AgentVote
 
 
 def create_tick(price: float, volume: float = 100.0) -> DataPoint:

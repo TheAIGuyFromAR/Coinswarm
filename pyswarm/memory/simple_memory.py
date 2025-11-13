@@ -12,12 +12,12 @@ Features:
 Future: Upgrade to Redis vector DB + quorum voting when scaling to multi-user.
 """
 
-import numpy as np
-from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass, field
-from collections import defaultdict
 import logging
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class Episode:
     reason: str = ""  # Human-readable explanation
 
     # Individual agent votes (for attribution)
-    agent_votes: Dict[str, Dict] = field(default_factory=dict)
+    agent_votes: dict[str, dict] = field(default_factory=dict)
     # Format: {"TrendFollower": {"action": "BUY", "confidence": 0.85, "reason": "..."}}
 
     # ==================== MARKET CONTEXT ====================
@@ -56,7 +56,7 @@ class Episode:
     state: np.ndarray = field(default_factory=lambda: np.array([]))  # Shape: (n_features,)
 
     # Raw market data at decision time
-    market_context: Dict = field(default_factory=dict)
+    market_context: dict = field(default_factory=dict)
     # Contains:
     # - "price": current price
     # - "volume_24h": 24h volume
@@ -65,7 +65,7 @@ class Episode:
     # - "recent_volatility": recent volatility measure
 
     # Technical indicators
-    technical_indicators: Dict = field(default_factory=dict)
+    technical_indicators: dict = field(default_factory=dict)
     # Contains:
     # - "rsi": RSI value
     # - "macd": MACD value
@@ -75,7 +75,7 @@ class Episode:
     # - "atr": Average True Range
 
     # Sentiment signals
-    sentiment_data: Dict = field(default_factory=dict)
+    sentiment_data: dict = field(default_factory=dict)
     # Contains:
     # - "news_sentiment": Aggregated news sentiment (-1 to 1)
     # - "social_sentiment": Twitter/Reddit sentiment
@@ -85,7 +85,7 @@ class Episode:
     # ==================== PORTFOLIO STATE ====================
 
     # Current portfolio state when trade was made
-    portfolio_state: Dict = field(default_factory=dict)
+    portfolio_state: dict = field(default_factory=dict)
     # Contains:
     # - "total_value": Total portfolio value
     # - "cash_available": Available cash
@@ -135,7 +135,7 @@ class Pattern:
     centroid: np.ndarray  # Average state vector
 
     # Episodes in this pattern
-    episodes: List[Episode] = field(default_factory=list)
+    episodes: list[Episode] = field(default_factory=list)
 
     # Statistics
     n_samples: int = 0
@@ -145,10 +145,10 @@ class Pattern:
     sharpe_ratio: float = 0.0
 
     # Action distribution
-    action_counts: Dict[str, int] = field(default_factory=lambda: {"BUY": 0, "SELL": 0, "HOLD": 0})
+    action_counts: dict[str, int] = field(default_factory=lambda: {"BUY": 0, "SELL": 0, "HOLD": 0})
 
     # Performance by action
-    reward_by_action: Dict[str, List[float]] = field(default_factory=lambda: defaultdict(list))
+    reward_by_action: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))
 
     # Metadata
     created_at: datetime = field(default_factory=datetime.now)
@@ -189,7 +189,7 @@ class Pattern:
 
         self.last_updated = datetime.now()
 
-    def get_best_action(self) -> Tuple[str, float]:
+    def get_best_action(self) -> tuple[str, float]:
         """
         Determine best action for this pattern based on historical performance.
 
@@ -260,8 +260,8 @@ class SimpleMemory:
         self.min_pattern_samples = min_pattern_samples
 
         # Storage
-        self.episodes: List[Episode] = []
-        self.patterns: Dict[str, Pattern] = {}
+        self.episodes: list[Episode] = []
+        self.patterns: dict[str, Pattern] = {}
 
         # Statistics
         self.total_episodes_stored = 0
@@ -283,14 +283,14 @@ class SimpleMemory:
         # Decision context
         confidence: float = 0.0,
         reason: str = "",
-        agent_votes: Optional[Dict[str, Dict]] = None,
+        agent_votes: dict[str, dict] | None = None,
         # Market context
-        state: Optional[np.ndarray] = None,
-        market_context: Optional[Dict] = None,
-        technical_indicators: Optional[Dict] = None,
-        sentiment_data: Optional[Dict] = None,
+        state: np.ndarray | None = None,
+        market_context: dict | None = None,
+        technical_indicators: dict | None = None,
+        sentiment_data: dict | None = None,
         # Portfolio state
-        portfolio_state: Optional[Dict] = None,
+        portfolio_state: dict | None = None,
         # Outcome
         reward: float = 0.0,
         holding_period: float = 0.0,
@@ -394,7 +394,7 @@ class SimpleMemory:
         state: np.ndarray,
         k: int = 10,
         min_similarity: float = 0.7
-    ) -> List[Tuple[Episode, float]]:
+    ) -> list[tuple[Episode, float]]:
         """
         Find k most similar past episodes using cosine similarity.
 
@@ -426,7 +426,7 @@ class SimpleMemory:
         self,
         state: np.ndarray,
         k: int = 10
-    ) -> Tuple[str, float]:
+    ) -> tuple[str, float]:
         """
         Suggest best action for given state based on similar past episodes.
 
@@ -526,7 +526,7 @@ class SimpleMemory:
         self.pattern_updates += 1
         logger.info(f"Updated patterns: {len(self.patterns)} patterns from {len(self.episodes)} episodes")
 
-    def get_pattern_for_state(self, state: np.ndarray) -> Optional[Pattern]:
+    def get_pattern_for_state(self, state: np.ndarray) -> Pattern | None:
         """Find the pattern that best matches this state"""
         if not self.patterns:
             return None
@@ -542,7 +542,7 @@ class SimpleMemory:
 
         return best_pattern if best_similarity > 0.7 else None
 
-    def get_statistics(self) -> Dict:
+    def get_statistics(self) -> dict:
         """Get memory system statistics"""
         return {
             "total_episodes": len(self.episodes),

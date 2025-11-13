@@ -40,12 +40,12 @@ Example:
 """
 
 import logging
+import random
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
-from dataclasses import dataclass
-import random
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +68,8 @@ class WindowResult:
     profit_factor: float
 
     # Pattern discoveries
-    patterns_discovered: List[str]
-    novel_patterns: List[str]
+    patterns_discovered: list[str]
+    novel_patterns: list[str]
 
     # Pass/fail
     passed: bool
@@ -87,12 +87,12 @@ class RandomWindowValidator:
     def __init__(
         self,
         data: pd.DataFrame,
-        window_size_days: Optional[int] = None,  # Fixed size (if specified)
-        window_size_range: Tuple[int, int] = (30, 180),  # Random range (if not fixed)
+        window_size_days: int | None = None,  # Fixed size (if specified)
+        window_size_range: tuple[int, int] = (30, 180),  # Random range (if not fixed)
         n_windows: int = 100,  # Test 100 random windows
         min_data_years: float = 2.0,  # Require 2+ years
         purge_days: int = 5,  # Gap between train/test to prevent leakage
-        random_seed: Optional[int] = None
+        random_seed: int | None = None
     ):
         """
         Initialize random window validator.
@@ -145,9 +145,9 @@ class RandomWindowValidator:
             )
 
         # Results storage
-        self.window_results: List[WindowResult] = []
+        self.window_results: list[WindowResult] = []
 
-    def generate_random_windows(self) -> List[Tuple[datetime, datetime, int]]:
+    def generate_random_windows(self) -> list[tuple[datetime, datetime, int]]:
         """
         Generate random time windows with RANDOM starts AND lengths.
 
@@ -217,7 +217,7 @@ class RandomWindowValidator:
         min_sharpe: float = 1.5,
         min_win_rate: float = 0.55,
         max_drawdown: float = 0.20
-    ) -> Dict:
+    ) -> dict:
         """
         Validate strategy on all random windows.
 
@@ -327,7 +327,7 @@ class RandomWindowValidator:
         # For now, placeholder logic:
 
         # Simulate trades
-        for i in range(10):  # Placeholder: 10 trades per window
+        for _i in range(10):  # Placeholder: 10 trades per window
             # This is where you'd call:
             # decision = await strategy_runner.make_decision(...)
             # trade = await strategy_runner.execute(...)
@@ -413,7 +413,7 @@ class RandomWindowValidator:
         self,
         passed: int,
         failed: int
-    ) -> Dict:
+    ) -> dict:
         """Aggregate results across all windows"""
 
         total = passed + failed
@@ -476,7 +476,7 @@ class RandomWindowValidator:
             "window_results": self.window_results
         }
 
-    def get_failed_windows(self) -> List[WindowResult]:
+    def get_failed_windows(self) -> list[WindowResult]:
         """Get all windows that failed validation"""
         return [r for r in self.window_results if not r.passed]
 
@@ -502,12 +502,12 @@ class RandomWindowValidator:
         else:
             print("❌ STRATEGY OVERFITTED. Failed in some windows.")
 
-        print(f"\nPerformance Across All Windows:")
+        print("\nPerformance Across All Windows:")
         print(f"  Sharpe: {results['avg_sharpe']:.2f} (median={results['median_sharpe']:.2f}, range=[{results['min_sharpe']:.2f}, {results['max_sharpe']:.2f}])")
         print(f"  Win Rate: {results['avg_win_rate']:.1%} (median={results['median_win_rate']:.1%}, range=[{results['min_win_rate']:.1%}, {results['max_win_rate']:.1%}])")
         print(f"  Max Drawdown: {results['avg_drawdown']:.1%} (median={results['median_drawdown']:.1%}, worst={results['max_drawdown']:.1%})")
 
-        print(f"\nPerformance by Market Regime:")
+        print("\nPerformance by Market Regime:")
         for regime, stats in results["regime_stats"].items():
             print(f"  {regime.upper()}:")
             print(f"    Windows: {stats['total_windows']}, Passed: {stats['passed']} ({stats['pass_rate']:.1%})")

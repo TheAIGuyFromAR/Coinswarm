@@ -7,14 +7,14 @@ Runs immediately with 100% mock data to demonstrate the backtesting system.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
 import random
+from datetime import datetime, timedelta
 
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
 from coinswarm.agents.arbitrage_agent import ArbitrageAgent
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
+from coinswarm.agents.risk_agent import RiskManagementAgent
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine
 from coinswarm.data_ingest.base import DataPoint
 
 logging.basicConfig(
@@ -176,9 +176,9 @@ async def run_quick_backtest():
         print("⚠️  Low Sharpe ratio (<1.0) - high risk for the returns.")
 
     if result.win_rate > 0.5:
-        print(f"✅ Win rate >50% - agents are picking winners.")
+        print("✅ Win rate >50% - agents are picking winners.")
     else:
-        print(f"⚠️  Win rate <50% - need better signals.")
+        print("⚠️  Win rate <50% - need better signals.")
 
     print()
 

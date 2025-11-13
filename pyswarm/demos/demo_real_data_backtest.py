@@ -10,14 +10,13 @@ Worker URL: https://coinswarm.bamn86.workers.dev
 
 import asyncio
 import logging
-from datetime import datetime
 
-from coinswarm.data_ingest.coinswarm_worker_client import CoinswarmWorkerClient
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
 from coinswarm.agents.arbitrage_agent import ArbitrageAgent
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
+from coinswarm.agents.risk_agent import RiskManagementAgent
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine
+from coinswarm.data_ingest.coinswarm_worker_client import CoinswarmWorkerClient
 
 logging.basicConfig(
     level=logging.INFO,

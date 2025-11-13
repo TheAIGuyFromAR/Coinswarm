@@ -18,19 +18,18 @@ Usage:
     python find_10x_btc_strategies.py --generations 100
 """
 
-import asyncio
 import argparse
+import asyncio
 import json
 import random
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from typing import List, Dict, Tuple
-from dataclasses import dataclass, asdict
 
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
 from coinswarm.agents.arbitrage_agent import ArbitrageAgent
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
+from coinswarm.agents.risk_agent import RiskManagementAgent
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine
 from coinswarm.data_ingest.base import DataPoint
 
 
@@ -101,7 +100,7 @@ def generate_btc_market_data(
     start_date: datetime,
     days: int,
     btc_trend: float = 0.0  # Daily BTC appreciation (-1.0 to +1.0)
-) -> Tuple[List[DataPoint], float, float]:
+) -> tuple[list[DataPoint], float, float]:
     """
     Generate BTC price data
 
@@ -262,16 +261,16 @@ async def hunt_10x_btc_strategies(
     print("₿ HUNTING FOR 10X BTC-DENOMINATED STRATEGIES")
     print("="*90 + "\n")
 
-    print(f"Goal: Accumulate 10x more BTC than HODL")
-    print(f"Profit Metric: BITCOIN, not USD")
-    print(f"Not keeping up with BTC = LOSING\n")
+    print("Goal: Accumulate 10x more BTC than HODL")
+    print("Profit Metric: BITCOIN, not USD")
+    print("Not keeping up with BTC = LOSING\n")
 
-    print(f"Target Criteria:")
-    print(f"  • 10x more BTC than HODL")
-    print(f"  • Positive BTC accumulation")
-    print(f"  • Sharpe > 1.5")
-    print(f"  • Max DD < 40%")
-    print(f"  • At least 5 trades\n")
+    print("Target Criteria:")
+    print("  • 10x more BTC than HODL")
+    print("  • Positive BTC accumulation")
+    print("  • Sharpe > 1.5")
+    print("  • Max DD < 40%")
+    print("  • At least 5 trades\n")
 
     # Test across different BTC market conditions
     btc_trends = [
@@ -292,7 +291,7 @@ async def hunt_10x_btc_strategies(
         for _ in range(population_size)
     ]
 
-    found_10x: List[BTCStrategyResult] = []
+    found_10x: list[BTCStrategyResult] = []
     all_time_best: BTCStrategyResult = None
 
     for generation in range(max_generations):
@@ -300,7 +299,7 @@ async def hunt_10x_btc_strategies(
         print(f"Generation {generation + 1}/{max_generations}")
         print(f"{'='*90}")
 
-        results: List[BTCStrategyResult] = []
+        results: list[BTCStrategyResult] = []
 
         for i, config in enumerate(population):
             # Test on random BTC trend
@@ -335,7 +334,7 @@ async def hunt_10x_btc_strategies(
 
         # Top 3
         results.sort(key=lambda r: r.btc_vs_hodl_multiple, reverse=True)
-        print(f"\n  Top 3:")
+        print("\n  Top 3:")
         for i, r in enumerate(results[:3]):
             print(f"    {i+1}. {r.btc_vs_hodl_multiple:.2f}x BTC ({r.btc_gained:+.4f} BTC), "
                   f"USD: {r.usd_return_pct:+.1%}, Trades: {r.total_trades}")
@@ -425,8 +424,8 @@ async def hunt_10x_btc_strategies(
         print(f"💾 Saved to: {filename}\n")
 
     else:
-        print(f"❌ No 10x BTC strategies found")
-        print(f"\nBest Achieved:")
+        print("❌ No 10x BTC strategies found")
+        print("\nBest Achieved:")
         print(f"  BTC vs HODL: {all_time_best.btc_vs_hodl_multiple:.2f}x")
         print(f"  BTC Gained: {all_time_best.btc_gained:+.4f}")
         print(f"  USD Return: {all_time_best.usd_return_pct:+.1%}\n")

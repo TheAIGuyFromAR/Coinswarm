@@ -18,16 +18,12 @@ Use cases:
 5. Keep compute >50% utilized between live trades
 """
 
-import asyncio
 import logging
-from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from collections import defaultdict
+from datetime import datetime
 
-from coinswarm.data_ingest.base import DataPoint
 from coinswarm.agents.committee import AgentCommittee, CommitteeDecision
-
+from coinswarm.data_ingest.base import DataPoint
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +34,7 @@ class BacktestConfig:
     start_date: datetime
     end_date: datetime
     initial_capital: float = 100000.0
-    symbols: List[str] = None
+    symbols: list[str] = None
     timeframe: str = "1m"  # 1m, 5m, 15m, 1h, 4h, 1d
     commission: float = 0.001  # 0.1% per trade
     slippage: float = 0.0005  # 0.05% slippage
@@ -54,13 +50,13 @@ class BacktestTrade:
     entry_time: datetime
     entry_price: float
     size: float
-    exit_time: Optional[datetime] = None
-    exit_price: Optional[float] = None
+    exit_time: datetime | None = None
+    exit_price: float | None = None
     pnl: float = 0.0
     pnl_pct: float = 0.0
     commission_paid: float = 0.0
     reason: str = ""
-    agent_votes: Optional[Dict] = None
+    agent_votes: dict | None = None
 
 
 @dataclass
@@ -103,7 +99,7 @@ class BacktestResult:
     max_trade_duration: float
 
     # Trades
-    trades: List[BacktestTrade]
+    trades: list[BacktestTrade]
 
 
 class BacktestEngine:
@@ -125,18 +121,18 @@ class BacktestEngine:
         self.config = config
 
         # Simulation state
-        self.current_time: Optional[datetime] = None
+        self.current_time: datetime | None = None
         self.capital = config.initial_capital
         self.initial_capital = config.initial_capital
 
         # Positions
-        self.positions: Dict[str, BacktestTrade] = {}
+        self.positions: dict[str, BacktestTrade] = {}
 
         # Completed trades
-        self.trades: List[BacktestTrade] = []
+        self.trades: list[BacktestTrade] = []
 
         # Equity curve (for drawdown calculation)
-        self.equity_curve: List[Tuple[datetime, float]] = []
+        self.equity_curve: list[tuple[datetime, float]] = []
 
         # Statistics
         self.stats = {
@@ -148,7 +144,7 @@ class BacktestEngine:
     async def run_backtest(
         self,
         committee: AgentCommittee,
-        historical_data: Dict[str, List[DataPoint]]
+        historical_data: dict[str, list[DataPoint]]
     ) -> BacktestResult:
         """
         Run backtest with given committee and historical data.
@@ -200,12 +196,12 @@ class BacktestEngine:
 
     def _merge_and_sort_data(
         self,
-        historical_data: Dict[str, List[DataPoint]]
-    ) -> List[DataPoint]:
+        historical_data: dict[str, list[DataPoint]]
+    ) -> list[DataPoint]:
         """Merge all symbols and sort by timestamp"""
 
         all_ticks = []
-        for symbol, ticks in historical_data.items():
+        for _symbol, ticks in historical_data.items():
             all_ticks.extend(ticks)
 
         # Sort by timestamp
@@ -473,7 +469,7 @@ class BacktestEngine:
             trades=self.trades
         )
 
-    def _calculate_max_drawdown(self) -> Tuple[float, float]:
+    def _calculate_max_drawdown(self) -> tuple[float, float]:
         """Calculate maximum drawdown"""
 
         if not self.equity_curve:
@@ -483,7 +479,7 @@ class BacktestEngine:
         max_drawdown_pct = 0.0
         peak = self.equity_curve[0][1]
 
-        for timestamp, equity in self.equity_curve:
+        for _timestamp, equity in self.equity_curve:
             if equity > peak:
                 peak = equity
 

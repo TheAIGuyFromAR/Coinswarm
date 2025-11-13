@@ -11,10 +11,8 @@ Goal: Learn what conditions indicate a good time to take profits.
 """
 
 import random
-from typing import Dict, Optional
-from datetime import datetime
 
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
 from coinswarm.data_ingest.base import DataPoint
 
 
@@ -52,8 +50,8 @@ class OpportunisticSellAgent(BaseAgent):
     async def analyze(
         self,
         tick: DataPoint,
-        position: Optional[Dict],
-        market_context: Dict
+        position: dict | None,
+        market_context: dict
     ) -> AgentVote:
         """
         Decide whether to sell based on peak detection.
@@ -151,7 +149,7 @@ class OpportunisticSellAgent(BaseAgent):
 
         return vote
 
-    def _calculate_market_state(self, tick: DataPoint, position: Optional[Dict]) -> Dict:
+    def _calculate_market_state(self, tick: DataPoint, position: dict | None) -> dict:
         """Calculate current market state features"""
 
         price = tick.data.get("price", tick.data.get("close", 0))
@@ -182,7 +180,7 @@ class OpportunisticSellAgent(BaseAgent):
 
         return state
 
-    def _detect_peak(self, state: Dict, profit_pct: float) -> bool:
+    def _detect_peak(self, state: dict, profit_pct: float) -> bool:
         """
         Try to detect if this is a peak using various heuristics.
 
@@ -227,7 +225,7 @@ class OpportunisticSellAgent(BaseAgent):
         # Need at least 60% of signals to trigger sell
         return signal_ratio >= 0.6
 
-    def _generate_sell_justification(self, state: Dict, profit_pct: float, confidence: float) -> str:
+    def _generate_sell_justification(self, state: dict, profit_pct: float, confidence: float) -> str:
         """
         Generate justification for selling at this "peak".
         """

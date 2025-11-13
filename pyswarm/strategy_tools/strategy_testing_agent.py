@@ -14,12 +14,11 @@ Process:
 import asyncio
 import json
 import logging
-from pathlib import Path
-from typing import List, Dict
-from datetime import datetime
-from dataclasses import dataclass, asdict
-import statistics
 import random
+import statistics
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 
 from coinswarm.data_ingest.base import DataPoint
 
@@ -58,16 +57,16 @@ class StrategyTestingAgent:
 
     def load_patterns(self, filepath: str = "data/discovered_patterns/patterns.json"):
         """Load discovered patterns"""
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             self.patterns = json.load(f)
 
         logger.info(f"Loaded {len(self.patterns)} patterns to test")
 
     async def test_pattern_on_window(
         self,
-        pattern: Dict,
-        data_window: List[DataPoint]
-    ) -> Dict:
+        pattern: dict,
+        data_window: list[DataPoint]
+    ) -> dict:
         """
         Test a single pattern on a data window.
 
@@ -145,7 +144,7 @@ class StrategyTestingAgent:
             "total_return_pct": (capital - self.initial_capital) / self.initial_capital
         }
 
-    def _should_enter(self, pattern: Dict, tick: DataPoint, history: List[DataPoint]) -> bool:
+    def _should_enter(self, pattern: dict, tick: DataPoint, history: list[DataPoint]) -> bool:
         """
         Check if pattern entry conditions are met.
         """
@@ -196,7 +195,7 @@ class StrategyTestingAgent:
         # All conditions met
         return True
 
-    async def test_random_baseline(self, data_window: List[DataPoint]) -> Dict:
+    async def test_random_baseline(self, data_window: list[DataPoint]) -> dict:
         """
         Test random trading as baseline for comparison.
         """
@@ -250,8 +249,8 @@ class StrategyTestingAgent:
 
     async def test_strategy(
         self,
-        pattern: Dict,
-        all_data: List[DataPoint],
+        pattern: dict,
+        all_data: list[DataPoint],
         num_tests: int = 100
     ) -> StrategyResult:
         """
@@ -267,7 +266,7 @@ class StrategyTestingAgent:
         pattern_results = []
         random_results = []
 
-        for i in range(num_tests):
+        for _i in range(num_tests):
             # Pick random window
             window_size = random.randint(50, 150)
             max_start = len(all_data) - window_size
@@ -336,11 +335,11 @@ class StrategyTestingAgent:
         logger.info(f"  Pattern Return:  {avg_pattern_return:+.2%}")
         logger.info(f"  Random Return:   {avg_random_return:+.2%}")
         logger.info(f"  Advantage:       {vs_random_return:+.2%}")
-        logger.info(f"")
+        logger.info("")
         logger.info(f"  Pattern Win Rate: {avg_pattern_winrate:.1%}")
         logger.info(f"  Random Win Rate:  {avg_random_winrate:.1%}")
         logger.info(f"  Advantage:        {vs_random_winrate:+.1%}")
-        logger.info(f"")
+        logger.info("")
         logger.info(f"  Confidence Score: {confidence:.0%}")
         logger.info(f"  Vote: {'👍 UPVOTE' if votes > 0 else '👎 DOWNVOTE'}")
 
@@ -389,9 +388,9 @@ class StrategyTestingAgent:
             logger.info(f"  Votes: {r.votes}")
 
 
-def load_historical_data(filepath: str) -> List[DataPoint]:
+def load_historical_data(filepath: str) -> list[DataPoint]:
     """Load historical data from JSON file"""
-    with open(filepath, 'r') as f:
+    with open(filepath) as f:
         data = json.load(f)
 
     symbol = data.get("symbol", "BTC")

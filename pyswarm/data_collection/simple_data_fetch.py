@@ -17,11 +17,11 @@ Saves to JSON for testing.
 """
 
 import json
-import urllib.request
-import urllib.parse
 import ssl
 import time
-from datetime import datetime, timedelta
+import urllib.parse
+import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 # Your Cloudflare Worker endpoint - Using original working Worker
@@ -156,7 +156,7 @@ def fetch_historical_data(symbol: str, target_days: int = 730):
         if actual_years < 2.0:
             print(f"  ⚠️  Only {actual_years:.1f} years - need 2+ for robust validation!")
         else:
-            print(f"  ✅ Sufficient data for validation")
+            print("  ✅ Sufficient data for validation")
 
         return all_candles
     else:
@@ -170,18 +170,18 @@ def main():
     print("MULTI-ASSET HISTORICAL DATA FETCHER")
     print("="*80)
     print(f"Fetching {len(SYMBOLS)} symbols")
-    print(f"Target: 2+ years (730+ days) of 1h candles")
+    print("Target: 2+ years (730+ days) of 1h candles")
     print(f"Data directory: {DATA_DIR}")
     print(f"Cloudflare Worker: {WORKER_URL}")
 
     if USE_MULTI_SOURCE:
-        print(f"Mode: Multi-source (/multi-price)")
-        print(f"  Sources: CryptoCompare, CoinGecko, Kraken, Coinbase")
-        print(f"  Limit: 730+ days per request (2+ years)")
+        print("Mode: Multi-source (/multi-price)")
+        print("  Sources: CryptoCompare, CoinGecko, Kraken, Coinbase")
+        print("  Limit: 730+ days per request (2+ years)")
     else:
-        print(f"Mode: Original (/price)")
-        print(f"  Sources: Kraken, Coinbase only")
-        print(f"  Limit: 365 days/request, will fetch multiple chunks")
+        print("Mode: Original (/price)")
+        print("  Sources: Kraken, Coinbase only")
+        print("  Limit: 365 days/request, will fetch multiple chunks")
 
     print("="*80 + "\n")
 

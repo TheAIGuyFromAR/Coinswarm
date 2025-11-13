@@ -10,18 +10,15 @@ Usage:
 
 import asyncio
 import json
-import random
-from datetime import datetime, timedelta
-from typing import List, Dict, Optional
-
-from coinswarm.data_ingest.coinswarm_worker_client import CoinswarmWorkerClient
-from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.arbitrage_agent import ArbitrageAgent
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
-from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
 import logging
+
+from coinswarm.agents.arbitrage_agent import ArbitrageAgent
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
+from coinswarm.agents.committee import AgentCommittee
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine
+from coinswarm.data_ingest.base import DataPoint
+from coinswarm.data_ingest.coinswarm_worker_client import CoinswarmWorkerClient
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +53,8 @@ class RelaxedRiskAgent(BaseAgent):
     async def analyze(
         self,
         tick: DataPoint,
-        position: Optional[Dict],
-        market_context: Dict
+        position: dict | None,
+        market_context: dict
     ) -> AgentVote:
         """Analyze risk with relaxed thresholds"""
 
@@ -147,7 +144,7 @@ class RelaxedRiskAgent(BaseAgent):
         return variance ** 0.5
 
 
-async def fetch_real_data_chunked(symbol: str, days: int) -> List[DataPoint]:
+async def fetch_real_data_chunked(symbol: str, days: int) -> list[DataPoint]:
     """Fetch real data in 30-day chunks"""
     client = CoinswarmWorkerClient()
 
@@ -187,7 +184,7 @@ async def fetch_real_data_chunked(symbol: str, days: int) -> List[DataPoint]:
     return sorted_data
 
 
-def create_overlapping_windows(data: List[DataPoint], window_days: int = 30, step_days: int = 7) -> List[tuple]:
+def create_overlapping_windows(data: list[DataPoint], window_days: int = 30, step_days: int = 7) -> list[tuple]:
     """
     Create overlapping 1-month windows with 7-day steps
 
@@ -208,7 +205,7 @@ def create_overlapping_windows(data: List[DataPoint], window_days: int = 30, ste
 
 
 async def test_window(
-    data: List[DataPoint],
+    data: list[DataPoint],
     start_idx: int,
     end_idx: int,
     config: dict,
@@ -295,22 +292,22 @@ async def main():
     print("="*90 + "\n")
 
     # Load best strategy
-    with open("discovered_strategies_BTCUSDC_20251106_002943.json", 'r') as f:
+    with open("discovered_strategies_BTCUSDC_20251106_002943.json") as f:
         data = json.load(f)
 
     strategy = data['strategies'][2]  # Rank 3
 
-    print(f"Strategy Configuration:")
+    print("Strategy Configuration:")
     print(f"  Trend Weight: {strategy['config']['trend_weight']:.3f}")
     print(f"  Risk Weight: {strategy['config']['risk_weight']:.3f} (RELAXED thresholds)")
     print(f"  Arbitrage Weight: {strategy['config']['arbitrage_weight']:.3f}")
     print(f"  Confidence Threshold: {strategy['config']['confidence_threshold']:.3f}\n")
 
-    print(f"Risk Agent Relaxation:")
-    print(f"  Max Volatility: 10% (was 5%) ✅")
-    print(f"  Flash Crash: 20% (was 10%) ✅")
-    print(f"  Max Drawdown: 30% (was 20%) ✅")
-    print(f"  Max Position: 15% (was 10%) ✅\n")
+    print("Risk Agent Relaxation:")
+    print("  Max Volatility: 10% (was 5%) ✅")
+    print("  Flash Crash: 20% (was 10%) ✅")
+    print("  Max Drawdown: 30% (was 20%) ✅")
+    print("  Max Position: 15% (was 10%) ✅\n")
 
     # Fetch 6 months of data
     print("="*90)
@@ -324,16 +321,16 @@ async def main():
         return
 
     # Create overlapping 1-month windows (every 7 days)
-    print(f"\n" + "="*90)
-    print(f"PHASE 2: Creating overlapping 1-month test windows")
+    print("\n" + "="*90)
+    print("PHASE 2: Creating overlapping 1-month test windows")
     print("="*90 + "\n")
 
     windows = create_overlapping_windows(real_data, window_days=30, step_days=7)
     print(f"Created {len(windows)} overlapping 1-month windows (7-day step)\n")
 
     # Test each window
-    print(f"="*90)
-    print(f"PHASE 3: Testing strategy on all windows")
+    print("="*90)
+    print("PHASE 3: Testing strategy on all windows")
     print("="*90 + "\n")
 
     results = []
@@ -371,12 +368,12 @@ async def main():
     beat_hodl = [r for r in results if r['vs_hodl'] > 1.0]
     profitable = [r for r in results if r['strategy_return'] > 0]
 
-    print(f"Trading Activity:")
+    print("Trading Activity:")
     print(f"  Windows with Trades: {len(traded)}/{len(results)} ({len(traded)/len(results):.0%})")
     print(f"  Windows with No Trades: {len(no_trades)}/{len(results)} ({len(no_trades)/len(results):.0%})")
     print()
 
-    print(f"Performance:")
+    print("Performance:")
     print(f"  Beat HODL: {len(beat_hodl)}/{len(results)} ({len(beat_hodl)/len(results):.0%})")
     print(f"  Profitable (>0%): {len(profitable)}/{len(results)} ({len(profitable)/len(results):.0%})")
     print()
@@ -386,7 +383,7 @@ async def main():
         avg_return = sum(r['strategy_return'] for r in traded) / len(traded)
         avg_win_rate = sum(r['win_rate'] for r in traded) / len(traded)
 
-        print(f"When Strategy Traded:")
+        print("When Strategy Traded:")
         print(f"  Avg Trades per Window: {avg_trades:.1f}")
         print(f"  Avg Return: {avg_return:+.2%}")
         print(f"  Avg Win Rate: {avg_win_rate:.1%}")
@@ -396,7 +393,7 @@ async def main():
     total_strategy = sum(r['strategy_return'] for r in results)
     total_hodl = sum(r['hodl_return'] for r in results)
 
-    print(f"Cumulative Across All Windows:")
+    print("Cumulative Across All Windows:")
     print(f"  Strategy: {total_strategy:+.2%}")
     print(f"  HODL: {total_hodl:+.2%}")
     print()
@@ -406,13 +403,13 @@ async def main():
         best = max(traded, key=lambda r: r['strategy_return'])
         worst = min(traded, key=lambda r: r['strategy_return'])
 
-        print(f"Best Window:")
+        print("Best Window:")
         print(f"  {best['start_date'].date()} to {best['end_date'].date()}")
         print(f"  Return: {best['strategy_return']:+.2%} vs HODL: {best['hodl_return']:+.2%}")
         print(f"  Trades: {best['total_trades']}, Win Rate: {best['win_rate']:.0%}")
         print()
 
-        print(f"Worst Window:")
+        print("Worst Window:")
         print(f"  {worst['start_date'].date()} to {worst['end_date'].date()}")
         print(f"  Return: {worst['strategy_return']:+.2%} vs HODL: {worst['hodl_return']:+.2%}")
         print(f"  Trades: {worst['total_trades']}, Win Rate: {worst['win_rate']:.0%}")
@@ -420,21 +417,21 @@ async def main():
 
     # Assessment
     print(f"{'='*90}")
-    print(f"ASSESSMENT")
+    print("ASSESSMENT")
     print(f"{'='*90}\n")
 
     if len(traded) == 0:
-        print(f"❌ STILL TOO CONSERVATIVE: No trades in any window")
-        print(f"   Even with relaxed risk, strategy won't trade")
-        print(f"   Need to: Lower confidence threshold OR reduce risk weight")
+        print("❌ STILL TOO CONSERVATIVE: No trades in any window")
+        print("   Even with relaxed risk, strategy won't trade")
+        print("   Need to: Lower confidence threshold OR reduce risk weight")
     elif len(profitable) / len(results) >= 0.6:
         print(f"✅ STRONG: Profitable in {len(profitable)/len(results):.0%} of windows")
-        print(f"   Making real money, not just preserving capital")
+        print("   Making real money, not just preserving capital")
     elif len(beat_hodl) / len(results) >= 0.6:
-        print(f"⚠️  DEFENSIVE: Beats HODL but not consistently profitable")
-        print(f"   Good at capital preservation, needs profit optimization")
+        print("⚠️  DEFENSIVE: Beats HODL but not consistently profitable")
+        print("   Good at capital preservation, needs profit optimization")
     else:
-        print(f"❌ WEAK: Inconsistent performance")
+        print("❌ WEAK: Inconsistent performance")
 
     print(f"\n{'='*90}\n")
 

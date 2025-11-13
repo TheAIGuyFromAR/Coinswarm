@@ -12,13 +12,11 @@ Extracts proven strategies and converts them into testable patterns.
 
 import asyncio
 import logging
-from typing import Dict, Optional, List
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
 from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
-
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +39,10 @@ class ResearchStrategy:
     year: int
     strategy_name: str
     description: str
-    pattern: Dict  # Strategy parameters
-    backtested_sharpe: Optional[float]  # Sharpe ratio from paper
-    backtested_return: Optional[float]  # Annual return from paper
-    asset_classes: List[str]  # ["crypto", "equities", "forex", etc.]
+    pattern: dict  # Strategy parameters
+    backtested_sharpe: float | None  # Sharpe ratio from paper
+    backtested_return: float | None  # Annual return from paper
+    asset_classes: list[str]  # ["crypto", "equities", "forex", etc.]
     url: str
 
 
@@ -71,7 +69,7 @@ class AcademicResearchAgent(BaseAgent):
         self,
         name: str = "AcademicResearcher",
         weight: float = 0.0,  # Doesn't vote on trades
-        sources: Optional[List[AcademicSource]] = None
+        sources: list[AcademicSource] | None = None
     ):
         super().__init__(name, weight)
 
@@ -79,14 +77,14 @@ class AcademicResearchAgent(BaseAgent):
         self.sources = sources or self._default_sources()
 
         # Discovered strategies (not yet tested)
-        self.discovered_strategies: List[ResearchStrategy] = []
+        self.discovered_strategies: list[ResearchStrategy] = []
 
         # Cache
-        self.cache: Dict[str, List[ResearchStrategy]] = {}
+        self.cache: dict[str, list[ResearchStrategy]] = {}
         self.cache_ttl = timedelta(days=7)  # Cache for 1 week
         self.last_research_time = datetime.now()
 
-    def _default_sources(self) -> List[AcademicSource]:
+    def _default_sources(self) -> list[AcademicSource]:
         """Default academic sources"""
         return [
             # Quantitative finance papers
@@ -147,8 +145,8 @@ class AcademicResearchAgent(BaseAgent):
     async def analyze(
         self,
         tick: DataPoint,
-        position: Optional[Dict],
-        market_context: Dict
+        position: dict | None,
+        market_context: dict
     ) -> AgentVote:
         """
         Academic researcher doesn't vote on new trades.
@@ -162,7 +160,7 @@ class AcademicResearchAgent(BaseAgent):
             reason="Academic researcher does not vote on new trades"
         )
 
-    async def research_strategies(self, query: str = "cryptocurrency trading") -> List[ResearchStrategy]:
+    async def research_strategies(self, query: str = "cryptocurrency trading") -> list[ResearchStrategy]:
         """
         Research academic strategies.
 
@@ -216,7 +214,7 @@ class AcademicResearchAgent(BaseAgent):
         self,
         source: AcademicSource,
         query: str
-    ) -> List[ResearchStrategy]:
+    ) -> list[ResearchStrategy]:
         """
         Query a single academic source.
 
@@ -301,7 +299,7 @@ class AcademicResearchAgent(BaseAgent):
             logger.error(f"Error querying {source.name}: {e}")
             return []
 
-    def get_top_strategies(self, n: int = 10) -> List[ResearchStrategy]:
+    def get_top_strategies(self, n: int = 10) -> list[ResearchStrategy]:
         """
         Get top N strategies by Sharpe ratio.
 
@@ -324,7 +322,7 @@ class AcademicResearchAgent(BaseAgent):
 
         return sorted_strategies[:n]
 
-    def convert_to_testable_pattern(self, strategy: ResearchStrategy) -> Dict:
+    def convert_to_testable_pattern(self, strategy: ResearchStrategy) -> dict:
         """
         Convert academic strategy to testable pattern.
 
@@ -350,7 +348,7 @@ class AcademicResearchAgent(BaseAgent):
 
         return pattern
 
-    def get_research_summary(self) -> Dict:
+    def get_research_summary(self) -> dict:
         """Get summary of academic research"""
 
         return {

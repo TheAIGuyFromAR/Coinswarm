@@ -18,13 +18,12 @@ import asyncio
 import json
 import logging
 import random
-from datetime import datetime, timedelta
-from typing import List, Dict
+from datetime import datetime
 from pathlib import Path
 
-from coinswarm.data_ingest.base import DataPoint
 from coinswarm.agents.chaos_buy_agent import ChaosBuyAgent
 from coinswarm.agents.opportunistic_sell_agent import OpportunisticSellAgent
+from coinswarm.data_ingest.base import DataPoint
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,9 +58,9 @@ class ChaosTradingSimulator:
 
     async def run_iteration(
         self,
-        data_window: List[DataPoint],
+        data_window: list[DataPoint],
         iteration: int
-    ) -> Dict:
+    ) -> dict:
         """
         Run one chaos trading iteration on a data window.
 
@@ -217,7 +216,7 @@ class ChaosTradingSimulator:
 
     async def run_simulation(
         self,
-        all_data: List[DataPoint],
+        all_data: list[DataPoint],
         num_iterations: int = 100,
         window_size_range: tuple = (20, 100)  # 20-100 candles per window
     ):
@@ -280,7 +279,7 @@ class ChaosTradingSimulator:
 
         return all_results
 
-    def _analyze_results(self, all_results: List[Dict]):
+    def _analyze_results(self, all_results: list[dict]):
         """Analyze and display overall simulation results"""
 
         logger.info("\n" + "=" * 80)
@@ -293,7 +292,7 @@ class ChaosTradingSimulator:
         total_wins = sum(r["num_wins"] for r in all_results)
         total_losses = sum(r["num_losses"] for r in all_results)
 
-        logger.info(f"\n📊 Overall Statistics:")
+        logger.info("\n📊 Overall Statistics:")
         logger.info(f"   Total Iterations:  {total_iterations}")
         logger.info(f"   Total Trades:      {total_trades}")
         logger.info(f"   Winning Trades:    {total_wins}")
@@ -310,7 +309,7 @@ class ChaosTradingSimulator:
         best_return = max(returns) if returns else 0
         worst_return = min(returns) if returns else 0
 
-        logger.info(f"\n💵 Return Statistics:")
+        logger.info("\n💵 Return Statistics:")
         logger.info(f"   Average Return:    {avg_return:+.2%}")
         logger.info(f"   Best Return:       {best_return:+.2%}")
         logger.info(f"   Worst Return:      {worst_return:+.2%}")
@@ -326,7 +325,7 @@ class ChaosTradingSimulator:
             avg_win = sum(t["pnl"] for t in winning_trades) / len(winning_trades) if winning_trades else 0
             avg_loss = sum(t["pnl"] for t in losing_trades) / len(losing_trades) if losing_trades else 0
 
-            logger.info(f"\n📈 Trade Statistics:")
+            logger.info("\n📈 Trade Statistics:")
             logger.info(f"   Avg Trade P&L:     ${avg_pnl:,.2f} ({avg_pnl_pct:+.2%})")
             logger.info(f"   Avg Winning Trade: ${avg_win:,.2f}")
             logger.info(f"   Avg Losing Trade:  ${avg_loss:,.2f}")
@@ -334,7 +333,7 @@ class ChaosTradingSimulator:
         # Save detailed results
         self._save_results(all_results)
 
-    def _save_results(self, all_results: List[Dict]):
+    def _save_results(self, all_results: list[dict]):
         """Save detailed results to JSON for later analysis"""
 
         output_dir = Path("data/chaos_trading")
@@ -374,9 +373,9 @@ class ChaosTradingSimulator:
         logger.info(f"💾 All trades saved to: {trades_file}")
 
 
-def load_historical_data(filepath: str) -> List[DataPoint]:
+def load_historical_data(filepath: str) -> list[DataPoint]:
     """Load historical data from JSON file"""
-    with open(filepath, 'r') as f:
+    with open(filepath) as f:
         data = json.load(f)
 
     symbol = data.get("symbol", "BTC")

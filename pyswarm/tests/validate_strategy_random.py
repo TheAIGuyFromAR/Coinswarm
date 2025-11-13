@@ -10,19 +10,18 @@ Usage:
     python validate_strategy_random.py --windows 20 --days 60 --symbol BTC-USDC
 """
 
-import asyncio
 import argparse
+import asyncio
 import logging
 import random
-from datetime import datetime, timedelta
-from typing import List, Dict
 import statistics
+from datetime import datetime, timedelta
 
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
 from coinswarm.agents.arbitrage_agent import ArbitrageAgent
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
+from coinswarm.agents.risk_agent import RiskManagementAgent
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine
 from coinswarm.data_ingest.base import DataPoint
 
 logging.basicConfig(
@@ -37,7 +36,7 @@ def generate_market_data(
     start_date: datetime,
     days: int,
     market_regime: str = "random"
-) -> List[DataPoint]:
+) -> list[DataPoint]:
     """
     Generate mock market data with different regimes
 
@@ -114,9 +113,9 @@ async def run_backtest_window(
     start_date: datetime,
     days: int,
     market_regime: str,
-    agent_weights: Dict[str, float],
+    agent_weights: dict[str, float],
     confidence_threshold: float
-) -> Dict:
+) -> dict:
     """Run a single backtest on a random window"""
 
     # Generate data for this window
@@ -167,7 +166,7 @@ async def validate_strategy(
     symbol: str = "BTC-USDC",
     num_windows: int = 10,
     days_per_window: int = 30,
-    agent_weights: Dict[str, float] = None,
+    agent_weights: dict[str, float] = None,
     confidence_threshold: float = 0.6
 ):
     """
@@ -188,7 +187,7 @@ async def validate_strategy(
     print("RANDOM WINDOW STRATEGY VALIDATION")
     print("="*70 + "\n")
 
-    print(f"Testing Strategy:")
+    print("Testing Strategy:")
     print(f"  Symbol: {symbol}")
     print(f"  Windows: {num_windows}")
     print(f"  Window Length: {days_per_window} days")
@@ -238,10 +237,10 @@ async def validate_strategy(
     returns = [r["return_pct"] for r in results]
     win_rates = [r["win_rate"] for r in results]
     sharpes = [r["sharpe"] for r in results]
-    sortinos = [r["sortino"] for r in results]
+    [r["sortino"] for r in results]
     max_drawdowns = [r["max_drawdown"] for r in results]
     total_trades = [r["total_trades"] for r in results]
-    profit_factors = [r["profit_factor"] for r in results]
+    [r["profit_factor"] for r in results]
 
     # Count positive returns
     positive_windows = sum(1 for r in returns if r > 0)
@@ -252,26 +251,26 @@ async def validate_strategy(
     print()
     print(f"Profitable Windows:  {positive_windows}/{num_windows} ({positive_windows/num_windows:.0%})")
     print()
-    print(f"Return %:")
+    print("Return %:")
     print(f"  Mean:              {statistics.mean(returns):+.2%}")
     print(f"  Median:            {statistics.median(returns):+.2%}")
     print(f"  Std Dev:           {statistics.stdev(returns):.2%}")
     print(f"  Min:               {min(returns):+.2%}")
     print(f"  Max:               {max(returns):+.2%}")
     print()
-    print(f"Win Rate:")
+    print("Win Rate:")
     print(f"  Mean:              {statistics.mean(win_rates):.1%}")
     print(f"  Median:            {statistics.median(win_rates):.1%}")
     print()
-    print(f"Sharpe Ratio:")
+    print("Sharpe Ratio:")
     print(f"  Mean:              {statistics.mean(sharpes):.2f}")
     print(f"  Median:            {statistics.median(sharpes):.2f}")
     print()
-    print(f"Max Drawdown:")
+    print("Max Drawdown:")
     print(f"  Mean:              {statistics.mean(max_drawdowns):.1%}")
     print(f"  Worst:             {max(max_drawdowns):.1%}")
     print()
-    print(f"Trades per Window:")
+    print("Trades per Window:")
     print(f"  Mean:              {statistics.mean(total_trades):.0f}")
     print(f"  Total:             {sum(total_trades)}")
     print("="*70)
@@ -283,7 +282,7 @@ async def validate_strategy(
 
     mean_return = statistics.mean(returns)
     mean_sharpe = statistics.mean(sharpes)
-    mean_win_rate = statistics.mean(win_rates)
+    statistics.mean(win_rates)
     consistency = positive_windows / num_windows
 
     if mean_return > 0.05 and mean_sharpe > 1.5 and consistency > 0.6:

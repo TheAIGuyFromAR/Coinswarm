@@ -7,12 +7,10 @@ Alternative to direct Binance API calls (useful when network restricted).
 """
 
 import logging
+from datetime import datetime
+
 import httpx
-from datetime import datetime, timedelta
-from typing import List, Optional
-
 from coinswarm.data_ingest.base import DataPoint
-
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +42,7 @@ class WorkerClient:
         timeframe: str = "1h",
         days: int = 30,
         use_cache: bool = True
-    ) -> List[DataPoint]:
+    ) -> list[DataPoint]:
         """
         Fetch historical data from Worker.
 

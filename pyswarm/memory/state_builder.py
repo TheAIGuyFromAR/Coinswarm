@@ -15,10 +15,10 @@ State Vector Components (384 dimensions):
 - Temporal (160): time of day, day of week, market regime embeddings
 """
 
-import numpy as np
-from typing import Dict, Optional, List
-from datetime import datetime
 import logging
+from datetime import datetime
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -66,11 +66,11 @@ class StateBuilder:
         self,
         symbol: str,
         price: float,
-        market_context: Optional[Dict] = None,
-        technical_indicators: Optional[Dict] = None,
-        sentiment_data: Optional[Dict] = None,
-        portfolio_state: Optional[Dict] = None,
-        timestamp: Optional[datetime] = None
+        market_context: dict | None = None,
+        technical_indicators: dict | None = None,
+        sentiment_data: dict | None = None,
+        portfolio_state: dict | None = None,
+        timestamp: datetime | None = None
     ) -> np.ndarray:
         """
         Build state vector from market data.
@@ -137,7 +137,7 @@ class StateBuilder:
 
         return state
 
-    def _extract_price_features(self, price: float, market_context: Dict) -> np.ndarray:
+    def _extract_price_features(self, price: float, market_context: dict) -> np.ndarray:
         """Extract price-based features (24 dims)"""
         features = np.zeros(24)
 
@@ -185,7 +185,7 @@ class StateBuilder:
 
         return features
 
-    def _extract_technical_features(self, indicators: Dict) -> np.ndarray:
+    def _extract_technical_features(self, indicators: dict) -> np.ndarray:
         """Extract technical indicator features (80 dims)"""
         features = np.zeros(80)
 
@@ -244,7 +244,7 @@ class StateBuilder:
 
         return features
 
-    def _extract_microstructure_features(self, market_context: Dict) -> np.ndarray:
+    def _extract_microstructure_features(self, market_context: dict) -> np.ndarray:
         """Extract market microstructure features (40 dims)"""
         features = np.zeros(40)
 
@@ -274,7 +274,7 @@ class StateBuilder:
 
         return features
 
-    def _extract_sentiment_features(self, sentiment: Dict) -> np.ndarray:
+    def _extract_sentiment_features(self, sentiment: dict) -> np.ndarray:
         """Extract sentiment features (40 dims)"""
         features = np.zeros(40)
 
@@ -307,7 +307,7 @@ class StateBuilder:
 
         return features
 
-    def _extract_portfolio_features(self, portfolio: Dict) -> np.ndarray:
+    def _extract_portfolio_features(self, portfolio: dict) -> np.ndarray:
         """Extract portfolio state features (40 dims)"""
         features = np.zeros(40)
 

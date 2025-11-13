@@ -4,12 +4,10 @@ Unit tests for AgentCommittee
 Tests voting aggregation, weighted confidence, veto system, and dynamic weight adjustment.
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock
-from decimal import Decimal
 
-from coinswarm.agents.committee import AgentCommittee, CommitteeDecision
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
+import pytest
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
+from coinswarm.agents.committee import AgentCommittee
 from coinswarm.data_ingest.base import DataPoint
 
 

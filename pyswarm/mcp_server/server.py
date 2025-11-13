@@ -8,21 +8,17 @@ Based on: docs/architecture/mcp-server-design.md
 """
 
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
+from coinswarm.api.coinbase_client import CoinbaseAPIClient, OrderSide
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import (
     Resource,
-    Tool,
     TextContent,
-    ImageContent,
-    EmbeddedResource,
+    Tool,
 )
-
-from coinswarm.api.coinbase_client import CoinbaseAPIClient, OrderSide, OrderType, TimeInForce
-from coinswarm.core.config import settings
 
 logger = structlog.get_logger(__name__)
 
@@ -38,7 +34,7 @@ class CoinbaseMCPServer:
     def __init__(self):
         """Initialize MCP server with Coinbase client"""
         self.server = Server("coinbase-trading")
-        self.coinbase_client: Optional[CoinbaseAPIClient] = None
+        self.coinbase_client: CoinbaseAPIClient | None = None
         self.logger = logger.bind(component="mcp_server")
 
         # Register handlers
@@ -61,7 +57,7 @@ class CoinbaseMCPServer:
         """Register MCP resource handlers"""
 
         @self.server.list_resources()
-        async def list_resources() -> List[Resource]:
+        async def list_resources() -> list[Resource]:
             """List available resources"""
             return [
                 Resource(
@@ -138,7 +134,7 @@ class CoinbaseMCPServer:
         """Register MCP tool handlers"""
 
         @self.server.list_tools()
-        async def list_tools() -> List[Tool]:
+        async def list_tools() -> list[Tool]:
             """List available tools"""
             return [
                 Tool(
@@ -253,7 +249,7 @@ class CoinbaseMCPServer:
             ]
 
         @self.server.call_tool()
-        async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
+        async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             """Execute tool by name"""
             client = await self._get_client()
 
@@ -293,7 +289,7 @@ class CoinbaseMCPServer:
         """Register MCP prompt handlers"""
 
         @self.server.list_prompts()
-        async def list_prompts() -> List[Dict[str, Any]]:
+        async def list_prompts() -> list[dict[str, Any]]:
             """List available prompts"""
             return [
                 {
@@ -323,7 +319,7 @@ class CoinbaseMCPServer:
     # ========================================================================
 
     async def _get_market_data(
-        self, client: CoinbaseAPIClient, args: Dict[str, Any]
+        self, client: CoinbaseAPIClient, args: dict[str, Any]
     ) -> str:
         """Get market data for a product"""
         product_id = args["product_id"]
@@ -340,7 +336,7 @@ class CoinbaseMCPServer:
 """
 
     async def _get_historical_candles(
-        self, client: CoinbaseAPIClient, args: Dict[str, Any]
+        self, client: CoinbaseAPIClient, args: dict[str, Any]
     ) -> str:
         """Get historical candles"""
         candles = await client.get_product_candles(
@@ -360,7 +356,7 @@ class CoinbaseMCPServer:
         return result
 
     async def _place_market_order(
-        self, client: CoinbaseAPIClient, args: Dict[str, Any]
+        self, client: CoinbaseAPIClient, args: dict[str, Any]
     ) -> str:
         """Place market order"""
         # Validate order before placing
@@ -379,7 +375,7 @@ class CoinbaseMCPServer:
         return f"Market order placed successfully. Order ID: {order_id}"
 
     async def _place_limit_order(
-        self, client: CoinbaseAPIClient, args: Dict[str, Any]
+        self, client: CoinbaseAPIClient, args: dict[str, Any]
     ) -> str:
         """Place limit order"""
         # Validate order before placing
@@ -399,14 +395,14 @@ class CoinbaseMCPServer:
         return f"Limit order placed successfully. Order ID: {order_id}"
 
     async def _cancel_order(
-        self, client: CoinbaseAPIClient, args: Dict[str, Any]
+        self, client: CoinbaseAPIClient, args: dict[str, Any]
     ) -> str:
         """Cancel order"""
         result = await client.cancel_order(args["order_id"])
         return f"Order cancelled successfully: {result}"
 
     async def _get_account_balance(
-        self, client: CoinbaseAPIClient, args: Dict[str, Any]
+        self, client: CoinbaseAPIClient, args: dict[str, Any]
     ) -> str:
         """Get account balance"""
         if account_id := args.get("account_id"):
@@ -417,8 +413,8 @@ class CoinbaseMCPServer:
             return self._format_accounts(accounts)
 
     async def _validate_order(
-        self, client: CoinbaseAPIClient, args: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, client: CoinbaseAPIClient, args: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Validate order against risk limits and trading rules.
 
@@ -426,7 +422,7 @@ class CoinbaseMCPServer:
             Dictionary with 'valid' (bool) and 'reason' (str) keys
         """
         # Get current account balance
-        accounts = await client.list_accounts()
+        await client.list_accounts()
 
         # TODO: Implement full risk validation based on settings.trading limits
         # For now, basic validation
@@ -445,7 +441,7 @@ class CoinbaseMCPServer:
     # Formatting Methods
     # ========================================================================
 
-    def _format_accounts(self, accounts: List[Dict[str, Any]]) -> str:
+    def _format_accounts(self, accounts: list[dict[str, Any]]) -> str:
         """Format accounts list for display"""
         result = f"Trading Accounts ({len(accounts)}):\n\n"
         for account in accounts:
@@ -454,7 +450,7 @@ class CoinbaseMCPServer:
             result += f"{account.get('hold', {}).get('value', '0')} on hold\n"
         return result
 
-    def _format_account(self, account: Dict[str, Any]) -> str:
+    def _format_account(self, account: dict[str, Any]) -> str:
         """Format single account for display"""
         return f"""Account: {account.get('uuid', 'N/A')}
 Currency: {account.get('currency', 'N/A')}
@@ -462,7 +458,7 @@ Available: {account.get('available_balance', {}).get('value', '0')}
 Hold: {account.get('hold', {}).get('value', '0')}
 """
 
-    def _format_products(self, products: List[Dict[str, Any]]) -> str:
+    def _format_products(self, products: list[dict[str, Any]]) -> str:
         """Format products list for display"""
         result = f"Trading Products ({len(products)}):\n\n"
         for product in products[:20]:  # Show first 20
@@ -473,7 +469,7 @@ Hold: {account.get('hold', {}).get('value', '0')}
         return result
 
     def _format_product_with_ticker(
-        self, product: Dict[str, Any], ticker: Dict[str, Any]
+        self, product: dict[str, Any], ticker: dict[str, Any]
     ) -> str:
         """Format product with ticker data"""
         return f"""Product: {product.get('product_id', 'N/A')}
@@ -485,7 +481,7 @@ Best Bid: ${ticker.get('best_bid', 'N/A')}
 Best Ask: ${ticker.get('best_ask', 'N/A')}
 """
 
-    def _format_orders(self, orders: List[Dict[str, Any]]) -> str:
+    def _format_orders(self, orders: list[dict[str, Any]]) -> str:
         """Format orders list for display"""
         result = f"Orders ({len(orders)}):\n\n"
         for order in orders:
@@ -495,7 +491,7 @@ Best Ask: ${ticker.get('best_ask', 'N/A')}
             result += f"{order.get('status', 'N/A')}\n"
         return result
 
-    def _format_order(self, order: Dict[str, Any]) -> str:
+    def _format_order(self, order: dict[str, Any]) -> str:
         """Format single order for display"""
         return f"""Order: {order.get('order_id', 'N/A')}
 Product: {order.get('product_id', 'N/A')}
@@ -505,7 +501,7 @@ Status: {order.get('status', 'N/A')}
 Size: {order.get('order_configuration', {}).get('base_size', 'N/A')}
 """
 
-    def _format_fills(self, fills: List[Dict[str, Any]]) -> str:
+    def _format_fills(self, fills: list[dict[str, Any]]) -> str:
         """Format fills list for display"""
         result = f"Fills ({len(fills)}):\n\n"
         for fill in fills:

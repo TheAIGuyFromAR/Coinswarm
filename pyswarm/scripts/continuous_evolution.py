@@ -15,10 +15,9 @@ This creates an evolutionary pressure towards profitable strategies.
 
 import asyncio
 import logging
-from pathlib import Path
 import subprocess
 import time
-from datetime import datetime
+from pathlib import Path
 
 logging.basicConfig(
     level=logging.INFO,
@@ -95,7 +94,7 @@ class ContinuousEvolutionSystem:
         logger.info(f"\n{'='*80}")
         logger.info(f"CYCLE {self.cycle_count + 1}: PATTERN ANALYSIS")
         logger.info(f"{'='*80}")
-        logger.info(f"Analyzing trades to find patterns...")
+        logger.info("Analyzing trades to find patterns...")
 
         # Run pattern analysis
         result = subprocess.run(
@@ -151,7 +150,7 @@ class ContinuousEvolutionSystem:
         upvotes = output.count("👍 UPVOTE")
         downvotes = output.count("👎 DOWNVOTE")
 
-        logger.info(f"✓ Tested strategies")
+        logger.info("✓ Tested strategies")
         logger.info(f"  Upvotes: {upvotes}")
         logger.info(f"  Downvotes: {downvotes}")
 
@@ -185,7 +184,7 @@ class ContinuousEvolutionSystem:
                 for w in winners[:3]:  # Top 3
                     logger.info(f"  - {w['pattern_name']}: {w['avg_return']:+.2%} return, {w['win_rate']:.1%} win rate")
             else:
-                logger.info(f"\n⏳ No winning strategies yet (all downvoted)")
+                logger.info("\n⏳ No winning strategies yet (all downvoted)")
 
         logger.info(f"{'='*80}\n")
 
@@ -244,7 +243,7 @@ class ContinuousEvolutionSystem:
 
         except KeyboardInterrupt:
             logger.info("\n\nStopping evolution system...")
-            logger.info(f"\nFinal Statistics:")
+            logger.info("\nFinal Statistics:")
             logger.info(f"  Total Cycles: {self.cycle_count}")
             logger.info(f"  Total Trades Generated: {self.total_trades_generated:,}")
             logger.info(f"  Total Patterns Discovered: {self.total_patterns_discovered}")

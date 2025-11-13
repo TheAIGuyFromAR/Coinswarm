@@ -13,11 +13,11 @@ import json
 import random
 from datetime import datetime, timedelta
 
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
 from coinswarm.agents.arbitrage_agent import ArbitrageAgent
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
+from coinswarm.agents.risk_agent import RiskManagementAgent
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine
 from coinswarm.data_ingest.base import DataPoint
 
 
@@ -189,7 +189,7 @@ async def run_and_analyze(config: dict, symbol: str, test_days: int, seed: int):
 
 async def main():
     # Load best strategy
-    with open("discovered_strategies_BTCUSDC_20251106_002943.json", 'r') as f:
+    with open("discovered_strategies_BTCUSDC_20251106_002943.json") as f:
         data = json.load(f)
 
     # Use rank 3 (best performer)
@@ -198,19 +198,19 @@ async def main():
     print("\n" + "="*90)
     print("EXPLORING REAL TRADES - WHAT WORKED AND WHAT LOST")
     print("="*90)
-    print(f"\nStrategy Configuration:")
+    print("\nStrategy Configuration:")
     print(f"  Trend Weight: {strategy['config']['trend_weight']:.3f}")
     print(f"  Risk Weight: {strategy['config']['risk_weight']:.3f}")
     print(f"  Arbitrage Weight: {strategy['config']['arbitrage_weight']:.3f}")
     print(f"  Confidence Threshold: {strategy['config']['confidence_threshold']:.3f}")
-    print(f"\nOriginal Discovery Performance:")
+    print("\nOriginal Discovery Performance:")
     print(f"  Return: {strategy['return_pct']:+.2%}")
     print(f"  HODL: {strategy['hodl_return_pct']:+.2%}")
     print(f"  vs HODL: {strategy['vs_hodl_multiple']:.2f}x")
 
     # Run 20 different tests with different seeds/conditions
     print(f"\n{'='*90}")
-    print(f"RUNNING 20 TESTS WITH RANDOM START DATES AND MARKET CONDITIONS")
+    print("RUNNING 20 TESTS WITH RANDOM START DATES AND MARKET CONDITIONS")
     print(f"{'='*90}")
 
     results = []
@@ -225,7 +225,7 @@ async def main():
 
     # Aggregate analysis
     print(f"\n\n{'='*90}")
-    print(f"AGGREGATE ANALYSIS - WHAT WORKED AND WHAT LOST")
+    print("AGGREGATE ANALYSIS - WHAT WORKED AND WHAT LOST")
     print(f"{'='*90}\n")
 
     # Group by outcome
@@ -236,7 +236,7 @@ async def main():
             outcomes[outcome] = []
         outcomes[outcome].append(r)
 
-    print(f"OUTCOME DISTRIBUTION:")
+    print("OUTCOME DISTRIBUTION:")
     for outcome, runs in sorted(outcomes.items(), key=lambda x: len(x[1]), reverse=True):
         count = len(runs)
         pct = count / len(results) * 100
@@ -246,7 +246,7 @@ async def main():
 
     # What worked?
     print(f"\n{'='*90}")
-    print(f"WHAT WORKED? (Runs that beat HODL)")
+    print("WHAT WORKED? (Runs that beat HODL)")
     print(f"{'='*90}\n")
 
     beat_hodl = [r for r in results if r['vs_hodl'] > 1.0]
@@ -263,7 +263,7 @@ async def main():
         avg_win_rate = sum(r['win_rate'] for r in beat_hodl) / len(beat_hodl)
         avg_sharpe = sum(r['sharpe'] for r in beat_hodl) / len(beat_hodl)
 
-        print(f"  WINNING PATTERNS:")
+        print("  WINNING PATTERNS:")
         print(f"    Avg Trades: {avg_trades:.1f}")
         print(f"    Avg Win Rate: {avg_win_rate:.1%}")
         print(f"    Avg Sharpe: {avg_sharpe:.2f}")
@@ -272,16 +272,16 @@ async def main():
         bull_wins = len([r for r in beat_hodl if r['trend'] > 0.1])
         bear_wins = len([r for r in beat_hodl if r['trend'] < -0.1])
         sideways_wins = len([r for r in beat_hodl if abs(r['trend']) <= 0.1])
-        print(f"\n    Market Conditions:")
+        print("\n    Market Conditions:")
         print(f"      Bull: {bull_wins}/{len(beat_hodl)}")
         print(f"      Bear: {bear_wins}/{len(beat_hodl)}")
         print(f"      Sideways: {sideways_wins}/{len(beat_hodl)}")
     else:
-        print(f"  ⚠️  Strategy did NOT beat HODL in any test run!")
+        print("  ⚠️  Strategy did NOT beat HODL in any test run!")
 
     # What lost?
     print(f"\n{'='*90}")
-    print(f"WHAT LOST? (Runs that underperformed HODL)")
+    print("WHAT LOST? (Runs that underperformed HODL)")
     print(f"{'='*90}\n")
 
     lost_to_hodl = [r for r in results if r['vs_hodl'] <= 1.0]
@@ -297,7 +297,7 @@ async def main():
         avg_trades = sum(r['total_trades'] for r in lost_to_hodl) / len(lost_to_hodl)
         avg_win_rate = sum(r['win_rate'] for r in lost_to_hodl) / len(lost_to_hodl)
 
-        print(f"  LOSING PATTERNS:")
+        print("  LOSING PATTERNS:")
         print(f"    Avg Trades: {avg_trades:.1f}")
         print(f"    Avg Win Rate: {avg_win_rate:.1%}")
 
@@ -305,14 +305,14 @@ async def main():
         bull_losses = len([r for r in lost_to_hodl if r['trend'] > 0.1])
         bear_losses = len([r for r in lost_to_hodl if r['trend'] < -0.1])
         sideways_losses = len([r for r in lost_to_hodl if abs(r['trend']) <= 0.1])
-        print(f"\n    Market Conditions:")
+        print("\n    Market Conditions:")
         print(f"      Bull: {bull_losses}/{len(lost_to_hodl)}")
         print(f"      Bear: {bear_losses}/{len(lost_to_hodl)}")
         print(f"      Sideways: {sideways_losses}/{len(lost_to_hodl)}")
 
     # Overall assessment
     print(f"\n{'='*90}")
-    print(f"OVERALL ASSESSMENT")
+    print("OVERALL ASSESSMENT")
     print(f"{'='*90}\n")
 
     total_strategy_return = sum(r['strategy_return'] for r in results)
@@ -326,13 +326,13 @@ async def main():
 
     if beat_hodl_rate >= 0.6:
         print(f"\n  ✅ ROBUST: Strategy beats HODL in {beat_hodl_rate:.0%} of tests")
-        print(f"     → Shows consistent edge across market conditions")
+        print("     → Shows consistent edge across market conditions")
     elif beat_hodl_rate >= 0.4:
         print(f"\n  ⚠️  MODERATE: Strategy beats HODL in {beat_hodl_rate:.0%} of tests")
-        print(f"     → Some edge but inconsistent")
+        print("     → Some edge but inconsistent")
     else:
         print(f"\n  ❌ WEAK: Strategy only beats HODL in {beat_hodl_rate:.0%} of tests")
-        print(f"     → Likely overfit to specific conditions")
+        print("     → Likely overfit to specific conditions")
 
     print(f"\n{'='*90}\n")
 

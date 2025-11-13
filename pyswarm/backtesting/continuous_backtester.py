@@ -15,16 +15,13 @@ Target: >50% CPU utilization at all times
 
 import asyncio
 import logging
-from typing import Dict, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from queue import PriorityQueue
 
 from coinswarm.agents.committee import AgentCommittee
 from coinswarm.agents.strategy_learning_agent import Strategy
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig, BacktestResult
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine, BacktestResult
 from coinswarm.data_ingest.base import DataPoint
-
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +31,7 @@ class BacktestTask:
     """Task in backtest queue"""
     priority: int  # Lower = higher priority
     strategy: Strategy
-    agent_config: Dict
+    agent_config: dict
     created_at: datetime
 
     def __lt__(self, other):
@@ -73,7 +70,7 @@ class ContinuousBacktester:
 
     def __init__(
         self,
-        historical_data: Dict[str, List[DataPoint]],
+        historical_data: dict[str, list[DataPoint]],
         backtest_config: BacktestConfig,
         max_concurrent_backtests: int = 4
     ):
@@ -85,7 +82,7 @@ class ContinuousBacktester:
         self.task_queue: asyncio.Queue = asyncio.Queue()
 
         # Results storage
-        self.results: Dict[str, BacktestResult] = {}
+        self.results: dict[str, BacktestResult] = {}
 
         # Statistics
         self.stats = {
@@ -126,7 +123,7 @@ class ContinuousBacktester:
     async def queue_backtest(
         self,
         strategy: Strategy,
-        agent_config: Dict,
+        agent_config: dict,
         priority: int = 2
     ):
         """
@@ -202,7 +199,7 @@ class ContinuousBacktester:
                 # Callback to strategy learning agent
                 await self._process_backtest_result(task, result)
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # No tasks in queue, continue
                 continue
 
@@ -226,12 +223,12 @@ class ContinuousBacktester:
 
         return result
 
-    def _create_committee(self, agent_config: Dict) -> AgentCommittee:
+    def _create_committee(self, agent_config: dict) -> AgentCommittee:
         """Create agent committee from configuration"""
 
         # Placeholder: In production, dynamically create agents
-        from coinswarm.agents.trend_agent import TrendFollowingAgent
         from coinswarm.agents.risk_agent import RiskManagementAgent
+        from coinswarm.agents.trend_agent import TrendFollowingAgent
 
         agents = [
             TrendFollowingAgent(),
@@ -332,11 +329,11 @@ class ContinuousBacktester:
 
         return cpu_utilization
 
-    def get_result(self, strategy_id: str) -> Optional[BacktestResult]:
+    def get_result(self, strategy_id: str) -> BacktestResult | None:
         """Get backtest result for a strategy"""
         return self.results.get(strategy_id)
 
-    def get_best_strategies(self, n: int = 10) -> List[BacktestResult]:
+    def get_best_strategies(self, n: int = 10) -> list[BacktestResult]:
         """
         Get top N strategies by Sharpe ratio.
 
@@ -352,7 +349,7 @@ class ContinuousBacktester:
 
         return sorted_results[:n]
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get backtesting statistics"""
 
         return {

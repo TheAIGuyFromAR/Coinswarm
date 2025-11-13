@@ -4,10 +4,9 @@ Unit tests for Data Ingest Base Classes
 Tests DataPoint, SourceMetadata, DataSource, and related functionality.
 """
 
-import pytest
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from coinswarm.data_ingest.base import (
     DataDomain,
     DataPoint,

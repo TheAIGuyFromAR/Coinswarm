@@ -4,13 +4,12 @@ Soundness tests for Binance Data Ingestor
 Tests determinism, latency, and data consistency.
 """
 
-import pytest
 import time
 from datetime import datetime
-from unittest.mock import AsyncMock, patch
 
-from coinswarm.data_ingest.exchanges.binance import BinanceIngestor
+import pytest
 from coinswarm.data_ingest.base import DataPoint
+from coinswarm.data_ingest.exchanges.binance import BinanceIngestor
 
 
 class TestBinanceDeterminism:
@@ -247,11 +246,11 @@ class TestBinanceLatency:
     @pytest.mark.asyncio
     async def test_datapoint_creation_latency(self):
         """Test that DataPoint creation is fast"""
-        ingestor = BinanceIngestor()
+        BinanceIngestor()
 
         start = time.perf_counter()
         for i in range(1000):
-            dp = DataPoint(
+            DataPoint(
                 source="binance",
                 symbol="BTC-USD",
                 timeframe="tick",

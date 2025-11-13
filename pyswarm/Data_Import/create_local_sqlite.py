@@ -1,5 +1,6 @@
-import sqlite3
 import os
+import sqlite3
+
 
 def create_local_db(db_path="historical_local.db"):
     conn = sqlite3.connect(db_path)

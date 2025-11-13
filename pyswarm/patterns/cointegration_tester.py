@@ -7,9 +7,9 @@ Example: BTC-USDT and BTC-USDC should be cointegrated (same asset, different sta
 If spread widens beyond normal range → mean reversion trade opportunity
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
+
+import numpy as np
 
 
 @dataclass
@@ -43,14 +43,14 @@ class CointegrationTester:
             lookback_period: Candles for calculating mean/std
         """
         self.lookback_period = lookback_period
-        self.spread_history: Dict[tuple, List[float]] = {}
+        self.spread_history: dict[tuple, list[float]] = {}
 
     def test_cointegration(
         self,
         price1: np.ndarray,
         price2: np.ndarray,
         significance_level: float = 0.05
-    ) -> Tuple[bool, float]:
+    ) -> tuple[bool, float]:
         """
         Test if two price series are cointegrated
 
@@ -73,7 +73,7 @@ class CointegrationTester:
         # Simple test: Check if spread returns to mean frequently
 
         mean_spread = np.mean(spread)
-        std_spread = np.std(spread)
+        np.std(spread)
 
         # Count mean crossings
         above_mean = spread > mean_spread
@@ -91,8 +91,8 @@ class CointegrationTester:
 
     def detect_spread_opportunities(
         self,
-        price_data: Dict[str, np.ndarray]
-    ) -> List[CointegrationOpportunity]:
+        price_data: dict[str, np.ndarray]
+    ) -> list[CointegrationOpportunity]:
         """
         Detect spread trading opportunities across pairs
 

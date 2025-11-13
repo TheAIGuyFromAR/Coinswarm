@@ -9,14 +9,12 @@ Supports:
 - Multiple symbols from directory
 """
 
-import logging
 import csv
+import logging
 from datetime import datetime
-from typing import List, Optional
 from pathlib import Path
 
 from coinswarm.data_ingest.base import DataPoint
-
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +37,7 @@ class CSVImporter:
         file_path: str,
         symbol: str = None,
         timeframe: str = "1h"
-    ) -> List[DataPoint]:
+    ) -> list[DataPoint]:
         """
         Import Binance historical data CSV.
 
@@ -65,7 +63,7 @@ class CSVImporter:
         data_points = []
 
         try:
-            with open(file_path, 'r') as f:
+            with open(file_path) as f:
                 reader = csv.reader(f)
 
                 for row in reader:
@@ -123,7 +121,7 @@ class CSVImporter:
         price_col: str = "price",
         volume_col: str = "volume",
         timeframe: str = "1h"
-    ) -> List[DataPoint]:
+    ) -> list[DataPoint]:
         """
         Import custom CSV with configurable columns.
 
@@ -146,7 +144,7 @@ class CSVImporter:
         data_points = []
 
         try:
-            with open(file_path, 'r') as f:
+            with open(file_path) as f:
                 reader = csv.DictReader(f)
 
                 for row in reader:

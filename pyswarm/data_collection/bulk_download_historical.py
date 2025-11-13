@@ -12,12 +12,13 @@ Your API Key: da672b9999120841fbd4427fa4550b83b5f23e017c5c03ff33bafe09064abe83
 """
 
 import asyncio
-import httpx
 import json
-from datetime import datetime, timedelta
-from pathlib import Path
-import time
 import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+import httpx
 
 
 class BulkHistoricalFetcher:
@@ -126,7 +127,7 @@ class BulkHistoricalFetcher:
 
                 # Check if we've gone back far enough
                 if candles[0]['time'] <= target_start:
-                    print(f"\n  🎯 Reached target date!")
+                    print("\n  🎯 Reached target date!")
                     break
 
                 # Rate limit (be nice to API)
@@ -165,7 +166,7 @@ class BulkHistoricalFetcher:
             total_time = time.time() - start_time
 
             print(f"\n{'='*80}")
-            print(f"✅ SUCCESS!")
+            print("✅ SUCCESS!")
             print(f"{'='*80}")
             print(f"Symbol:       {symbol}")
             print(f"Interval:     {interval_minutes} minutes")
@@ -199,14 +200,14 @@ async def download_max_granularity(symbols=None, interval=5, days=730):
         symbols = ['BTC', 'ETH', 'SOL']
 
     print(f"\n{'#'*80}")
-    print(f"# BULK HISTORICAL DATA DOWNLOAD")
+    print("# BULK HISTORICAL DATA DOWNLOAD")
     print(f"{'#'*80}")
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Symbols:  {', '.join(symbols)}")
     print(f"  Interval: {interval} minutes")
     print(f"  History:  {days} days ({days/365:.1f} years)")
     print(f"  Expected: ~{(days * 24 * 60 // interval):,} candles per symbol")
-    print(f"\n")
+    print("\n")
 
     results = {}
 
@@ -225,7 +226,7 @@ async def download_max_granularity(symbols=None, interval=5, days=730):
 
             # Small delay between symbols
             if i < len(symbols):
-                print(f"⏳ Waiting 2 seconds before next symbol...\n")
+                print("⏳ Waiting 2 seconds before next symbol...\n")
                 await asyncio.sleep(2)
 
         except Exception as e:
@@ -267,8 +268,8 @@ async def download_max_granularity(symbols=None, interval=5, days=730):
     print("="*80)
 
     print(f"\n✅ Downloaded: {len([r for r in results.values() if 'error' not in r])}/{len(symbols)} symbols")
-    print(f"📁 Location: data/historical/")
-    print(f"🚀 Ready for backtesting!\n")
+    print("📁 Location: data/historical/")
+    print("🚀 Ready for backtesting!\n")
 
     return results
 

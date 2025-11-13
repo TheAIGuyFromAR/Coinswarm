@@ -16,14 +16,13 @@ Usage:
     python fetch_historical_data.py --symbol BTC --use-cache
 """
 
-import asyncio
 import argparse
+import asyncio
 import json
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import List, Dict
 
 from coinswarm.data_ingest.coinswarm_worker_client import CoinswarmWorkerClient
 
@@ -45,7 +44,7 @@ class HistoricalDataCache:
         """Get cache file path for symbol and period"""
         return self.cache_dir / f"{symbol}_{days}days.json"
 
-    def load(self, symbol: str, days: int) -> List[dict]:
+    def load(self, symbol: str, days: int) -> list[dict]:
         """Load cached data if available and recent"""
         cache_file = self.get_cache_path(symbol, days)
 
@@ -60,10 +59,10 @@ class HistoricalDataCache:
 
         logger.info(f"Loading {symbol} from cache ({age_hours:.1f} hours old)")
 
-        with open(cache_file, 'r') as f:
+        with open(cache_file) as f:
             return json.load(f)
 
-    def save(self, symbol: str, days: int, data: List[dict]):
+    def save(self, symbol: str, days: int, data: list[dict]):
         """Save data to cache"""
         cache_file = self.get_cache_path(symbol, days)
 
@@ -79,7 +78,7 @@ async def fetch_with_retry(
     days: int,
     max_retries: int = 3,
     retry_delay: int = 5
-) -> List:
+) -> list:
     """Fetch data with retry logic for rate limiting"""
 
     for attempt in range(max_retries):
@@ -103,11 +102,11 @@ async def fetch_with_retry(
 
 
 async def fetch_multi_month_data(
-    symbols: List[str],
+    symbols: list[str],
     months: int,
     use_cache: bool = True,
     chunk_size: int = 30  # Fetch in 30-day chunks
-) -> Dict[str, List]:
+) -> dict[str, list]:
     """
     Fetch multiple months of data for multiple symbols.
 
@@ -177,7 +176,7 @@ async def fetch_multi_month_data(
 
                 # Wait between chunks to avoid rate limiting
                 if chunk_num < chunks_needed - 1:
-                    logger.info(f"  Waiting 10s before next chunk...")
+                    logger.info("  Waiting 10s before next chunk...")
                     await asyncio.sleep(10)
 
             except Exception as e:

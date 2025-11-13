@@ -14,10 +14,9 @@ This is how agents will trade in PRODUCTION.
 
 import asyncio
 import logging
+import random
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Dict
-import random
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,7 +56,7 @@ class MultiPairDataLoader:
     def __init__(self, data_dir: str = "data/historical"):
         self.data_dir = Path(data_dir)
 
-    def load_all_pairs(self, interval: str = "5m") -> Dict:
+    def load_all_pairs(self, interval: str = "5m") -> dict:
         """Load data for all configured pairs"""
 
         logger.info(f"Loading multi-pair data from {self.data_dir}...")
@@ -74,7 +73,7 @@ class MultiPairDataLoader:
                 historical_data[pair] = self._mock_load(pair)
             else:
                 logger.warning(f"  ⚠️  {pair:12s} not found at {filename}")
-                logger.info(f"      Run: python fetch_multi_pair_data.py")
+                logger.info("      Run: python fetch_multi_pair_data.py")
                 # Use mock data for demo
                 historical_data[pair] = self._mock_load(pair)
 
@@ -195,7 +194,7 @@ class MultiPairBacktestEngine:
     async def run_multi_pair_backtest(
         self,
         committee,
-        historical_data: Dict,
+        historical_data: dict,
         start_date: datetime,
         end_date: datetime
     ):
@@ -213,7 +212,7 @@ class MultiPairBacktestEngine:
         logger.info("MULTI-PAIR INTEGRATED BACKTEST")
         logger.info("="*80)
 
-        logger.info(f"\nConfiguration:")
+        logger.info("\nConfiguration:")
         logger.info(f"  Pairs:            {len(historical_data)}")
         logger.info(f"  Initial Capital:  ${self.config.initial_capital:,.0f}")
         logger.info(f"  Max Positions:    {self.config.max_positions}")
@@ -228,8 +227,8 @@ class MultiPairBacktestEngine:
         # 5. Track cross-pair patterns
 
         # Mock backtest for demo
-        logger.info(f"\n🚀 Running integrated multi-pair backtest...")
-        logger.info(f"   (This is a demo - real implementation would iterate through data)")
+        logger.info("\n🚀 Running integrated multi-pair backtest...")
+        logger.info("   (This is a demo - real implementation would iterate through data)")
 
         # Simulate some trades across pairs
         await self._simulate_multi_pair_trading(historical_data)
@@ -237,7 +236,7 @@ class MultiPairBacktestEngine:
         # Print results
         self._print_results()
 
-    async def _simulate_multi_pair_trading(self, historical_data: Dict):
+    async def _simulate_multi_pair_trading(self, historical_data: dict):
         """Simulate trading across multiple pairs (mock)"""
 
         # In real implementation, this would:
@@ -266,21 +265,21 @@ class MultiPairBacktestEngine:
     def _print_results(self):
         """Print backtest results"""
 
-        logger.info(f"\n" + "="*80)
+        logger.info("\n" + "="*80)
         logger.info("BACKTEST RESULTS")
         logger.info("="*80)
 
-        logger.info(f"\nPortfolio Summary:")
+        logger.info("\nPortfolio Summary:")
         logger.info(f"  Initial Capital:  ${self.portfolio.initial_capital:,.0f}")
         logger.info(f"  Final Equity:     ${self.portfolio.get_total_equity():,.0f}")
         logger.info(f"  Open Positions:   {len(self.portfolio.positions)}")
 
-        logger.info(f"\nPosition Breakdown:")
-        for pair, pos in self.portfolio.positions.items():
+        logger.info("\nPosition Breakdown:")
+        for pair, _pos in self.portfolio.positions.items():
             exposure = self.portfolio.get_pair_exposure(pair)
             logger.info(f"  {pair:12s}: {exposure:6.1%} of portfolio")
 
-        logger.info(f"\nAsset Allocation:")
+        logger.info("\nAsset Allocation:")
         for asset in ["BTC", "SOL", "ETH"]:
             exposure = self.portfolio.get_asset_exposure(asset)
             logger.info(f"  {asset:12s}: {exposure:6.1%} of portfolio")

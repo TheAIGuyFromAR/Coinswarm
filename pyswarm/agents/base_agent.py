@@ -13,8 +13,6 @@ Committee aggregates votes using weighted confidence.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Optional
-from datetime import datetime
 
 from coinswarm.data_ingest.base import DataPoint
 
@@ -62,8 +60,8 @@ class BaseAgent(ABC):
     async def analyze(
         self,
         tick: DataPoint,
-        position: Optional[Dict],
-        market_context: Dict
+        position: dict | None,
+        market_context: dict
     ) -> AgentVote:
         """
         Analyze market data and return vote.
@@ -78,7 +76,7 @@ class BaseAgent(ABC):
         """
         pass
 
-    def update_performance(self, trade_result: Dict):
+    def update_performance(self, trade_result: dict):
         """
         Update agent performance stats.
 

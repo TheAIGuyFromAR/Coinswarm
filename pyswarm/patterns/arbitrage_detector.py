@@ -7,8 +7,6 @@ Detects arbitrage opportunities across:
 3. Statistical arbitrage (mean reversion on spreads)
 """
 
-import numpy as np
-from typing import Dict, List, Optional
 from dataclasses import dataclass
 
 
@@ -16,11 +14,11 @@ from dataclasses import dataclass
 class ArbitrageOpportunity:
     """Detected arbitrage opportunity"""
     type: str  # "stablecoin", "triangular", "statistical"
-    pairs_involved: List[str]
+    pairs_involved: list[str]
     profit_potential: float  # Percentage profit
     confidence: float
     description: str
-    execution_steps: List[str]
+    execution_steps: list[str]
     risk_level: str  # "low", "medium", "high"
 
 
@@ -51,8 +49,8 @@ class ArbitrageDetector:
 
     def detect_stablecoin_arbitrage(
         self,
-        price_data: Dict[str, float]
-    ) -> List[ArbitrageOpportunity]:
+        price_data: dict[str, float]
+    ) -> list[ArbitrageOpportunity]:
         """
         Detect arbitrage across stablecoin pairs
 
@@ -116,8 +114,8 @@ class ArbitrageDetector:
 
     def detect_triangular_arbitrage(
         self,
-        price_data: Dict[str, float]
-    ) -> List[ArbitrageOpportunity]:
+        price_data: dict[str, float]
+    ) -> list[ArbitrageOpportunity]:
         """
         Detect triangular arbitrage opportunities
 
@@ -155,7 +153,6 @@ class ArbitrageDetector:
                 if net_profit > self.min_profit_pct:
                     if direct_btc_sol < implied_btc_sol:
                         # Direct pair is cheaper
-                        path = ["USD", "BTC", "SOL", "USD"]
                         steps = [
                             "1. Buy BTC with USD",
                             "2. Trade BTC for SOL (direct pair)",
@@ -164,7 +161,6 @@ class ArbitrageDetector:
                         ]
                     else:
                         # Cross pair is cheaper
-                        path = ["USD", "SOL", "BTC", "USD"]
                         steps = [
                             "1. Buy SOL with USD",
                             "2. Trade SOL for BTC (direct pair)",
@@ -186,8 +182,8 @@ class ArbitrageDetector:
 
     def detect_all_arbitrage(
         self,
-        price_data: Dict[str, float]
-    ) -> List[ArbitrageOpportunity]:
+        price_data: dict[str, float]
+    ) -> list[ArbitrageOpportunity]:
         """
         Detect all types of arbitrage opportunities
 
@@ -252,7 +248,7 @@ if __name__ == "__main__":
         print(f"   Confidence: {opp.confidence:.0%}")
         print(f"   Risk: {opp.risk_level}")
         print(f"   Description: {opp.description}")
-        print(f"\n   Execution:")
+        print("\n   Execution:")
         for step in opp.execution_steps:
             print(f"     {step}")
 

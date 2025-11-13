@@ -7,10 +7,11 @@ Fetch REAL historical cryptocurrency data from Binance
 - Real exchange prices and volumes
 """
 
-import requests
-import time
 import json
-from datetime import datetime, timedelta
+import time
+from datetime import datetime
+
+import requests
 
 # Binance API endpoint for historical klines
 BINANCE_API = "https://api.binance.com/api/v3/klines"
@@ -270,5 +271,5 @@ if __name__ == "__main__":
 
     print(f"\n✓ Saved {len(all_trades):,} real trades to {output_file}")
     print(f"  Coins: {', '.join(PAIRS)}")
-    print(f"  Timeframe: 30 days")
-    print(f"  Granularity: 1-minute candles")
+    print("  Timeframe: 30 days")
+    print("  Granularity: 1-minute candles")

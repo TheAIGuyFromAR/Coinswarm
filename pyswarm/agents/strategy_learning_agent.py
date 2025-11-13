@@ -15,13 +15,11 @@ This is the "memory improver" that invents new strategies.
 
 import logging
 import random
-from typing import Dict, Optional, List, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
 from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
-
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +29,13 @@ class Strategy:
     """A trading strategy pattern"""
     id: str
     name: str
-    pattern: Dict  # Strategy parameters
+    pattern: dict  # Strategy parameters
     weight: float  # Current weight (+ for good, - for bad)
     win_rate: float
     avg_pnl: float
     trade_count: int
     created_at: datetime
-    parent_strategies: List[str]  # Strategies this was derived from
+    parent_strategies: list[str]  # Strategies this was derived from
     sandbox_tested: bool = False
     production_ready: bool = False
 
@@ -72,7 +70,7 @@ class StrategyLearningAgent(BaseAgent):
         self.sandbox_min_trades = sandbox_min_trades
 
         # Strategy pool
-        self.strategies: Dict[str, Strategy] = {}
+        self.strategies: dict[str, Strategy] = {}
 
         # Initialize with base strategies
         self._initialize_base_strategies()
@@ -144,8 +142,8 @@ class StrategyLearningAgent(BaseAgent):
     async def analyze(
         self,
         tick: DataPoint,
-        position: Optional[Dict],
-        market_context: Dict
+        position: dict | None,
+        market_context: dict
     ) -> AgentVote:
         """
         Strategy learner doesn't vote on new trades.
@@ -159,7 +157,7 @@ class StrategyLearningAgent(BaseAgent):
             reason="Strategy learner does not vote on new trades"
         )
 
-    def update_strategy_weights(self, strategy_weights: Dict[str, float]):
+    def update_strategy_weights(self, strategy_weights: dict[str, float]):
         """
         Update strategy weights from trade analysis.
 
@@ -260,7 +258,7 @@ class StrategyLearningAgent(BaseAgent):
                 f"{parents[0].id} + {parents[1].id}"
             )
 
-    def _select_parents(self, strategies: List[Strategy]) -> List[Strategy]:
+    def _select_parents(self, strategies: list[Strategy]) -> list[Strategy]:
         """
         Select 2 parents for breeding using weighted random selection.
 
@@ -289,7 +287,7 @@ class StrategyLearningAgent(BaseAgent):
 
         return selected
 
-    def _breed_strategies(self, parent1: Strategy, parent2: Strategy) -> Optional[Strategy]:
+    def _breed_strategies(self, parent1: Strategy, parent2: Strategy) -> Strategy | None:
         """
         Breed two strategies to create a child.
 
@@ -344,7 +342,7 @@ class StrategyLearningAgent(BaseAgent):
 
         return child
 
-    def _mutate_pattern(self, pattern: Dict) -> Dict:
+    def _mutate_pattern(self, pattern: dict) -> dict:
         """
         Apply random mutation to strategy pattern.
 
@@ -391,21 +389,21 @@ class StrategyLearningAgent(BaseAgent):
             logger.warning(f"Strategy {strategy_id} failed sandbox, culling")
             del self.strategies[strategy_id]
 
-    def get_production_strategies(self) -> List[Strategy]:
+    def get_production_strategies(self) -> list[Strategy]:
         """Get all production-ready strategies"""
         return [
             s for s in self.strategies.values()
             if s.production_ready
         ]
 
-    def get_sandbox_strategies(self) -> List[Strategy]:
+    def get_sandbox_strategies(self) -> list[Strategy]:
         """Get strategies awaiting sandbox testing"""
         return [
             s for s in self.strategies.values()
             if not s.sandbox_tested
         ]
 
-    def get_strategy_summary(self) -> Dict:
+    def get_strategy_summary(self) -> dict:
         """Get summary of strategy pool"""
 
         production = self.get_production_strategies()

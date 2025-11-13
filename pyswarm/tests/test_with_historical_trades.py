@@ -13,14 +13,13 @@ Key features:
 """
 
 import asyncio
+import json
 import logging
 import re
-import json
+import statistics
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional
-from dataclasses import dataclass
-import statistics
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,9 +38,9 @@ class HistoricalTrade:
     pnl_pct: float
     profitable: bool
     buy_reason: str
-    buy_state: Dict
+    buy_state: dict
     sell_reason: str
-    sell_state: Dict
+    sell_state: dict
     duration_minutes: float
 
 
@@ -50,9 +49,9 @@ class HistoricalTradesLoader:
 
     def __init__(self, sql_file: str = "historical-trades-50k.sql"):
         self.sql_file = Path(sql_file)
-        self.trades: List[HistoricalTrade] = []
+        self.trades: list[HistoricalTrade] = []
 
-    def load_trades(self) -> List[HistoricalTrade]:
+    def load_trades(self) -> list[HistoricalTrade]:
         """Parse SQL file and extract trades"""
 
         logger.info(f"Loading historical trades from {self.sql_file}...")
@@ -63,7 +62,7 @@ class HistoricalTradesLoader:
                 f"Expected to find 50,000 real trades!"
             )
 
-        with open(self.sql_file, 'r') as f:
+        with open(self.sql_file) as f:
             content = f.read()
 
         # Find all INSERT statements
@@ -98,7 +97,7 @@ class HistoricalTradesLoader:
         logger.info(f"✅ Loaded {len(self.trades)} real historical trades")
         return self.trades
 
-    def _parse_trade_row(self, row: str) -> Optional[HistoricalTrade]:
+    def _parse_trade_row(self, row: str) -> HistoricalTrade | None:
         """Parse a single trade row"""
 
         # Split by comma, but respect quotes and braces
@@ -173,7 +172,7 @@ class HistoricalTradesLoader:
 class PatternAnalyzer:
     """Analyze historical trades to discover profitable patterns"""
 
-    def __init__(self, trades: List[HistoricalTrade]):
+    def __init__(self, trades: list[HistoricalTrade]):
         self.trades = trades
         self.profitable_trades = [t for t in trades if t.profitable]
         self.losing_trades = [t for t in trades if not t.profitable]
@@ -213,7 +212,7 @@ class PatternAnalyzer:
         avg_profit = statistics.mean([t.pnl_pct for t in self.profitable_trades]) if self.profitable_trades else 0
         avg_loss = statistics.mean([t.pnl_pct for t in self.losing_trades]) if self.losing_trades else 0
 
-        logger.info(f"\nBasic Statistics:")
+        logger.info("\nBasic Statistics:")
         logger.info(f"  Total Trades:     {total:,}")
         logger.info(f"  Profitable:       {profitable:,} ({win_rate:.1%})")
         logger.info(f"  Losing:           {losing:,} ({1-win_rate:.1%})")
@@ -227,7 +226,7 @@ class PatternAnalyzer:
     def _analyze_buy_reasons(self):
         """Analyze which buy reasons are most profitable"""
 
-        logger.info(f"\nBuy Reason Analysis:")
+        logger.info("\nBuy Reason Analysis:")
 
         buy_reasons = {}
         for trade in self.trades:
@@ -262,7 +261,7 @@ class PatternAnalyzer:
     def _analyze_sell_reasons(self):
         """Analyze which sell reasons correlate with profits"""
 
-        logger.info(f"\nSell Reason Analysis:")
+        logger.info("\nSell Reason Analysis:")
 
         sell_reasons = {}
         for trade in self.trades:
@@ -297,7 +296,7 @@ class PatternAnalyzer:
     def _analyze_market_conditions(self):
         """Analyze market conditions at entry for profitable vs losing trades"""
 
-        logger.info(f"\nMarket Conditions Analysis:")
+        logger.info("\nMarket Conditions Analysis:")
 
         # Analyze momentum
         profitable_momentum = [
@@ -312,7 +311,7 @@ class PatternAnalyzer:
         ]
 
         if profitable_momentum and losing_momentum:
-            logger.info(f"  Entry Momentum (1-tick):")
+            logger.info("  Entry Momentum (1-tick):")
             logger.info(f"    Profitable trades: {statistics.mean(profitable_momentum):+.4f}")
             logger.info(f"    Losing trades:     {statistics.mean(losing_momentum):+.4f}")
 
@@ -329,7 +328,7 @@ class PatternAnalyzer:
         ]
 
         if profitable_volume and losing_volume:
-            logger.info(f"  Entry Volume vs Avg:")
+            logger.info("  Entry Volume vs Avg:")
             logger.info(f"    Profitable trades: {statistics.mean(profitable_volume):.2f}x")
             logger.info(f"    Losing trades:     {statistics.mean(losing_volume):.2f}x")
 
@@ -346,14 +345,14 @@ class PatternAnalyzer:
         ]
 
         if profitable_volatility and losing_volatility:
-            logger.info(f"  Entry Volatility:")
+            logger.info("  Entry Volatility:")
             logger.info(f"    Profitable trades: {statistics.mean(profitable_volatility):.4f}")
             logger.info(f"    Losing trades:     {statistics.mean(losing_volatility):.4f}")
 
     def _analyze_trade_durations(self):
         """Analyze optimal trade durations"""
 
-        logger.info(f"\nTrade Duration Analysis:")
+        logger.info("\nTrade Duration Analysis:")
 
         # Bucket by duration
         buckets = {

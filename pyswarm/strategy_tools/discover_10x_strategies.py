@@ -21,21 +21,20 @@ Usage:
     python discover_10x_strategies.py --generations 100 --population 50
 """
 
-import asyncio
 import argparse
+import asyncio
+import json
 import logging
 import random
-import json
-from datetime import datetime, timedelta
-from typing import List, Dict, Tuple
-from dataclasses import dataclass, asdict
 import statistics
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta
 
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
 from coinswarm.agents.arbitrage_agent import ArbitrageAgent
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
+from coinswarm.agents.risk_agent import RiskManagementAgent
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine
 from coinswarm.data_ingest.base import DataPoint
 
 logging.basicConfig(
@@ -113,7 +112,7 @@ def generate_market_data(
     start_date: datetime,
     days: int,
     market_regime: str = "random"
-) -> Tuple[List[DataPoint], float]:
+) -> tuple[list[DataPoint], float]:
     """
     Generate mock market data and return with HODL return
 
@@ -280,15 +279,15 @@ async def genetic_algorithm(
     print("🧬 AUTOMATED 10X STRATEGY DISCOVERY")
     print("="*80 + "\n")
 
-    print(f"Configuration:")
+    print("Configuration:")
     print(f"  Symbol: {symbol}")
     print(f"  Test Period: {test_days} days (~{test_days/30:.1f} months)")
     print(f"  Population Size: {population_size}")
     print(f"  Generations: {generations}")
     print(f"  Elite Size: {elite_size}")
     print(f"  Mutation Rate: {mutation_rate:.0%}")
-    print(f"\n🎯 Goal: Find strategies that beat HODL by 10x")
-    print(f"   Success Criteria: Sharpe >2.0, Max DD <25%, Win Rate >55%\n")
+    print("\n🎯 Goal: Find strategies that beat HODL by 10x")
+    print("   Success Criteria: Sharpe >2.0, Max DD <25%, Win Rate >55%\n")
 
     # Initialize random population
     population = [
@@ -302,8 +301,8 @@ async def genetic_algorithm(
     ]
 
     # Track best strategies found
-    best_10x_strategies: List[StrategyResult] = []
-    best_5x_strategies: List[StrategyResult] = []
+    best_10x_strategies: list[StrategyResult] = []
+    best_5x_strategies: list[StrategyResult] = []
     all_time_best: StrategyResult = None
 
     market_regimes = ["random", "bull", "bear", "sideways", "volatile"]
@@ -315,7 +314,7 @@ async def genetic_algorithm(
         print(f"{'='*80}")
 
         # Test all strategies in population
-        results: List[StrategyResult] = []
+        results: list[StrategyResult] = []
 
         for i, config in enumerate(population):
             # Test on random regime
@@ -356,7 +355,7 @@ async def genetic_algorithm(
         print(f"  5x+ Strategies Found: {len(best_5x_strategies)}")
 
         # Show top 3
-        print(f"\n  Top 3 This Generation:")
+        print("\n  Top 3 This Generation:")
         for i, r in enumerate(results[:3]):
             print(f"    {i+1}. {r.vs_hodl_multiple:.2f}x | Return: {r.return_pct:+.1%} | Sharpe: {r.sharpe_ratio:.2f} | "
                   f"Win: {r.win_rate:.0%} | Trades: {r.total_trades}")
@@ -415,7 +414,7 @@ async def genetic_algorithm(
     print(f"5x+ Strategies Found: {len(best_5x_strategies)}")
 
     if all_time_best:
-        print(f"\n🏆 All-Time Best Strategy:")
+        print("\n🏆 All-Time Best Strategy:")
         print(f"{'='*80}")
         print(f"  vs HODL: {all_time_best.vs_hodl_multiple:.2f}x")
         print(f"  Return: {all_time_best.return_pct:+.2%} (HODL: {all_time_best.hodl_return_pct:+.2%})")
@@ -426,7 +425,7 @@ async def genetic_algorithm(
         print(f"  Total Trades: {all_time_best.total_trades}")
         print(f"  Profit Factor: {all_time_best.profit_factor:.2f}")
         print(f"  Market Regime: {all_time_best.market_regime}")
-        print(f"\n  Configuration:")
+        print("\n  Configuration:")
         print(f"    Trend Weight: {all_time_best.config.trend_weight:.3f}")
         print(f"    Risk Weight: {all_time_best.config.risk_weight:.3f}")
         print(f"    Arbitrage Weight: {all_time_best.config.arbitrage_weight:.3f}")

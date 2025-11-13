@@ -12,10 +12,8 @@ lead to profitable vs unprofitable trades.
 """
 
 import random
-from typing import Dict, Optional
-from datetime import datetime
 
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
 from coinswarm.data_ingest.base import DataPoint
 
 
@@ -51,8 +49,8 @@ class ChaosBuyAgent(BaseAgent):
     async def analyze(
         self,
         tick: DataPoint,
-        position: Optional[Dict],
-        market_context: Dict
+        position: dict | None,
+        market_context: dict
     ) -> AgentVote:
         """
         Randomly decide to buy or not, with justification.
@@ -120,7 +118,7 @@ class ChaosBuyAgent(BaseAgent):
 
         return vote
 
-    def _calculate_market_state(self, tick: DataPoint) -> Dict:
+    def _calculate_market_state(self, tick: DataPoint) -> dict:
         """Calculate current market state features"""
 
         price = tick.data.get("price", tick.data.get("close", 0))
@@ -160,7 +158,7 @@ class ChaosBuyAgent(BaseAgent):
         variance = sum((p - mean) ** 2 for p in prices) / len(prices)
         return (variance ** 0.5) / mean
 
-    def _generate_buy_justification(self, state: Dict, confidence: float) -> str:
+    def _generate_buy_justification(self, state: dict, confidence: float) -> str:
         """
         Generate a justification for buying based on current state.
 

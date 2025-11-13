@@ -4,12 +4,10 @@ Soundness tests for Coinbase API client.
 Tests determinism, latency, and safety of the Coinbase integration.
 """
 
-import asyncio
 import pytest
+from coinswarm.api.coinbase_client import CoinbaseAPIClient
 
 from tests.soundness.base import DeterminismTest, LatencyTest, SafetyInvariantTest
-from coinswarm.api.coinbase_client import CoinbaseAPIClient, OrderSide
-
 
 # ============================================================================
 # Determinism Tests

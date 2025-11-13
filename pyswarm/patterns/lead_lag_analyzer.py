@@ -7,9 +7,9 @@ Example: If BTC moves, does SOL follow 15 minutes later?
 If yes, we can trade SOL based on BTC's movements!
 """
 
-import numpy as np
-from typing import Dict, List, Optional
 from dataclasses import dataclass
+
+import numpy as np
 
 
 @dataclass
@@ -46,9 +46,9 @@ class LeadLagAnalyzer:
         self,
         price1: np.ndarray,
         price2: np.ndarray,
-        timestamps1: Optional[np.ndarray] = None,
-        timestamps2: Optional[np.ndarray] = None
-    ) -> Optional[LeadLagPattern]:
+        timestamps1: np.ndarray | None = None,
+        timestamps2: np.ndarray | None = None
+    ) -> LeadLagPattern | None:
         """
         Detect if one series leads another
 
@@ -137,8 +137,8 @@ class LeadLagAnalyzer:
 
     def detect_all_lead_lag_patterns(
         self,
-        price_data: Dict[str, np.ndarray]
-    ) -> List[LeadLagPattern]:
+        price_data: dict[str, np.ndarray]
+    ) -> list[LeadLagPattern]:
         """
         Detect lead-lag patterns across all pairs
 

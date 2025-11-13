@@ -13,9 +13,8 @@ This avoids timeouts by breaking work into micro-batches.
 
 # This will be converted to JavaScript for Cloudflare Workers
 
-import json
-from datetime import datetime
 import random
+from datetime import datetime
 
 
 class ChaosTradeGenerator:
@@ -25,7 +24,7 @@ class ChaosTradeGenerator:
         """Generate 50 random trades quickly (< 1 second)"""
         trades = []
 
-        for i in range(num_trades):
+        for _i in range(num_trades):
             # Simulate a quick random trade
             entry_price = random.uniform(60000, 70000)
             exit_price = entry_price * random.uniform(0.95, 1.05)

@@ -14,14 +14,11 @@ Strategy: Random 1-month windows over 3-month period to avoid overfitting
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
 from random import randint
-import aiohttp
 
 from coinswarm.data_ingest.base import DataPoint
 from coinswarm.data_ingest.binance_ingestor import BinanceIngestor
 from coinswarm.data_ingest.news_sentiment_fetcher import NewsSentimentFetcher
-
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +36,9 @@ class HistoricalDataFetcher:
 
     def __init__(
         self,
-        cryptocompare_api_key: Optional[str] = None,
-        newsapi_key: Optional[str] = None,
-        reddit_credentials: Optional[Dict] = None
+        cryptocompare_api_key: str | None = None,
+        newsapi_key: str | None = None,
+        reddit_credentials: dict | None = None
     ):
         self.binance = BinanceIngestor()
         self.sentiment_fetcher = NewsSentimentFetcher(
@@ -78,7 +75,7 @@ class HistoricalDataFetcher:
         months: int = 3,
         timeframe: str = "1m",
         include_sentiment: bool = True
-    ) -> Dict[str, List[DataPoint]]:
+    ) -> dict[str, list[DataPoint]]:
         """
         Fetch historical data for all pairs.
 
@@ -108,7 +105,7 @@ class HistoricalDataFetcher:
         ]
         spot_results = await asyncio.gather(*spot_tasks, return_exceptions=True)
 
-        for pair, data in zip(self.spot_pairs, spot_results):
+        for pair, data in zip(self.spot_pairs, spot_results, strict=False):
             if isinstance(data, Exception):
                 logger.error(f"Failed to fetch {pair}: {data}")
             else:
@@ -123,7 +120,7 @@ class HistoricalDataFetcher:
         ]
         cross_results = await asyncio.gather(*cross_tasks, return_exceptions=True)
 
-        for pair, data in zip(self.cross_pairs, cross_results):
+        for pair, data in zip(self.cross_pairs, cross_results, strict=False):
             if isinstance(data, Exception):
                 logger.warning(f"✗ {pair}: {data} (pair may not exist)")
             else:
@@ -147,7 +144,7 @@ class HistoricalDataFetcher:
 
             sentiment_results = await asyncio.gather(*sentiment_tasks, return_exceptions=True)
 
-            for symbol, sentiment_data in zip(sentiment_symbols, sentiment_results):
+            for symbol, sentiment_data in zip(sentiment_symbols, sentiment_results, strict=False):
                 if isinstance(sentiment_data, Exception):
                     logger.warning(f"✗ {symbol} sentiment: {sentiment_data}")
                 else:
@@ -166,7 +163,7 @@ class HistoricalDataFetcher:
         start_date: datetime,
         end_date: datetime,
         timeframe: str
-    ) -> List[DataPoint]:
+    ) -> list[DataPoint]:
         """Fetch data for a single pair"""
 
         try:
@@ -196,7 +193,7 @@ class HistoricalDataFetcher:
         total_months: int = 3,
         window_size_days: int = 30,
         num_windows: int = 10
-    ) -> List[Tuple[datetime, datetime]]:
+    ) -> list[tuple[datetime, datetime]]:
         """
         Generate random 1-month windows over a 3-month period.
 
@@ -237,7 +234,7 @@ class HistoricalDataFetcher:
         end_date: datetime,
         timeframe: str = "1m",
         include_sentiment: bool = True
-    ) -> Dict[str, List[DataPoint]]:
+    ) -> dict[str, list[DataPoint]]:
         """
         Fetch data for a specific time window.
 
@@ -258,7 +255,7 @@ class HistoricalDataFetcher:
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        for pair, data in zip(all_pairs, results):
+        for pair, data in zip(all_pairs, results, strict=False):
             if isinstance(data, Exception):
                 logger.warning(f"✗ {pair}: {data}")
             else:
@@ -280,7 +277,7 @@ class HistoricalDataFetcher:
 
             sentiment_results = await asyncio.gather(*sentiment_tasks, return_exceptions=True)
 
-            for symbol, sentiment_data in zip(sentiment_symbols, sentiment_results):
+            for symbol, sentiment_data in zip(sentiment_symbols, sentiment_results, strict=False):
                 if not isinstance(sentiment_data, Exception):
                     sentiment_points = self.sentiment_fetcher.convert_to_datapoints(sentiment_data)
                     all_data[f"{symbol}-SENTIMENT"] = sentiment_points
@@ -292,7 +289,7 @@ class HistoricalDataFetcher:
         symbol: str,
         start_date: datetime,
         end_date: datetime
-    ) -> List[DataPoint]:
+    ) -> list[DataPoint]:
         """
         Fetch historical news articles with sentiment.
 
@@ -332,8 +329,8 @@ class HistoricalDataFetcher:
         self,
         start_date: datetime,
         end_date: datetime,
-        keywords: List[str] = None
-    ) -> List[Dict]:
+        keywords: list[str] = None
+    ) -> list[dict]:
         """
         Fetch historical tweets about crypto.
 
@@ -368,7 +365,7 @@ class HistoricalDataFetcher:
         self,
         start_date: datetime,
         end_date: datetime
-    ) -> Dict[str, List[Dict]]:
+    ) -> dict[str, list[dict]]:
         """
         Fetch macro economic data.
 
@@ -395,15 +392,6 @@ class HistoricalDataFetcher:
 
         macro_data = {}
 
-        indicators = [
-            "FEDFUNDS",   # Fed funds rate
-            "CPIAUCSL",   # CPI
-            "UNRATE",     # Unemployment
-            "SP500",      # S&P 500
-            "DEXUSEU",    # Dollar index
-            "GOLDAMGBD228NLBM",  # Gold
-            "DGS10"       # 10Y treasury
-        ]
 
         # TODO: Implement FRED API calls
         # FRED API is free: https://fred.stlouisfed.org/docs/api/fred/
@@ -417,8 +405,8 @@ class HistoricalDataFetcher:
         self,
         start_date: datetime,
         end_date: datetime,
-        metrics: List[str] = None
-    ) -> Dict[str, List[Dict]]:
+        metrics: list[str] = None
+    ) -> dict[str, list[dict]]:
         """
         Fetch on-chain data.
 

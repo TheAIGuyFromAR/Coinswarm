@@ -22,18 +22,18 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from datetime import datetime, timedelta
 import random
+from datetime import datetime, timedelta
 
-from coinswarm.agents.trend_agent import TrendFollowingAgent
-from coinswarm.agents.risk_agent import RiskManagementAgent
-from coinswarm.agents.arbitrage_agent import ArbitrageAgent
-from coinswarm.agents.trade_analysis_agent import TradeAnalysisAgent
-from coinswarm.agents.strategy_learning_agent import StrategyLearningAgent
 from coinswarm.agents.academic_research_agent import AcademicResearchAgent
-from coinswarm.agents.hedge_agent import HedgeAgent
+from coinswarm.agents.arbitrage_agent import ArbitrageAgent
 from coinswarm.agents.committee import AgentCommittee
-from coinswarm.backtesting.backtest_engine import BacktestEngine, BacktestConfig
+from coinswarm.agents.hedge_agent import HedgeAgent
+from coinswarm.agents.risk_agent import RiskManagementAgent
+from coinswarm.agents.strategy_learning_agent import StrategyLearningAgent
+from coinswarm.agents.trade_analysis_agent import TradeAnalysisAgent
+from coinswarm.agents.trend_agent import TrendFollowingAgent
+from coinswarm.backtesting.backtest_engine import BacktestConfig, BacktestEngine
 from coinswarm.data_ingest.base import DataPoint
 
 logging.basicConfig(

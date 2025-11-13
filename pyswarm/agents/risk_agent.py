@@ -13,11 +13,9 @@ Critical for protecting capital in the swarm.
 """
 
 import logging
-from typing import Dict, Optional
 
+from coinswarm.agents.base_agent import AgentVote, BaseAgent
 from coinswarm.data_ingest.base import DataPoint
-from coinswarm.agents.base_agent import BaseAgent, AgentVote
-
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +51,8 @@ class RiskManagementAgent(BaseAgent):
     async def analyze(
         self,
         tick: DataPoint,
-        position: Optional[Dict],
-        market_context: Dict
+        position: dict | None,
+        market_context: dict
     ) -> AgentVote:
         """
         Analyze risk and potentially veto trade.

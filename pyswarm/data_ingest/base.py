@@ -5,10 +5,11 @@ Defines standardized interfaces for all data sources.
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any
 
 import structlog
 
@@ -46,12 +47,12 @@ class DataPoint:
     symbol: str  # "BTC-USD", "ETH-USD", "global", etc.
     timeframe: str  # "tick", "1m", "1h", "1d", etc.
     timestamp: datetime
-    data: Dict[str, Any]
+    data: dict[str, Any]
     quality_score: float = 1.0  # 0.0-1.0, default is perfect quality
     version: str = "v1"  # Schema version
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage"""
         return {
             "source": self.source,
@@ -65,7 +66,7 @@ class DataPoint:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "DataPoint":
+    def from_dict(cls, d: dict[str, Any]) -> "DataPoint":
         """Create from dictionary"""
         return cls(
             source=d["source"],
@@ -87,10 +88,10 @@ class SourceMetadata:
     domain: DataDomain
     description: str
     update_frequency: str  # "real-time", "1m", "15m", "1h", "daily"
-    rate_limits: Dict[str, int]  # {"requests_per_second": 10, ...}
-    available_symbols: List[str]
-    available_timeframes: List[str]
-    supported_streams: List[str]
+    rate_limits: dict[str, int]  # {"requests_per_second": 10, ...}
+    available_symbols: list[str]
+    available_timeframes: list[str]
+    supported_streams: list[str]
     quality_sla: float  # Expected quality score (0-1)
     registered_at: datetime = field(default_factory=datetime.now)
 
@@ -116,7 +117,7 @@ class DataSource(ABC):
         end: datetime,
         timeframe: str = "1m",
         **kwargs,
-    ) -> List[DataPoint]:
+    ) -> list[DataPoint]:
         """
         Fetch historical data for a symbol.
 
@@ -134,7 +135,7 @@ class DataSource(ABC):
 
     @abstractmethod
     async def stream_realtime(
-        self, symbols: List[str], **kwargs
+        self, symbols: list[str], **kwargs
     ) -> AsyncIterator[DataPoint]:
         """
         Stream real-time data for given symbols.
@@ -187,7 +188,7 @@ class DataSource(ABC):
         # Default: uppercase and replace / with -
         return raw_symbol.upper().replace("/", "-")
 
-    def _calculate_quality_score(self, data: Dict[str, Any], **kwargs) -> float:
+    def _calculate_quality_score(self, data: dict[str, Any], **kwargs) -> float:
         """
         Calculate quality score for a data point.
 
@@ -220,19 +221,19 @@ class ExchangeDataSource(DataSource):
         super().__init__(source_name, DataDomain.EXCHANGES)
 
     @abstractmethod
-    async def get_products(self) -> List[Dict[str, Any]]:
+    async def get_products(self) -> list[dict[str, Any]]:
         """Get list of tradable products"""
         pass
 
     @abstractmethod
-    async def get_funding_rates(self, symbol: str) -> Optional[float]:
+    async def get_funding_rates(self, symbol: str) -> float | None:
         """Get current funding rate for a symbol (if applicable)"""
         pass
 
     @abstractmethod
     async def get_orderbook(
         self, symbol: str, depth: int = 20
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get current order book snapshot"""
         pass
 
@@ -249,7 +250,7 @@ class SentimentDataSource(DataSource):
 
     @abstractmethod
     async def get_sentiment_score(
-        self, keywords: List[str], lookback_hours: int = 24
+        self, keywords: list[str], lookback_hours: int = 24
     ) -> float:
         """
         Get aggregated sentiment score for keywords.
@@ -266,7 +267,7 @@ class SentimentDataSource(DataSource):
     @abstractmethod
     async def generate_embeddings(
         self, text: str
-    ) -> List[float]:
+    ) -> list[float]:
         """
         Generate text embeddings for sentiment analysis.
 
@@ -292,7 +293,7 @@ class MacroDataSource(DataSource):
     @abstractmethod
     async def get_indicator(
         self, indicator_name: str, start: datetime, end: datetime
-    ) -> List[DataPoint]:
+    ) -> list[DataPoint]:
         """
         Get economic indicator time series.
 
@@ -319,8 +320,8 @@ class OnChainDataSource(DataSource):
 
     @abstractmethod
     async def get_network_metrics(
-        self, chain: str, metrics: List[str]
-    ) -> Dict[str, Any]:
+        self, chain: str, metrics: list[str]
+    ) -> dict[str, Any]:
         """
         Get network-level metrics.
 

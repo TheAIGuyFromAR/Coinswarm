@@ -4,12 +4,12 @@ Unit tests for Binance Exchange Data Ingestor
 Tests OHLCV fetching, WebSocket parsing, symbol normalization, and more.
 """
 
-import pytest
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
+from unittest.mock import AsyncMock, patch
 
+import pytest
+from coinswarm.data_ingest.base import DataPoint
 from coinswarm.data_ingest.exchanges.binance import BinanceIngestor
-from coinswarm.data_ingest.base import DataPoint, StreamType
 
 
 class TestBinanceInitialization:

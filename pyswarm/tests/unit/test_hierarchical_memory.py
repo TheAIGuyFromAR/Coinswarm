@@ -28,19 +28,15 @@ Design Philosophy:
 - Check memory tier configurations
 """
 
-import pytest
-import numpy as np
 from datetime import datetime, timedelta
-from typing import List, Tuple
 
+import numpy as np
+import pytest
 from coinswarm.memory.hierarchical_memory import (
+    TIMESCALE_CONFIGS,
     HierarchicalMemory,
     Timescale,
-    TimescaleConfig,
-    TIMESCALE_CONFIGS
 )
-from coinswarm.memory.simple_memory import Episode
-
 
 # ============================================================================
 # Test Fixtures
@@ -422,7 +418,7 @@ async def test_store_episode_compresses_state_automatically(hierarchical_memory)
 @pytest.mark.asyncio
 async def test_store_episode_increments_statistics(hierarchical_memory, full_state_vector):
     """Test that storing multiple episodes updates statistics correctly"""
-    for i in range(5):
+    for _i in range(5):
         await hierarchical_memory.store_episode(
             timescale=Timescale.HOUR,
             state=full_state_vector,
@@ -535,7 +531,7 @@ async def test_recall_similar_returns_sorted_by_similarity(hierarchical_memory):
     # Store episodes with varying similarity
     base_state = np.ones(384)
 
-    for i, offset in enumerate([0.0, 0.1, 0.5, 1.0]):
+    for _i, offset in enumerate([0.0, 0.1, 0.5, 1.0]):
         state = base_state + offset
         await hierarchical_memory.store_episode(
             timescale=Timescale.HOUR,
@@ -566,7 +562,7 @@ async def test_recall_similar_respects_k_parameter(hierarchical_memory):
     state = np.random.randn(384)
 
     # Store 10 episodes
-    for i in range(10):
+    for _i in range(10):
         await hierarchical_memory.store_episode(
             timescale=Timescale.DAY,
             state=state + np.random.randn(384) * 0.1,
@@ -746,7 +742,7 @@ async def test_recall_cross_timescale_limits_adjacent_results(hierarchical_memor
 
     # Store many episodes in HOUR and adjacent timescales
     for ts in [Timescale.MINUTE, Timescale.HOUR, Timescale.DAY]:
-        for i in range(10):
+        for _i in range(10):
             await hierarchical_memory.store_episode(
                 timescale=ts,
                 state=state + np.random.randn(384) * 0.01,

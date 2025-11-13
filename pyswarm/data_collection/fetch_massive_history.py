@@ -8,10 +8,10 @@ This gives us ~17,500 data points per symbol for analysis.
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
+
 import aiohttp
-from typing import List, Dict
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ API_KEY = "da672b9999120841fbd4427fa4550b83b5f23e017c5c03ff33bafe09064abe83"
 BASE_URL = "https://min-api.cryptocompare.com/data/v2/histohour"
 
 
-async def fetch_chunk(session: aiohttp.ClientSession, symbol: str, to_ts: int, limit: int = 2000) -> List[Dict]:
+async def fetch_chunk(session: aiohttp.ClientSession, symbol: str, to_ts: int, limit: int = 2000) -> list[dict]:
     """Fetch one chunk of historical data"""
     params = {
         "fsym": symbol,
@@ -38,7 +38,7 @@ async def fetch_chunk(session: aiohttp.ClientSession, symbol: str, to_ts: int, l
         return []
 
 
-async def fetch_historical_data(symbol: str, days: int = 730) -> List[Dict]:
+async def fetch_historical_data(symbol: str, days: int = 730) -> list[dict]:
     """
     Fetch historical data for a symbol going back 'days' days.
 
@@ -90,7 +90,7 @@ async def fetch_historical_data(symbol: str, days: int = 730) -> List[Dict]:
     return unique_data
 
 
-async def fetch_all_symbols(symbols: List[str], days: int = 730):
+async def fetch_all_symbols(symbols: list[str], days: int = 730):
     """Fetch historical data for multiple symbols"""
 
     logger.info("=" * 80)

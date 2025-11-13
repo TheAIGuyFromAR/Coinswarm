@@ -15,9 +15,9 @@ Paper Trading System responsibilities:
 This is CRITICAL for Phase 1 - must work perfectly before Phase 2/3.
 """
 
+from datetime import datetime
+
 import pytest
-from datetime import datetime, timedelta
-from decimal import Decimal
 
 # TODO: Uncomment when PaperTradingSystem is implemented
 # from coinswarm.paper_trading.system import PaperTradingSystem, Order, Fill, Position
