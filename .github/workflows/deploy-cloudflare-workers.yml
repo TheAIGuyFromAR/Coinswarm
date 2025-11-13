@@ -321,6 +321,10 @@ jobs:
           workingDirectory: 'pyswarm'
           wranglerVersion: "4.45.4"
           command: deploy --config wrangler_historical_import.toml
+          secrets: |
+            CRYPTOCOMPARE_API_KEY
+        env:
+          CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
         continue-on-error: false  # Fail if Python deployment fails
 
       - name: Delete Old Historical Cron Worker
