@@ -237,32 +237,38 @@ jobs:
           wranglerVersion: "4.45.4"
           command: kv namespace create HISTORICAL_PRICES
 
-      - name: Deploy Historical Data Worker
-        if: steps.filter.outputs.historical == 'true' || steps.filter.outputs.workflow == 'true'
-        uses: cloudflare/wrangler-action@v3
-        continue-on-error: true
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: 'cloudflare-agents'
-          wranglerVersion: "4.45.4"
-          command: deploy --config wrangler-historical.toml
+      # DISABLED: KV caching worker (coinswarm-historical-data) - KV namespace not configured
+      # This worker requires HISTORICAL_PRICES KV namespace which is commented out in wrangler-historical.toml
+      # To re-enable: Uncomment KV namespace in config, then uncomment deployment below
+      # - name: Deploy Historical Data Worker
+      #   if: steps.filter.outputs.historical == 'true' || steps.filter.outputs.workflow == 'true'
+      #   uses: cloudflare/wrangler-action@v3
+      #   continue-on-error: true
+      #   with:
+      #     apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      #     accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      #     workingDirectory: 'cloudflare-agents'
+      #     wranglerVersion: "4.45.4"
+      #     command: deploy --config wrangler-historical.toml
 
-      - name: Deploy Historical Data Collection Cron
-        if: steps.filter.outputs.historical-cron == 'true' || steps.filter.outputs.workflow == 'true'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: 'cloudflare-agents'
-          wranglerVersion: "4.45.4"
-          command: deploy --config wrangler-historical-collection-cron.toml
-          secrets: |
-            COINGECKO
-            CRYPTOCOMPARE_API_KEY
-        env:
-          COINGECKO: ${{ secrets.COINGECKO }}
-          CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
+      # DISABLED: Old cron worker (coinswarm-historical-collection-cron) - Being replaced by queue system
+      # This worker is deprecated and deleted by the "Delete Old Historical Cron Worker" step below
+      # No need to deploy it anymore - the Python worker + queue system replaced it
+      # - name: Deploy Historical Data Collection Cron
+      #   if: steps.filter.outputs.historical-cron == 'true' || steps.filter.outputs.workflow == 'true'
+      #   uses: cloudflare/wrangler-action@v3
+      #   with:
+      #     apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      #     accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      #     workingDirectory: 'cloudflare-agents'
+      #     wranglerVersion: "4.45.4"
+      #     command: deploy --config wrangler-historical-collection-cron.toml
+      #     secrets: |
+      #       COINGECKO
+      #       CRYPTOCOMPARE_API_KEY
+      #   env:
+      #     COINGECKO: ${{ secrets.COINGECKO }}
+      #     CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
 
       - name: Create Historical Data Queue
         if: steps.filter.outputs.historical-queue-consumer == 'true' || steps.filter.outputs.historical-queue-producer == 'true' || steps.filter.outputs.workflow == 'true'
