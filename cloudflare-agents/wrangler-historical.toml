@@ -1,4 +1,17 @@
-# Wrangler configuration for Historical Data Worker
+# ⛔ DEPRECATED - DO NOT DEPLOY ⛔
+# This worker requires KV namespace which is not configured.
+# KV namespace is commented out below (lines 17-20).
+# Most endpoints return 503: "KV storage not configured"
+#
+# Use the queue-based system instead:
+#   - coinswarm-historical-import (Python) - pyswarm/wrangler_historical_import.toml
+#   - historical-data-queue-consumer - wrangler-historical-queue-consumer.toml
+#   - historical-data-queue-producer - wrangler-historical-queue-producer.toml
+#
+# This file is kept for reference only.
+# GitHub Actions will DELETE this worker if it exists.
+
+# Wrangler configuration for Historical Data Worker (DEPRECATED - KV not configured)
 
 name = "coinswarm-historical-data"
 main = "historical-data-worker.ts"

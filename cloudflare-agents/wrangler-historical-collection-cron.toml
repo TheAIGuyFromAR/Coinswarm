@@ -1,4 +1,14 @@
-# Wrangler configuration for Historical Data Collection Cron Worker
+# ⛔ DEPRECATED - DO NOT DEPLOY ⛔
+# This worker has been replaced by the queue-based system
+# Use these instead:
+#   - coinswarm-historical-import (Python) - pyswarm/wrangler_historical_import.toml
+#   - historical-data-queue-consumer - wrangler-historical-queue-consumer.toml
+#   - historical-data-queue-producer - wrangler-historical-queue-producer.toml
+#
+# This file is kept for reference only.
+# GitHub Actions will DELETE this worker if it exists.
+
+# Wrangler configuration for Historical Data Collection Cron Worker (DEPRECATED)
 
 name = "coinswarm-historical-collection-cron"
 main = "historical-data-collection-cron.ts"
