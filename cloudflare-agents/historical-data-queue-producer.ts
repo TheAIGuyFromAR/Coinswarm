@@ -37,6 +37,17 @@ const TOKENS = [
 ];
 
 export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    return new Response(JSON.stringify({
+      status: 'ok',
+      message: 'Historical Data Queue Producer is running',
+      role: 'Runs every 30 minutes to fetch data and queue it',
+      schedule: '*/30 * * * *'
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  },
+
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     console.log('Starting historical data collection...');
 

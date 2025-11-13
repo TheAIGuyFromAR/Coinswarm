@@ -33,6 +33,16 @@ interface HistoricalDataPoint {
 }
 
 export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    return new Response(JSON.stringify({
+      status: 'ok',
+      message: 'Historical Data Queue Consumer is running',
+      role: 'Consumes queue messages and writes to D1 database'
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  },
+
   async queue(batch: MessageBatch<HistoricalDataPoint>, env: Env, ctx: ExecutionContext) {
     console.log(`📥 Processing batch of ${batch.messages.length} data points`);
 
