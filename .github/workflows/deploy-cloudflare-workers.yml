@@ -9,6 +9,7 @@ on:
     paths:
       - 'cloudflare-agents/**'
       - 'cloudflare-workers/**'
+      - 'pyswarm/**'
       - 'wrangler*.toml'
       - '.github/workflows/deploy-cloudflare-workers.yml'
   workflow_dispatch:  # Allow manual triggering
@@ -28,6 +29,11 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
@@ -61,6 +67,13 @@ jobs:
             historical-cron:
               - 'cloudflare-agents/historical-data-collection-cron.ts'
               - 'cloudflare-agents/wrangler-historical-collection-cron.toml'
+            historical-queue:
+              - 'cloudflare-agents/historical-data-queue-producer.ts'
+              - 'cloudflare-agents/historical-data-queue-consumer.ts'
+              - 'cloudflare-agents/wrangler-historical-queue.toml'
+            python-historical:
+              - 'pyswarm/Data_Import/historical_worker.py'
+              - 'pyswarm/wrangler_historical_import.toml'
             realtime-cron:
               - 'cloudflare-agents/realtime-price-collection-cron.ts'
               - 'cloudflare-agents/wrangler-realtime-price-cron.toml'
@@ -249,6 +262,66 @@ jobs:
           COINGECKO: ${{ secrets.COINGECKO }}
           CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
 
+      - name: Create Historical Data Queue
+        if: steps.filter.outputs.historical-queue == 'true' || steps.filter.outputs.workflow == 'true'
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: queues create historical-data-queue
+
+      - name: Create Dead Letter Queue
+        if: steps.filter.outputs.historical-queue == 'true' || steps.filter.outputs.workflow == 'true'
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: queues create historical-data-dlq
+
+      - name: Deploy Historical Data Queue Consumer
+        if: steps.filter.outputs.historical-queue == 'true' || steps.filter.outputs.workflow == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --name historical-data-queue-consumer --config wrangler-historical-queue.toml historical-data-queue-consumer.ts
+
+      - name: Deploy Historical Data Queue Producer
+        if: steps.filter.outputs.historical-queue == 'true' || steps.filter.outputs.workflow == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: deploy --name historical-data-queue-producer --config wrangler-historical-queue.toml historical-data-queue-producer.ts
+          secrets: |
+            CRYPTOCOMPARE_API_KEY
+        env:
+          CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
+
+      - name: Deploy Python Historical Worker
+        if: steps.filter.outputs.python-historical == 'true' || steps.filter.outputs.workflow == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'pyswarm'
+          wranglerVersion: "4.45.4"
+          command: deploy --config wrangler_historical_import.toml
+          secrets: |
+            CRYPTOCOMPARE_API_KEY
+        env:
+          CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
+
       - name: Deploy Real-Time Price Collection Cron
         if: steps.filter.outputs.realtime-cron == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
@@ -343,7 +416,9 @@ jobs:
           echo "- Check individual step logs above for deployment details"
           echo ""
           echo "🔍 View deployed workers at: https://dash.cloudflare.com"
-          echo "📈 Total workers managed: 14 (12 TypeScript + 2 JavaScript)"
-          echo "   - 12 TypeScript workers (cloudflare-agents/)"
+          echo "📈 Total workers managed: 17 (14 TypeScript + 2 JavaScript + 1 Python)"
+          echo "   - 14 TypeScript workers (cloudflare-agents/)"
           echo "   - 2 JavaScript workers (cloudflare-workers/)"
+          echo "   - 1 Python worker (pyswarm/)"
+          echo "   - Queue-based system (producer + consumer)"
           echo "   - Static dashboards worker included"
