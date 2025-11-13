@@ -321,11 +321,12 @@ jobs:
           workingDirectory: 'pyswarm'
           wranglerVersion: "4.45.4"
           command: deploy --config wrangler_historical_import.toml
-          secrets: |
-            CRYPTOCOMPARE_API_KEY
-        env:
-          CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
         continue-on-error: false  # Fail if Python deployment fails
+
+      # NOTE: CRYPTOCOMPARE_API_KEY must be added manually via:
+      # 1. Cloudflare Dashboard → Workers → coinswarm-historical-import → Settings → Variables and Secrets
+      # 2. Or via: wrangler secret put CRYPTOCOMPARE_API_KEY --config pyswarm/wrangler_historical_import.toml
+      # GitHub Actions secret passing is failing - adding secrets manually is more reliable
 
       - name: Delete Old Historical Cron Worker
         if: steps.filter.outputs.historical-cron == 'true' || steps.filter.outputs.historical-queue-producer == 'true' || steps.filter.outputs.workflow == 'true'
