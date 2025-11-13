@@ -3,10 +3,16 @@
 # Automated Post-Deployment Verification Script
 # Runs after GitHub Actions deployment to verify everything works
 
-set -e  # Exit on error
+# Don't exit on error - we want to see all results
+set +e
+
+# Set timeouts for wrangler commands
+export WRANGLER_TIMEOUT=10
 
 echo "🔍 Post-Deployment Verification"
 echo "========================================"
+echo "Working directory: $(pwd)"
+echo "Date: $(date)"
 echo ""
 
 # Exit codes
@@ -47,14 +53,21 @@ info() {
 }
 
 # Check if required env vars are set
+echo "Checking environment variables..."
 if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
     fail "CLOUDFLARE_API_TOKEN not set"
+    echo "This script requires CLOUDFLARE_API_TOKEN to be set"
     exit $EXIT_FAILURE
+else
+    pass "CLOUDFLARE_API_TOKEN is set"
 fi
 
 if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
     fail "CLOUDFLARE_ACCOUNT_ID not set"
+    echo "This script requires CLOUDFLARE_ACCOUNT_ID to be set"
     exit $EXIT_FAILURE
+else
+    pass "CLOUDFLARE_ACCOUNT_ID is set"
 fi
 
 export CLOUDFLARE_API_TOKEN
@@ -63,9 +76,21 @@ export CLOUDFLARE_ACCOUNT_ID
 info "Using Cloudflare Account: $CLOUDFLARE_ACCOUNT_ID"
 echo ""
 
+# Function to run commands with timeout
+run_with_timeout() {
+    timeout 30 "$@" 2>&1
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "TIMEOUT after 30 seconds"
+    fi
+    return $exit_code
+}
+
 # Test 1: Check if queues exist
 echo "Test 1: Verifying queues exist..."
-QUEUE_LIST=$(wrangler queues list 2>&1 || echo "FAILED")
+info "Running: wrangler queues list (max 30 sec timeout)"
+QUEUE_LIST=$(run_with_timeout wrangler queues list || echo "FAILED")
+echo "Queue list result: $(echo "$QUEUE_LIST" | head -3)"
 
 if echo "$QUEUE_LIST" | grep -q "historical-data-queue"; then
     pass "historical-data-queue exists"
@@ -82,8 +107,11 @@ fi
 echo ""
 
 # Test 2: Check if consumer is attached to queue
+echo ""
 echo "Test 2: Verifying queue consumer..."
-CONSUMER_INFO=$(wrangler queues consumer historical-data-queue 2>&1 || echo "FAILED")
+info "Running: wrangler queues consumer historical-data-queue (max 30 sec timeout)"
+CONSUMER_INFO=$(run_with_timeout wrangler queues consumer historical-data-queue || echo "FAILED")
+echo "Consumer info result: $(echo "$CONSUMER_INFO" | head -3)"
 
 if echo "$CONSUMER_INFO" | grep -q "historical-data-queue-consumer"; then
     pass "Consumer attached to queue"
