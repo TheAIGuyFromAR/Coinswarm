@@ -311,7 +311,7 @@ jobs:
           CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
 
       - name: Deploy Python Historical Worker
-        if: steps.filter.outputs.python-historical == 'true' || steps.filter.outputs.workflow == 'true'
+        if: steps.filter.outputs.python-historical == 'true' || steps.filter.outputs.historical-queue-producer == 'true' || steps.filter.outputs.historical-queue-consumer == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -323,6 +323,18 @@ jobs:
             CRYPTOCOMPARE_API_KEY
         env:
           CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
+        continue-on-error: false  # Fail if Python deployment fails
+
+      - name: Delete Old Historical Cron Worker
+        if: steps.filter.outputs.historical-cron == 'true' || steps.filter.outputs.historical-queue-producer == 'true' || steps.filter.outputs.workflow == 'true'
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: delete coinswarm-historical-collection-cron --force
 
       - name: Deploy Real-Time Price Collection Cron
         if: steps.filter.outputs.realtime-cron == 'true' || steps.filter.outputs.workflow == 'true'
