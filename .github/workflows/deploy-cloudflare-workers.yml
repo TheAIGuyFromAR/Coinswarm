@@ -342,6 +342,17 @@ jobs:
           wranglerVersion: "4.45.4"
           command: delete coinswarm-historical-collection-cron --force
 
+      - name: Delete Broken KV Historical Worker
+        if: steps.filter.outputs.historical == 'true' || steps.filter.outputs.workflow == 'true'
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare-agents'
+          wranglerVersion: "4.45.4"
+          command: delete coinswarm-historical-data --force
+
       - name: Deploy Real-Time Price Collection Cron
         if: steps.filter.outputs.realtime-cron == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
