@@ -22,7 +22,12 @@ max_concurrency = 5            # Run 5 consumer instances in parallel
 [limits]
 cpu_ms = 30000  # 30 seconds CPU time (for large batches)
 
-# Observability - Enable logs for monitoring
+# Observability - Enable logs and traces for monitoring
 [observability]
 enabled = true
 head_sampling_rate = 1  # Log 100% of requests (1 = 100%, 0.5 = 50%, etc)
+
+# Enable traces
+[[observability.logs]]
+enabled = true
+invocation_logs = true  # Log every worker invocation
