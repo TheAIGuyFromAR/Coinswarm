@@ -67,10 +67,12 @@ jobs:
             historical-cron:
               - 'cloudflare-agents/historical-data-collection-cron.ts'
               - 'cloudflare-agents/wrangler-historical-collection-cron.toml'
-            historical-queue:
+            historical-queue-producer:
               - 'cloudflare-agents/historical-data-queue-producer.ts'
+              - 'cloudflare-agents/wrangler-historical-queue-producer.toml'
+            historical-queue-consumer:
               - 'cloudflare-agents/historical-data-queue-consumer.ts'
-              - 'cloudflare-agents/wrangler-historical-queue.toml'
+              - 'cloudflare-agents/wrangler-historical-queue-consumer.toml'
             python-historical:
               - 'pyswarm/Data_Import/historical_worker.py'
               - 'pyswarm/wrangler_historical_import.toml'
@@ -263,7 +265,7 @@ jobs:
           CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
 
       - name: Create Historical Data Queue
-        if: steps.filter.outputs.historical-queue == 'true' || steps.filter.outputs.workflow == 'true'
+        if: steps.filter.outputs.historical-queue-consumer == 'true' || steps.filter.outputs.historical-queue-producer == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -274,7 +276,7 @@ jobs:
           command: queues create historical-data-queue
 
       - name: Create Dead Letter Queue
-        if: steps.filter.outputs.historical-queue == 'true' || steps.filter.outputs.workflow == 'true'
+        if: steps.filter.outputs.historical-queue-consumer == 'true' || steps.filter.outputs.historical-queue-producer == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -285,24 +287,24 @@ jobs:
           command: queues create historical-data-dlq
 
       - name: Deploy Historical Data Queue Consumer
-        if: steps.filter.outputs.historical-queue == 'true' || steps.filter.outputs.workflow == 'true'
+        if: steps.filter.outputs.historical-queue-consumer == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'cloudflare-agents'
           wranglerVersion: "4.45.4"
-          command: deploy --name historical-data-queue-consumer --config wrangler-historical-queue.toml historical-data-queue-consumer.ts
+          command: deploy --config wrangler-historical-queue-consumer.toml
 
       - name: Deploy Historical Data Queue Producer
-        if: steps.filter.outputs.historical-queue == 'true' || steps.filter.outputs.workflow == 'true'
+        if: steps.filter.outputs.historical-queue-producer == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'cloudflare-agents'
           wranglerVersion: "4.45.4"
-          command: deploy --name historical-data-queue-producer --config wrangler-historical-queue.toml historical-data-queue-producer.ts
+          command: deploy --config wrangler-historical-queue-producer.toml
           secrets: |
             CRYPTOCOMPARE_API_KEY
         env:
