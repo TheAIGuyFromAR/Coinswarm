@@ -27,7 +27,7 @@ cpu_ms = 30000  # 30 seconds CPU time (for large batches)
 enabled = true
 head_sampling_rate = 1  # Log 100% of requests (1 = 100%, 0.5 = 50%, etc)
 
-# Enable traces
+# Enable traces - logs AND execution timeline visible in dashboard
 [[observability.logs]]
 enabled = true
-invocation_logs = true  # Log every worker invocation
+invocation_logs = true  # Log every worker invocation with full trace data
