@@ -17,11 +17,3 @@ max_concurrency = 5
 
 [limits]
 cpu_ms = 30000
-
-[observability]
-enabled = true
-head_sampling_rate = 1
-
-[[observability.logs]]
-enabled = true
-invocation_logs = true

@@ -13,11 +13,3 @@ database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
 [[queues.producers]]
 queue = "historical-data-queue"
 binding = "HISTORICAL_DATA_QUEUE"
-
-[observability]
-enabled = true
-head_sampling_rate = 1
-
-[[observability.logs]]
-enabled = true
-invocation_logs = true
