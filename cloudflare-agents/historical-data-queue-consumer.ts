@@ -50,7 +50,7 @@ export default {
     const dataPoints: HistoricalDataPoint[] = [];
 
     // Extract all data points from messages
-    // Note: Python worker may send JSON strings (due to Pyodide proxy issues) or objects
+    // Note: Python worker sends JSON strings (batches of 100) due to Pyodide proxy issues
     for (const message of batch.messages) {
       const body = message.body;
 
@@ -58,12 +58,17 @@ export default {
       if (typeof body === 'string') {
         try {
           const parsed = JSON.parse(body);
-          dataPoints.push(parsed);
+          // Parsed result could be a single object or array
+          if (Array.isArray(parsed)) {
+            dataPoints.push(...parsed);
+          } else {
+            dataPoints.push(parsed);
+          }
         } catch (e) {
           console.error('Failed to parse JSON message:', e);
         }
       }
-      // Handle arrays of points
+      // Handle arrays of points (legacy/direct sends)
       else if (Array.isArray(body)) {
         dataPoints.push(...body);
       }

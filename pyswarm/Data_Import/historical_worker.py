@@ -60,36 +60,43 @@ def build_insert_sql(symbol, candle, timeframe, source):
 async def insert_candles_to_d1(env, symbol, candles, timeframe, source):
     """
     Queue candles for batch processing instead of direct D1 writes.
-    Sends one candle at a time to avoid Pyodide proxy lifetime issues.
+    Sends batches of 100 as JSON strings to avoid Pyodide proxy issues
+    and reduce number of queue API calls.
     """
     if not candles:
         return
 
-    # Send candles one at a time to avoid Pyodide proxy issues
+    # Send in batches of 100 to avoid Cloudflare subrequest limits
     import json
+    batch_size = 100
     total_sent = 0
 
-    for candle in candles:
-        # Create message as JSON string to avoid proxy issues
-        message = json.dumps({
-            "symbol": symbol,
-            "timestamp": candle["time"],
-            "timeframe": timeframe,
-            "open": float(candle["open"]),
-            "high": float(candle["high"]),
-            "low": float(candle["low"]),
-            "close": float(candle["close"]),
-            "volumeFrom": float(candle.get("volumefrom", 0)),
-            "volumeTo": float(candle.get("volumeto", 0)),
-            "source": source
-        })
+    for i in range(0, len(candles), batch_size):
+        batch = candles[i:i+batch_size]
 
-        # Send as JSON string - consumer will parse it
+        # Convert batch to list of dicts
+        batch_data = []
+        for candle in batch:
+            batch_data.append({
+                "symbol": symbol,
+                "timestamp": candle["time"],
+                "timeframe": timeframe,
+                "open": float(candle["open"]),
+                "high": float(candle["high"]),
+                "low": float(candle["low"]),
+                "close": float(candle["close"]),
+                "volumeFrom": float(candle.get("volumefrom", 0)),
+                "volumeTo": float(candle.get("volumeto", 0)),
+                "source": source
+            })
+
+        # Send batch as JSON string - consumer will parse it
+        message = json.dumps(batch_data)
         await env.HISTORICAL_QUEUE.send(message)
-        total_sent += 1
+        total_sent += len(batch)
 
     if total_sent > 0:
-        print(f"Queued {total_sent} candles for {symbol}")
+        print(f"Queued {total_sent} candles for {symbol} in {(len(candles) + batch_size - 1) // batch_size} batches")
 
 
 def fetch_ohlcv_cryptocompare(
