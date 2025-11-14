@@ -3,6 +3,9 @@ main = "Data_Import/historical_worker.py"
 compatibility_date = "2025-11-10"
 compatibility_flags = ["python_workers"]
 
+[vars]
+CRYPTOCOMPARE_API_KEY = "da672b9999120841fbd4427fa4550b83b5f23e017c5c03ff33bafe09064abe83"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "history"
