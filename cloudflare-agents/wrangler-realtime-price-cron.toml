@@ -26,9 +26,9 @@ crons = ["* * * * *"]  # Every minute
 #   CRYPTOCOMPARE_API_KEY - CryptoCompare API key
 #
 # Intelligent round-robin with leaky bucket algorithm:
-#   - CoinGecko: 7.5 calls/min (25% of 30)
-#   - CryptoCompare: 7.5 calls/min (25% of 30)
-#   - Binance.US: 300 weight/min (25% of 1200)
-#   - DexScreener: 75 calls/min (25% of 300)
+#   - CoinGecko: 15 calls/min (50% of 30)
+#   - CryptoCompare: 15 calls/min (50% of 30)
+#   - Binance.US: 600 weight/min (50% of 1200)
+#   - DexScreener: 150 calls/min (50% of 300)
 #
 # Chooses source with highest available capacity percentage each minute

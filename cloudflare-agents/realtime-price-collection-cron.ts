@@ -4,11 +4,11 @@
  * Runs every minute to collect current prices for all tokens
  * Uses intelligent round-robin with leaky bucket algorithm
  *
- * Rate limiting: 25% of each API's documented rate limit
- * - CoinGecko: 7.5 calls/min (25% of 30)
- * - CryptoCompare: 7.5 calls/min (25% of 30)
- * - Binance.US: 300 weight/min (25% of 1200)
- * - DexScreener: 75 calls/min (25% of 300)
+ * Rate limiting: 50% of each API's documented rate limit
+ * - CoinGecko: 15 calls/min (50% of 30)
+ * - CryptoCompare: 15 calls/min (50% of 30)
+ * - Binance.US: 600 weight/min (50% of 1200)
+ * - DexScreener: 150 calls/min (50% of 300)
  *
  * Algorithm: Choose source with highest available capacity percentage
  *
@@ -55,12 +55,12 @@ const TOKENS = [
   { symbol: 'AEROUSDT', coinId: 'aerodrome-finance' }
 ];
 
-// Rate limit buckets (25% of documented max)
+// Rate limit buckets (50% of documented max)
 const RATE_LIMIT_BUCKETS = {
-  coingecko: { capacity: 7.5, refillRate: 7.5 / 60 }, // 7.5 per minute = 0.125 per second
-  cryptocompare: { capacity: 7.5, refillRate: 7.5 / 60 },
-  binance: { capacity: 300, refillRate: 300 / 60 }, // 300 weight per minute = 5 per second
-  dexscreener: { capacity: 75, refillRate: 75 / 60 }
+  coingecko: { capacity: 15, refillRate: 15 / 60 }, // 15 per minute = 0.25 per second
+  cryptocompare: { capacity: 15, refillRate: 15 / 60 },
+  binance: { capacity: 600, refillRate: 600 / 60 }, // 600 weight per minute = 10 per second
+  dexscreener: { capacity: 150, refillRate: 150 / 60 }
 };
 
 /**
