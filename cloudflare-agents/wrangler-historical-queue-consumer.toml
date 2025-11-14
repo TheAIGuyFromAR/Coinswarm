@@ -11,8 +11,8 @@ enabled = true
 
 [[d1_databases]]
 binding = "DB"
-database_name = "coinswarm-evolution"
-database_id = "ac4629b2-8240-4378-b3e3-e5262cd9b285"
+database_name = "pyswarm-cccagg"
+database_id = "b37495a5-d7dc-4104-afab-4a9805eb5461"
 
 [[queues.consumers]]
 queue = "historical-data-queue"
