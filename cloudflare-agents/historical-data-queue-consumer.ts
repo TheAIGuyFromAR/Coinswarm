@@ -43,20 +43,32 @@ export default {
     });
   },
 
-  async queue(batch: MessageBatch<HistoricalDataPoint>, env: Env, ctx: ExecutionContext) {
+  async queue(batch: MessageBatch<HistoricalDataPoint | string>, env: Env, ctx: ExecutionContext) {
     console.log(`📥 Processing batch of ${batch.messages.length} data points`);
 
     const startTime = Date.now();
     const dataPoints: HistoricalDataPoint[] = [];
 
     // Extract all data points from messages
-    // Note: Python worker sends arrays of 10 points per message
+    // Note: Python worker may send JSON strings (due to Pyodide proxy issues) or objects
     for (const message of batch.messages) {
       const body = message.body;
-      // Handle both single points and arrays of points
-      if (Array.isArray(body)) {
+
+      // Handle JSON string (from Python worker)
+      if (typeof body === 'string') {
+        try {
+          const parsed = JSON.parse(body);
+          dataPoints.push(parsed);
+        } catch (e) {
+          console.error('Failed to parse JSON message:', e);
+        }
+      }
+      // Handle arrays of points
+      else if (Array.isArray(body)) {
         dataPoints.push(...body);
-      } else {
+      }
+      // Handle single point
+      else {
         dataPoints.push(body);
       }
     }
