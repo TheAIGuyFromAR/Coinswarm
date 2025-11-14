@@ -67,7 +67,7 @@ async def insert_candles_to_d1(env, symbol, candles, timeframe, source):
 
     # Batch candles into groups of 10 for efficient queueing
     batch_size = 10
-    messages = []
+    total_sent = 0
 
     for i in range(0, len(candles), batch_size):
         batch = candles[i:i+batch_size]
@@ -88,12 +88,12 @@ async def insert_candles_to_d1(env, symbol, candles, timeframe, source):
                 "source": source
             })
 
-        messages.append({"body": data_points})
+        # Send batch immediately to avoid Pyodide proxy lifetime issues
+        await env.HISTORICAL_QUEUE.send(data_points)
+        total_sent += len(data_points)
 
-    # Send all batches to queue
-    if messages:
-        await env.HISTORICAL_QUEUE.sendBatch(messages)
-        print(f"Queued {len(candles)} candles for {symbol} in {len(messages)} batches")
+    if total_sent > 0:
+        print(f"Queued {total_sent} candles for {symbol}")
 
 
 def fetch_ohlcv_cryptocompare(
