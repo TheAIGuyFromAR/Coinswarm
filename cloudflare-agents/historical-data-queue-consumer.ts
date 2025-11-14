@@ -34,10 +34,48 @@ interface HistoricalDataPoint {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+
+    // Add /stats endpoint to verify D1 data
+    if (url.pathname === '/stats') {
+      try {
+        const result = await env.DB.prepare(`
+          SELECT
+            COUNT(*) as total,
+            MIN(timestamp) as oldest,
+            MAX(timestamp) as newest,
+            symbol
+          FROM price_data
+          WHERE symbol = 'BTC-USDC'
+          GROUP BY symbol
+        `).first();
+
+        return new Response(JSON.stringify({
+          status: 'ok',
+          data: result,
+          oldest_date: result?.oldest ? new Date(result.oldest * 1000).toISOString() : null,
+          newest_date: result?.newest ? new Date(result.newest * 1000).toISOString() : null
+        }, null, 2), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (error: any) {
+        return new Response(JSON.stringify({
+          status: 'error',
+          error: error.message
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     return new Response(JSON.stringify({
       status: 'ok',
       message: 'Historical Data Queue Consumer is running',
-      role: 'Consumes queue messages and writes to D1 database'
+      role: 'Consumes queue messages and writes to D1 database',
+      endpoints: {
+        '/stats': 'Check BTC-USDC data in D1'
+      }
     }), {
       headers: { 'Content-Type': 'application/json' }
     });
