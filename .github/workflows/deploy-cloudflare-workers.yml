@@ -353,6 +353,7 @@ jobs:
       - name: Deploy Real-Time Price Collection Cron
         if: steps.filter.outputs.realtime-cron == 'true' || steps.filter.outputs.workflow == 'true'
         uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
